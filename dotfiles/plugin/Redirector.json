@@ -1,0 +1,74 @@
+{
+    "createdBy": "Redirector v3.5.3",
+    "createdAt": "2022-09-21T17:56:45.752Z",
+    "redirects": [
+        {
+            "description": "Mantis01",
+            "exampleUrl": "https://localtest/bf?dot=0764990",
+            "exampleResult": "https://mantis.fortinet.com/bug_view_page.php?bug_id=0764990",
+            "error": null,
+            "includePattern": "https://localtest/bf?dot=*",
+            "excludePattern": "",
+            "patternDesc": "",
+            "redirectUrl": "https://mantis.fortinet.com/bug_view_page.php?bug_id=$1",
+            "patternType": "W",
+            "processMatches": "noProcessing",
+            "disabled": false,
+            "grouped": false,
+            "appliesTo": [
+                "main_frame"
+            ]
+        },
+        {
+            "description": "Mantis",
+            "exampleUrl": "https://bf/?q=0764990",
+            "exampleResult": "https://mantis.fortinet.com/bug_view_page.php?bug_id=0764990",
+            "error": null,
+            "includePattern": "https://bf/?q=*",
+            "excludePattern": "",
+            "patternDesc": "",
+            "redirectUrl": "https://mantis.fortinet.com/bug_view_page.php?bug_id=$1",
+            "patternType": "W",
+            "processMatches": "noProcessing",
+            "disabled": false,
+            "grouped": false,
+            "appliesTo": [
+                "main_frame"
+            ]
+        },
+        {
+            "description": "PMDB",
+            "exampleUrl": "https://pm/?q=0764990",
+            "exampleResult": "https://pmdb.fortinet.com/ProjectManagement/viewDocument.php?id=0764990",
+            "error": null,
+            "includePattern": "https://pm/?q=*",
+            "excludePattern": "",
+            "patternDesc": "",
+            "redirectUrl": "https://pmdb.fortinet.com/ProjectManagement/viewDocument.php?id=$1",
+            "patternType": "W",
+            "processMatches": "noProcessing",
+            "disabled": false,
+            "grouped": false,
+            "appliesTo": [
+                "main_frame"
+            ]
+        },
+        {
+            "description": "QATask",
+            "exampleUrl": "https://t/?q=0764990",
+            "exampleResult": "https://phab.corp.fortinet.com/T0764990",
+            "error": null,
+            "includePattern": "https://t/?q=*",
+            "excludePattern": "",
+            "patternDesc": "",
+            "redirectUrl": "https://phab.corp.fortinet.com/T$1",
+            "patternType": "W",
+            "processMatches": "noProcessing",
+            "disabled": false,
+            "grouped": false,
+            "appliesTo": [
+                "main_frame"
+            ]
+        }
+    ]
+}

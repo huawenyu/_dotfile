@@ -1,0 +1,13 @@
+#!/bin/bash
+# 1. Download umlgraph from http://www.umlgraph.org/
+# 2. Install JDK, then copy tools.jar to umlgraph's lib dir
+#    $ cp /usr/java/jdk1.7.0_51/lib/tools.jar UMLGraph-5.6_6.6-SNAPSHOT/lib/.
+# 3. OK!
+if [ $# -ne 1 ]; then
+	echo 'usage: uml <file>'
+	exit
+fi
+
+file="$1"
+rm -f /tmp/uml.png
+cat $file | java -jar ~/script/conf/plantuml.jar -pipe -tutxt > /tmp/uml.txt

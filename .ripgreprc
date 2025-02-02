@@ -1,0 +1,56 @@
+# We can define type here, then give option in command line:
+#    only search type by `-t`,
+#    not search the type by `-T`.
+
+# Don't let ripgrep vomit really long lines to my terminal, and show a preview.
+--max-columns=250
+--max-columns-preview
+
+# Add my types.
+--type-add
+web:*.{html,css,js}*
+
+--type-add
+conf:*.{json,conf,log,diff,ini}*
+
+--type-add
+c:c,h
+
+--type-add
+wiki:wiki,md,sh
+
+# Using glob patterns to include/exclude files or folders
+--glob=!fpx-sync/*
+--glob=!git/*
+--glob=!.ccls-cache/*
+--glob=!patch.*
+--glob=!*.patch
+--glob=!log.*
+--glob=!*.log
+--glob=!cscope.*.out
+--glob=!cscope.out
+--glob=!.cscope.files
+#--glob=cscope.vim
+--glob=!tags
+--glob=!tagx
+--glob=!.tags
+--glob=!.tagx
+--glob=!*.orig
+--glob=!*.rej
+--glob=!compile_commands.json
+--glob=!init.map
+
+# Python ignore
+--glob=!__pycache__/*
+--glob=!*.pyc
+
+# Set the colors.
+--colors=line:none
+--colors=line:style:bold
+
+# Because who cares about case!?
+--smart-case
+--no-heading
+--line-number
+--sort-files
+

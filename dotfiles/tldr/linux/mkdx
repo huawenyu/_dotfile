@@ -1,0 +1,13 @@
+// vim: set ft=python:
+
+# Shortcut:
+Set prefix=;
+  prefix i        Insert/update TOC
+  prefix I        Load TOC to quickfix
+  prefix ,        Convert CSV to table
+  ge              Jump #link
+  prefix '        Toggle Quote
+  prefix ln       Toggle Link
+  prefix /b`s     Toggle italic/bold/code/strike
+List:
+  shift+enter     Support multi-line list

@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+### First time create a new dotfile:
+# curl -Lks https://github.com/huawenyu/_dotfile/blob/ubuntu/script/dot-init | /bin/bash
+#
+curDir=$(pwd)
+git init --bare  "$HOME/.dotfile"
+alias dot='/usr/bin/git  --git-dir=$HOME/.dotfile/  --work-tree=$HOME'
+dot config --local status.showUntrackedFiles no
+
+echo "Please create your dotfile repo, then enter the web-URL:"
+read webURL
+dot remote add origin  "$webURL"
+
+[ -f "$HOME/.bashrc" ] && echo "alias dot='/usr/bin/git  --git-dir=$HOME/.dotfile/  --work-tree=$HOME'" >> $HOME/.bashrc
+[ -f "$HOME/.zshrc"  ] && echo "alias dot='/usr/bin/git  --git-dir=$HOME/.dotfile/  --work-tree=$HOME'" >> $HOME/.zshrc
+

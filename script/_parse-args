@@ -1,0 +1,193 @@
+# vim: ft=zsh
+# vim: set copyindent preserveindent et sts=0 sw=4 ts=4 :
+#
+# https://stackoverflow.com/questions/192249/how-do-i-parse-command-line-arguments-in-bash
+# Normalize arguments cross all local script
+#
+# parse-args -e conf -s /etc /etc/hosts
+#       FILE EXTENSION  = conf
+#       SEARCH PATH     = /etc
+#       DEFAULT         =
+#       Number files in SEARCH PATH with EXTENSION: 14
+#       Last line of file specified as non-opt/last argument:
+#       #93.184.216.34    example.com
+#
+_ZT_ARGS_Positional=()
+
+# set default value
+_ZT_ARGS_Help=false
+_ZT_ARGS_Verbose=false
+_ZT_ARGS_Verbose2=false
+_ZT_ARGS_Version=false
+_ZT_ARGS_Default=false
+_ZT_ARGS_Confirm=false
+_ZT_ARGS_Dryrun=false
+_ZT_ARGS_Quiet=false
+_ZT_ARGS_Test=false
+#
+#https://serverfault.com/questions/245774/perform-rsync-while-following-sym-links
+_ZT_ARGS_FollowLink=false     # The -L flag to rsync will sync the contents of files or directories linked to, rather than the symbolic link.
+_ZT_ARGS_KeepLink=false       # need both -L and -K if you have symlinks on both sides, e.g. you already had your 1st rsync done and want to update the backup using rsync.
+
+_ZT_ARGS_Action='default'
+_ZT_ARGS_File=""
+_ZT_ARGS_Msg="none"
+_ZT_ARGS_Src=""     # src-file/src-dir/from-Addr 192.168.122.10
+_ZT_ARGS_Dst=""     # dst-file/dst-dir/to-Addr 192.168.122.10
+_ZT_ARGS_Host=""    # IP-Addr 192.168.122.10
+_ZT_ARGS_Port=""    # Host.port
+_ZT_ARGS_Local=""   # Listen on local: 0.0.0.0:8080
+_ZT_ARGS_ProxyPort=""   # 192.168.122.10:8080
+_ZT_ARGS_UserPwd=""     # user123:password123
+
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -h|--help)
+      _ZT_ARGS_Help=true
+      shift # past argument, usage: if [ "$_ZT_ARGS_Verbose" = true ] ; then
+      ;;
+    -V|--version)
+      _ZT_ARGS_Version=true
+      shift # past argument
+      ;;
+    -L|--copy-links)
+      _ZT_ARGS_FollowLink=true
+      shift # past argument
+      ;;
+    -K|--keep-dirlinks)
+      _ZT_ARGS_KeepLink=true
+      shift # past argument
+      ;;
+    -a|--action)
+      _ZT_ARGS_Action="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -f|--file)
+      _ZT_ARGS_File="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -m|--message)
+      _ZT_ARGS_Msg="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -s|--src)
+      _ZT_ARGS_Src="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -d|--dst)
+      _ZT_ARGS_Dst="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -H|--host)
+      _ZT_ARGS_Host="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -p|--port)
+      _ZT_ARGS_Port="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -l|--local)
+      _ZT_ARGS_Local="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -x|--proxy)
+      _ZT_ARGS_ProxyPort="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -u|--user)
+      _ZT_ARGS_UserPwd="$2"
+      shift # past argument
+      shift # past value
+      ;;
+    -n|--dryrun)
+      _ZT_ARGS_Dryrun=true
+      shift # past argument
+      ;;
+    -i|--confirm)
+      _ZT_ARGS_Confirm=true
+      shift # past argument
+      ;;
+    -q|--quiet)
+      _ZT_ARGS_Quiet=true
+      shift # past argument
+      ;;
+    -t|--test)
+      _ZT_ARGS_Test=true
+      shift # past argument
+      ;;
+    -vv|-vvv)
+      _ZT_ARGS_Verbose2=true
+      shift # past argument
+      ;;
+    -v|--verbose)
+      _ZT_ARGS_Verbose=true
+      shift # past argument, usage: if [ "$_ZT_ARGS_Verbose" = true ] ; then
+      ;;
+    --default)
+      _ZT_ARGS_Default=true
+      shift # past argument
+      ;;
+    -*|--*)
+      echo "Unknown option $1"
+      exit 1
+      ;;
+    *)
+      _ZT_ARGS_Positional+=("$1") # save positional arg
+      shift # past argument
+      ;;
+  esac
+done
+
+#set -- "${_ZT_ARGS_Positional[@]}" # restore positional parameters
+
+if [ "$_ZT_ARGS_Verbose2" = true ] || [ "$_ZT_ARGS_Help" = true ] ; then
+    echo "  Option -h help/usage, -v verbose, -vv dump-args, -V version"
+    echo "         -a action/model, -m message -i confirm, -n dryrun, -k number, -q quiet, -t test"
+    echo "         -s src/scope, -d dst/directory, -f file, -p port, -h host, -x proxy, -u UserPwd"
+    echo ""
+    echo "    _ZT_ARGS_Help        = ${_ZT_ARGS_Help}"
+    echo "    _ZT_ARGS_Version     = ${_ZT_ARGS_Version}"
+    echo "    _ZT_ARGS_Verbose     = ${_ZT_ARGS_Verbose}"
+    echo "    _ZT_ARGS_Verbose2    = ${_ZT_ARGS_Verbose2}"
+    echo "    _ZT_ARGS_Default     = ${_ZT_ARGS_Default}"
+    echo "    _ZT_ARGS_Dryrun      = ${_ZT_ARGS_Dryrun}"
+    echo "    _ZT_ARGS_Confirm     = ${_ZT_ARGS_Confirm}"
+    echo "    _ZT_ARGS_Quiet       = ${_ZT_ARGS_Quiet}"
+    echo "    _ZT_ARGS_Test        = ${_ZT_ARGS_Test}"
+    echo "    _ZT_ARGS_Action      = ${_ZT_ARGS_Action}"
+    echo "    _ZT_ARGS_File        = ${_ZT_ARGS_File}"
+    echo "    _ZT_ARGS_Msg         = ${_ZT_ARGS_Msg}"
+    echo "    _ZT_ARGS_Src         = ${_ZT_ARGS_Src}"
+    echo "    _ZT_ARGS_Dst         = ${_ZT_ARGS_Dst}"
+    echo "    _ZT_ARGS_Host        = ${_ZT_ARGS_Host}"
+    echo "    _ZT_ARGS_Port        = ${_ZT_ARGS_Port}"
+    echo "    _ZT_ARGS_Local       = ${_ZT_ARGS_Local}"
+    echo "    _ZT_ARGS_ProxyPort   = ${_ZT_ARGS_ProxyPort}"
+    echo "    _ZT_ARGS_UserPwd     = ${_ZT_ARGS_UserPwd}"
+    echo ""
+    echo "  See Also: tagme, syncme, t-*, t-work, ftp-*, smb-*, chk-*, checkhealth, Bear, bear-me"
+fi
+
+if [ ${_ZT_ARGS_Help} = true ] ; then
+    _do-echo "${_ZT_ARGS_Usage}"
+    return 1
+fi
+
+#echo "Number files in SEARCH PATH with EXTENSION:" $(ls -1 "${SEARCHPATH}"/*."${EXTENSION}" | wc -l)
+#
+#if [[ -n $1 ]]; then
+#    echo "Last line of file specified as non-opt/last argument:"
+#    tail -1 "$1"
+#fi
+
+

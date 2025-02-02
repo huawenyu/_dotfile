@@ -1,0 +1,11 @@
+# vim: ft=zsh
+# vim: set copyindent preserveindent et sts=0 sw=4 ts=4 :
+#
+
+if is-callable boxes; then
+    echo "$*" | boxes
+else
+    #echo "[plugin:zsh-local] Better 'boxes': sudo apt install boxes"
+    echo "$*"
+fi
+

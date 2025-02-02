@@ -1,0 +1,93 @@
+[user]
+	name = Huawen Yu
+	email = hyu@fortinet.com
+[core]
+	excludesfile = ~/.gitignore_global
+	editor = vim
+#[format]
+#	pretty = format:%h %ad %s(%an)
+[log]
+	date = short
+[github]
+	user = huawenyu
+[alias]
+	log0  = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cd) %C(bold yellow)(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=short
+	log1  = log --color --no-walk --tags --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cd) %C(bold yellow)(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=short
+
+	log00  = log --first-parent --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cd) %C(bold yellow)(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=short
+	log4  = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative --shortstat
+	log5  = log --graph --abbrev-commit --decorate --date=short --format=format:'%C(bold blue)%h%C(reset) %ad %C(white)%s%C(reset) %C(dim white)%C(cyan)(%an)%C(reset)%C(reset)%C(bold yellow)%d%C(reset)' --all
+	log6  = log --graph --abbrev-commit --decorate --format=format:'%C(bold blue)%h%C(reset) - %C(bold cyan)%aD%C(reset) %C(bold green)(%ar)%C(reset)%C(bold yellow)%d%C(reset)%n %C(white)%s%C(reset) %C(dim white)- %an%C(reset)' --all
+	log7  = log --format=format:"%H" --shortstat
+	# But too slow: git-foresta --all --style=10 | less -RSX
+	#   Foresta: https://github.com/takaaki-kasai/git-foresta
+	#       Install: curl -L https://github.com/takaaki-kasai/git-foresta/raw/master/git-foresta -o ~/bin/git-foresta && chmod +x ~/bin/git-foresta
+	message = show -s --format=%B
+	#tree  = foresta --all --style=10
+	tree  = log --graph --decorate --oneline --all
+
+	tree2 = log --graph --decorate --pretty=oneline --abbrev-commit
+	tree3 = "forest --pretty=format:'%C(red)%h %C(magenta)(%ar) %C(blue)%an %C(reset)%s' --style=15 --reverse"
+	tree4 = "forest --pretty=format:'%C(bold blue)%h%C(reset) %ad %C(white)%s%C(reset) %C(dim white)%C(cyan)(%an)%C(reset)%C(reset)%C(bold yellow)%d%C(reset)' --style=15 --reverse"
+	#d = difftool
+	#dt = "!f() { vim -p $(git diff --name-only) +\"tabdo Gvdiff $@\" +tabfirst; }; f"
+	#vimdiff = "!f() { vim -p $(git diff --name-only) +\"tabdo Gvdiff $@\" +tabfirst; }; f"
+
+	#parent = "!git show-branch 2>&1 | grep '*' | grep -v 'warning: ' | grep -v \"$(git rev-parse --abbrev-ref HEAD)\" | head -n1 | sed 's/.*\\[\\(.*\\)\\].*/\\1/' | sed 's/[\\^~].*//' #"
+	parent = "!git show-branch 2>/dev/null | grep '!' | grep -v \"$(git rev-parse --abbrev-ref HEAD)\" | tail -n1 | sed 's/.*\\[\\(.*\\)\\].*/\\1/' | sed 's/[\\^~].*//' #"
+
+    # list aliases
+    la = "!git config -l | grep alias | cut -c 7-"
+
+	# https://stackoverflow.com/questions/3321492/git-alias-with-positional-parameters
+	ls  = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cd) %C(bold yellow)(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=short
+	# https://jay.gooby.org/2021/07/13/positional-arguments-in-git-aliases
+	mantis = "!f() { \
+		git log $@ | awk 'BEGIN{text=\"\"} /^\\s*$/{next} /^commit/{one=0} /^Author: /{one=1; text=$0; next} /^Date: /{text = $2 \"  \" text; print text; next} /^    Problem Description:/{one=0} /^    Description:/{one=0} !/^    Purpose: /{ if (one==1) {print $0} } /^    Mantis: /{one=0} '; \
+		}; f"
+
+
+	# Git subtree if just use third-part repo, but no push request
+	#   git st-add <remote-repo> [<branch-name>]
+	st-add = "!f() { \
+		DEFAULT_BRANCH=master; \
+		DEFAULT_DIR=$(basename $1 | cut -d. -f1); \
+		git subtree add --prefix $DEFAULT_DIR $1 ${2:-$DEFAULT_BRANCH} --squash; \
+		}; f"
+	st-pull = "!f() { \
+		DEFAULT_BRANCH=master; \
+		DEFAULT_DIR=$(basename $1 | cut -d. -f1); \
+		git subtree pull --prefix $DEFAULT_DIR $1 ${2:-$DEFAULT_BRANCH} --squash; \
+		}; f"
+	st-push = "!f() { \
+		DEFAULT_BRANCH=master; \
+		DEFAULT_DIR=$(basename $1 | cut -d. -f1); \
+		git subtree push --prefix $DEFAULT_DIR $1 ${2:-$DEFAULT_BRANCH}; \
+		}; f"
+	vimdiff = "!f() { vim -p $(git diff --name-only) +\"tabdo Gvdiff $@\" +tabfirst; }; f"
+
+[credential]
+	helper = store
+[pack]
+	windowMemory = 100m
+	SizeLimit = 100m
+	threads = 1
+	window = 0
+[http]
+	sslVerify = true
+[gitreview]
+	remote = origin
+	username = Yu,Huawen(Wilson)
+[commit]
+	template = ~/.gitmessage
+[pull]
+	ff = only
+[init]
+	defaultBranch = local
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+[safe]
+	directory = /ssd/proj/linux

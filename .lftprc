@@ -1,0 +1,17 @@
+# see full protocal debug info
+debug 3
+# if the ftp site use GBK char set
+# set ftp:charset GBK
+# the local is UTF-8 char set 
+set file:charset UTF-8
+# only 1 concurrent connection to one site 
+set net:connection-limit 1
+# net work protocal timeout
+set net:timeout 10
+# base interval time between reconnects
+set net:reconnect-interval-base 6
+# by which the interval-base is multiplied 
+set net:reconnect-interval-multiplier 1
+
+# not try to negotiate SSL connection with ftp server
+set ftp:ssl-allow false

@@ -1,0 +1,70 @@
+// vim: ft=markdown:
+
+```vim
+let g:Animal={}
+func g:Animal.new(typicalSound, name)
+    let ani = copy(self)
+    let ani.typicalSound = a:typicalSound
+    let ani.name = a:name
+    let ani.super = ani
+    return ani
+endfu
+
+func g:Animal.sayName()
+    echo self.typicalSound..', I am '..self.name
+endfu
+
+func g:Animal.walk()
+    echo self.name..' Animal::walks'
+endfu
+
+
+let g:Dog={}
+func g:Dog.new(name)
+    let dog = extend(copy(self), g:Animal.new('Wuff', a:name), 'keep')
+    return dog
+endfu
+
+func g:Dog.walk()
+    echo self.super.walk()
+    echo self.name..' Dog::walks'
+endf
+
+
+
+let g:Cat={}
+func g:Cat.new(name)
+    let cat = copy(self)
+    call extend(cat, g:Animal.new('Meow', a:name), 'keep')
+    return cat
+endfu
+
+
+func g:Cat.walk()
+    echo self.super.walk()
+    echo self.name..' Cat::walks'
+endf
+
+
+let s:animal1 = g:Dog.new('Charlie')
+let s:animal2 = g:Cat.new('Misty')
+let s:animal3 = g:Dog.new('Daisy'  )
+
+
+call s:animal1.sayName()
+call s:animal1.walk()
+" 
+" Wuff, I am Charlie
+
+
+call s:animal2.sayName()
+call s:animal2.walk()
+"
+" Meow, I am Misty
+
+
+call s:animal3.sayName()
+call s:animal3.walk()
+"
+" Wuff, I am Daisy
+```

@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# Share your current tmux session with other users easily and securely
+#
+# Author: Michal Sojka <michal.sojka@cvut.cz>
+#
+help() {
+    cat <<EOF
+Usage: tmux-share <user>
+       tmux-share -x
+Share current tmux session with another user.
+  <user>  the user to share with
+  -x      disable sharing and disconnect all other clients
+EOF
+}
+
+set -e
+
+: ${TMUX:?Error: This must be run from within tmux}
+
+socket_path=$(tmux display-message -p -F '#{socket_path}')
+session_name=$(tmux display-message -p -F '#{session_name}')
+: ${socket_path:?Cannot determine tmux socket path}
+
+case "$1" in
+    ""|-h|--help)
+	help
+	exit 1
+	;;
+    -x)
+	sudo setfacl --remove-all "${socket_path}"
+	sudo setfacl --remove-all "${socket_path%/*}"
+	tmux detach-client -a	# Detach all other clients
+	echo >&2 "Unshared"
+	exit 0
+	;;
+    *)
+	guest_user=${1:?No user specified}
+	id "$guest_user" > /dev/null
+	sudo setfacl -m u:"$guest_user":rw "${socket_path}"
+	sudo setfacl -m u:"$guest_user":rX "${socket_path%/*}"
+	tmux server-access -a "$guest_user" || true
+	;;
+esac
+
+attach_cmd="tmux -S $(printf %s "$socket_path") attach -t $(printf %s "$session_name")"
+
+cat <<EOF
+Now, $guest_user can attach your session by running:
+
+    $attach_cmd
+
+Append "-r" for read-only access.
+EOF
+
+write "$guest_user" <<EOF || :
+You can attach $USER's session by running:
+    $attach_cmd
+  Append "-r" for read-only access.
+
+EOF
+

@@ -1,0 +1,150 @@
+! vim: set filetype=xdefaults :
+!
+! Ubuntu: solve vim 256 color
+! sudo apt-get install rxvt-unicode-256color
+! Ref: https://github.com/sickill/dotfiles/blob/master/.Xdefaults
+! Check current config:
+!	xrdb -query | grep -i urxvt
+! Reload config:
+!	xrdb -load ~/.Xresources
+!
+URxvt*transparent : false
+URxvt.cursorBlink : false
+
+URxvt*perl-ext:
+!URxvt.perl-ext-common: default,keyboard-select,url-select,confirm-paste,clipboard,selection-to-clipboard,font-size
+URxvt.perl-ext-common: default,clipboard,selection-to-clipboard
+
+!URxvt*cutchars: "`^&,;=?@<>()[]{}\│\|\'\"\\~?`¬|│ "
+URxvt*cutchars: "`^&,;=?@<>()[]{}\│\|\'\"\\"
+
+!!! Change font size on Control-Plus/Minus
+!URxvt.keysym.Control-0x2b: perl:font-size:increase
+!URxvt.keysym.Control-0x2d: perl:font-size:decrease
+!
+!!! Yeah, I am one of those, who use these keys in Vim :-(
+urxvt.keysym.Home:          \033[1~
+urxvt.keysym.End:           \033[4~
+!urxvt.keysym.Control-Up:    \033[1;5A
+!urxvt.keysym.Control-Down:  \033[1;5B
+!urxvt.keysym.Control-Left:  \033[1;5D
+!urxvt.keysym.Control-Right: \033[1;5C
+
+
+!URxvt.keysym.M-x           : perl:keyboard-select:activate
+!URxvt.keysym.M-u           : perl:url-select:select_next
+!URxvt.keysym.M-c           : perl:clipboard:copy
+!URxvt.keysym.M-v           : perl:clipboard:paste
+!URxvt.keysym.M-s           : perl:keyboard-select:search
+!URxvt.keysym.M-C-v         : perl:clipboard:paste_escaped
+!URxvt.url-select.launcher  : firefox
+!URxvt.url-select.autocopy  : true
+!URxvt.url-select.underline : true
+URxvt.selection-autotransform.0: s/^([^:[:space:]]+):(\\d+):?$/+$2 \\Q$1\\E/
+
+! https://github.com/majutsushi/urxvt-font-size
+URxvt.keysym.C-equal:     perl:font-size:increase
+URxvt.keysym.C-minus:     perl:font-size:decrease
+
+!! Install-Font: sudo apt-get install -y fonts-wqy-microhei
+!!@ver1 Wilson For Dell-24, size=18; Dell-27, size=16;
+!URxvt.font        : xft:Liberation Mono:pixelsize=18:antialias=true:hinting=true
+!URxvt.boldfont    : xft:Liberation Mono:bold:pixelsize=18:antialias=true:hinting=true
+!!@ver2: resolve the chinese display
+!URxvt.font         : xft:DejaVu Sans Mono:pixelsize=16:antialias=true,             xft:WenQuanYi Bitmap Song:pixelsize=18:antialias=true
+!URxvt.boldFont     : xft:DejaVu Sans Mono:pixelsize=16:style=Bold:antialias=true,  xft:WenQuanYi Bitmap Song:pixelsize=18:style=Bold:antialias=true
+!!@ver3 we can offer multiple-font here: chinese font append tail
+!URxvt.font        : xft:DejaVu Sans Mono:pixelsize=16:antialias=true,                            xft:WenQuanYi Micro Hei Mono:style=Regular:pixelsize=18:antialias=true
+!URxvt.boldFont    : xft:DejaVu Sans Mono:pixelsize=16:weight=bold:antialias=true,                xft:WenQuanYi Micro Hei Mono:pixelsize=18:style=Bold:antialias=true
+!!@ver4   Sumsung-32, size=15
+URxvt.font        : xft:DejaVu Sans Mono:pixelsize=15,                            xft:WenQuanYi Micro Hei Mono:style=Regular:pixelsize=18:antialias=true
+URxvt.boldFont    : xft:DejaVu Sans Mono:pixelsize=15:weight=bold,                xft:WenQuanYi Micro Hei Mono:pixelsize=18:style=Bold:antialias=true
+!!@ver5   Dell-43, size=18
+URxvt.font        : xft:DejaVu Sans Mono:pixelsize=18,                            xft:WenQuanYi Micro Hei Mono:style=Regular:pixelsize=18:antialias=true
+URxvt.boldFont    : xft:DejaVu Sans Mono:pixelsize=18:weight=bold,                xft:WenQuanYi Micro Hei Mono:pixelsize=18:style=Bold:antialias=true
+
+URxvt.termName    : screen-256color
+URxvt.iso14755    : false
+URxvt.letterSpace : -1
+
+URxvt.urgentOnBell: true
+
+!! Using tmux as history
+!URxvt.saveLines  : 12000
+URxvt.saveLines   : 1
+URxvt.scrollBar   : false
+URxvt.scrollstyle : rxvt
+
+! XFT
+Xft.dpi: 96
+Xft.lcdfilter : lcddefault
+Xft.hintstyle : hintslight
+Xft.hinting   : true
+Xft.antialias : true
+Xft.rgba      : rgb
+Xft.autohint  : 0
+
+xpdf*antialias: yes
+xpdf*background: white
+xpdf*enableFreetype: yes
+xpdf*foreground: black
+xpdf*urlCommand: chromium %s
+
+!Fading
+!URxvt.fading    : 50
+!URxvt.fadeColor : #29303a
+!URxvt.fading: 15
+URxvt.intensityStyles: true
+URxvt.jumpScroll: True
+!URxvt.shading: 20
+URxvt.skipBuiltinGlyphs: true
+URxvt.xftAntialias: true
+
+!! Themes
+!! grey
+!URxvt*cursorColor:    #d0d0d0
+!! color yellow
+URxvt*cursorColor:    #ffff00
+
+URxvt*colorMode:      on
+URxvt*dynamicColors:  on
+URxvt*colorULMode:    on
+URxvt*underLine:      off
+URxvt*colorBDMode:    on
+
+URxvt*background:     #000000
+URxvt*foreground:     #9f9f9f
+URxvt*color0:         #000000
+URxvt*color1:         #9e1828
+URxvt*color2:         #aece92
+URxvt*color3:         #968a38
+URxvt*color4:         #414171
+URxvt*color5:         #963c59
+URxvt*color6:         #418179
+URxvt*color7:         #bebebe
+URxvt*color8:         #666666
+URxvt*color9:         #cf6171
+URxvt*color10:        #c5f779
+URxvt*color11:        #fff796
+URxvt*color12:        #4186be
+URxvt*color13:        #cf9ebe
+URxvt*color14:        #71bebe
+URxvt*color15:        #ffffff
+
+URxvt.color0: rgb:00/00/00
+URxvt.color1: rgb:CC/00/00
+URxvt.color2: rgb:4E/9A/06
+URxvt.color3: rgb:C4/A0/00
+URxvt.color4: rgb:34/65/A4
+URxvt.color5: rgb:75/50/7B
+URxvt.color6: rgb:06/98/9A
+URxvt.color7: rgb:D3/D7/CF
+URxvt.color8: rgb:55/57/53
+URxvt.color9: rgb:EF/29/29
+URxvt.color10: rgb:8A/E2/34
+URxvt.color11: rgb:FC/E9/4F
+URxvt.color12: rgb:72/9F/CF
+URxvt.color13: rgb:AD/7F/A8
+URxvt.color14: rgb:34/E2/E2
+URxvt.color15: rgb:EE/EE/EC
+URxvt.colorBD: rgb:ff/ff/ff

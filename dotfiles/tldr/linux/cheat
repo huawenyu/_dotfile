@@ -1,0 +1,49 @@
+// vim: set ft=markdown:
+
+# QuickStart
+
+Install:
+--------
+Our self + public command helper
+
+Don't use python version: pip3 install --user cheat
+	This python version not work good
+
+Please install go version:
+	Download the bin-file directly from [releases](https://github.com/cheat/cheat/releases)
+
+Config:
+-------
+
+Set env VAR to told config to cheat:
+
+	export CHEAT_CONFIG_PATH="~/.conf.yml"
+
+And the config file like:
+
+	$ cat ~/.conf.yml
+```yaml
+# Cheat config file conf.yml:
+cheatpaths:
+  - name: personal
+    path: ~/cheat1             # this is a separate directory and repository than above
+    tags: [ personal ]
+    readonly: false                   # new sheets may be written here
+
+  - name: wiki
+    path: ~/cheat2               # this is a separate directory and repository than above
+    tags: [ wiki ]
+    readonly: false                   # new sheets may be written here
+
+  - name: community                   # a name for the cheatpath
+    path: ~/Documents/cheatsheets     # the path's location on the filesystem
+    tags: [ community ]               # these tags will be applied to all sheets on the path
+    readonly: true                    # if true, `cheat` will not create new cheatsheets here
+```
+
+Shell completion:
+---------------
+
+Copy the relevant [completion script](https://github.com/cheat/cheat/tree/master/scripts)
+  into the appropriate directory 
+

@@ -1,0 +1,19 @@
+// vim: set ft=vim:
+
+https://blog.carbonfive.com/vim-text-objects-the-definitive-guide/
+Built-in Text Objects:  words, sentences and paragraphs, with 'a' include-surrounding, and exclude with 'i'.
+  Format: [<number>]<command><text-object or motion>
+    <command>: (c)hange, (d)elete(cut), or (y)ank(copy)
+      aw/iw   Word by punctuation
+      aW/iW   Word by whitespace  (see :help WORD)
+      as/is   Sentence
+      ap/ip   Paragraph
+      a"/i"   Quotes
+      a)/i)   Parentheses
+      a]/i]   Brackets
+      a}/i}   Braces
+      a>/i>   Angle Brackets
+      at/it   Tags (e.g. <html>inner</html>)
+
+      vah     vimwiki
+

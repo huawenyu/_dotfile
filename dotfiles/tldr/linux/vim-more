@@ -1,0 +1,41 @@
+
+
+1. Auto-Setup-IDE-without-Plugs:
+      $ nvim -u ~/.vimrc
+2. Hi, the <leader> is <space> and ',' :)
+      let mapleader = ","
+      nmap <space> <leader>
+      Check map: verbose map <leader>f, verboser map ;
+3. Help: press 'K'
+   When focus a plug's name, for example, please move cursor to following line, then press 'K':
+      @note:nvim
+      @note:test-vim
+4. Start slow troubleshooting:
+      $ vi --startuptime /tmp/log.1
+5. Displaying the current Vim environment
+      @note:vim_runtime
+6. Remote-mode:
+      NVIM_LISTEN_ADDRESS=/tmp/nvim.gdb vi
+      mode=basic NVIM_LISTEN_ADDRESS=/tmp/nvim.trace nvim
+7. Options for .vimrc from env command-line:
+      mode=basic vi <file>
+      debugger=vimspector vi <file>
+      debugger=vimdgb vi <file>
+      debugger=1 vi <file>
+8. MACRO, suppose recorded the macro into register q by qq, then we can change the macro like:
+      "qp    paste the contents of the register to the current cursor position
+      I      enter insert mode at the begging of the pasted line
+      ^      add the missing motion to return to the front of the line
+      <c-[>  return to visual mode
+      "qyy   yank this new modified macro back into the q register
+
+9. @note:troubleshooting
+      1. some myself plugin support s:log.debug feature:
+         - debug=1 vi <file>
+         - tail -f /tmp/vim.log
+      2. only load some plugin:
+         - let g:vim_confi_option.mode = ['test']
+         - Example: $ mode=test vi file.txt
+10. If two plugin is alternatives, choose the preceder one, like: AlterPlug('vista.vim')
+11. [Neovim 0.5 features and the switch to init.lua](https://oroques.dev/notes/neovim-init/)
+    [Learn X in Y minutes](https://learnxinyminutes.com/docs/lua/)

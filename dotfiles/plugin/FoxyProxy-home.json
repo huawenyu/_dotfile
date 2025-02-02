@@ -1,0 +1,57 @@
+{
+  "logging": {
+    "size": 100,
+    "active": false
+  },
+  "pzih31646415439329": {
+    "type": 3,
+    "color": "#66cc66",
+    "title": "Local2Work",
+    "active": true,
+    "address": "127.0.0.1",
+    "port": 9080,
+    "proxyDNS": false,
+    "username": "",
+    "password": "",
+    "whitePatterns": [
+      {
+        "title": "all URLs",
+        "active": true,
+        "pattern": "*",
+        "type": 1,
+        "protocols": 1
+      }
+    ],
+    "blackPatterns": [],
+    "pacURL": "",
+    "index": -1
+  },
+  "gkjm41646415463046": {
+    "type": 3,
+    "color": "#66cc66",
+    "title": "Local2Client",
+    "active": true,
+    "address": "127.0.0.1",
+    "port": 9090,
+    "proxyDNS": false,
+    "username": "",
+    "password": "",
+    "whitePatterns": [
+      {
+        "title": "all URLs",
+        "active": true,
+        "pattern": "*",
+        "type": 1,
+        "protocols": 1
+      }
+    ],
+    "blackPatterns": [],
+    "pacURL": "",
+    "index": -2
+  },
+  "mode": "disabled",
+  "browserVersion": "105.0.3",
+  "foxyProxyVersion": "7.5.1",
+  "foxyProxyEdition": "standard",
+  "sync": true
+}

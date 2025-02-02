@@ -1,0 +1,19 @@
+---
+# Run command to panes
+# List of windows
+windows:
+  - win-console:            # Name of the window
+      panes:                # List of panes
+        - client:
+          - keys: Enter
+        - server:
+          - keys: Enter
+        - fgt-left:
+          - keys: Enter
+        - fgt-right:
+          - keys: Enter
+        - cmdssh-left:
+          - keys: Enter
+        - cmdssh-right:
+          - keys: Enter
+

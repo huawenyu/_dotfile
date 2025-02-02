@@ -1,0 +1,51 @@
+#!/usr/bin/expect -f
+
+# Usage:
+# - Login dut1
+# - get pid of the-'process'
+# - then start gdbserver listen on 444
+# - at the same time, send tmux-pane 'Gef' to target remote
+#
+# dut_ctl.exp --dut dut1 --prompt 'dut1 (.*)#' --action "gdb" --gdb "Gef" --process "worker"
+#
+set _inner_spath [ file dirname [ file normalize [ info script ] ] ]
+set _inner_toolname [file tail [ file normalize [ info script ] ] ]
+
+source $_inner_spath/lib/get_opts.exp
+source $_inner_spath/lib/connect.exp
+
+parse_arguments "$_inner_toolname"
+
+set ret [connect]
+dbg 3  "Connect=$ret"
+if { $ret != 0 } {
+    dbg 3  "ToolCmdFail: Connect fail!"
+    exit
+}
+
+set ret [Get_pid_by_process_type]
+dbg 3  "Get_pid_by_process_type=$ret"
+if { $ret != 0 } {
+    dbg 3  "ToolCmdFail: Get_pid_by_process_type()!"
+    exit
+}
+
+set ret [Gdbserver_by_pid]
+dbg 3  "Gdbserver_by_pid=$ret"
+if { $ret != 0 } {
+    dbg 3  "ToolCmdFail: Gdbserver_by_pid() fail!"
+    exit
+}
+dbg 3  "ToolCmdSucc: Gdbserver_by_pid() Succ!"
+
+
+set pane_id [Tmux_pane_title2id $runCtx(tool,GDB)]
+if {$pane_id ne ""} {
+    puts "Pane ID for title '$runCtx(tool,GDB)' is: $pane_id"
+    Tmux_send_keys  "$pane_id"  "help remote-listening"
+}
+
+
+# Keep and handle over the connection to customer:
+interact
+

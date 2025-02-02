@@ -1,0 +1,519 @@
+#!/usr/bin/env bash
+#
+# Debug
+#set -x
+#
+SECONDS=0
+scriptDir=$(dirname $0)
+currDir=$(/usr/bin/pwd)
+
+# Change work dir to git-toplevel:
+# - if git-repo, the git-toplevel is the work dir
+# - others, it's current directory
+workDir=$(git rev-parse --show-toplevel 2>/dev/null)
+RESULT=$?
+if [ $RESULT -eq 0 ]; then
+    cd $workDir
+else
+    workDir=${currDir}
+fi
+
+_ZT_ARGS_Usage=$(cat <<-END
+    Generating tags and cscope database...
+
+    Sample:
+      tagme
+      tagme -a pull     ### Pull dev-git-dir 'compile_commands.json' from store-server
+      tagme -a push     ### Push dev-git-dir 'compile_commands.json' to store-server
+
+      tagme -a wiki     ### create .tags into HOME accross multiple wiki dirs
+      tagme -a md       ### markdown tag
+      tagme -a link
+      tagme -a save
+      tagme -a clean
+      tagme -f tag-update-file
+END
+)
+
+if ! source ${scriptDir}/_parse-args "$@" ; then
+    echo "----------end--------------"
+    exit 0
+fi
+action=${_ZT_ARGS_Action}
+one_file=${_ZT_ARGS_File}
+tagscope=$_ZT_ARGS_Src
+origDir=
+dstDir=${workDir}
+tmpDir='/tmp/tagme'
+
+if [[ "$currDir" == "$HOME" ]]; then
+    echo "Please enter a workdir, don't run from top-dir directly, e.g. '$HOME'."
+    exit 1
+fi
+
+# Check with: $ ctags --list-kinds=c
+#ctags -e --c-kinds=+defgstum -L ${FLIST} > /dev/null 2>&1
+#
+#v1. CTAGS_FLAG=--extra=+f
+#v2. CTAGS_FLAG="--fields=+niazS --extra=+fq --c++-kinds=+px --c-kinds=+px --output-format=e-ctags"
+# ctags disable add the function protocol by remove "+p" from c-kinds
+#v3. CTAGS_FLAG="--fields=+niazS --extras=+Ffq --c++-kinds=+x --c-kinds=+x --output-format=e-ctags"
+# improve c-kinds
+CTAGS_FLAG=" --fields=+n  --output-format=e-ctags "
+CTAGS_FLAG_c="--fields=+niazS --extras=+Ffq --c++-kinds=+x --c-kinds=+defgstumx"
+#CTAGS_FLAG_md=' -x --_xformat="%{input}	%{line}	%{name}	%{pattern}" '
+CTAGS_FLAG_md=' --fields=FPnN --tag-relative=no --extras=+{subparser}{guest} --language-force=Markdown '
+CTAGS_FLAG_script=" --with-list-header=no --machinable=yes"
+FLIST=".cscope.files"
+ClangdFile="compile_commands.json"
+FIND_FLAG=( \
+    -maxdepth 3 -type f \
+    "-not" "-path" './linux-?.*' \
+    "-not" "-path" './kernel/*' \
+)
+
+## Other files:
+#     tags.temp
+#     tags.lock
+#     GTAGS
+#     GPATH
+#     GRTAGS
+#     .tagme       -- temperary build dir
+#     .ccls-cache
+#
+tag_files=( \
+    ".tags" \
+    ".tagx" \
+    ".cscope.files" \
+    "tags" \
+    "cscope.po.out" \
+    "cscope.in.out" \
+    "cscope.out" \
+    "${ClangdFile}" \
+    "${tmpDir}" \
+)
+
+clean_files=( \
+  "${tmpDir}" \
+)
+
+trap cleanup EXIT INT TERM
+function cleanup() {
+    trap - EXIT
+
+    duration=$SECONDS
+    echo "trap-cleanup(action=$action time=$(($duration / 60))m:$(($duration % 60))s)"
+
+    for cleanfile in "${clean_files[@]}" ;  do
+        rm -fr "${cleanfile}" 2> /dev/null
+    done
+
+    # Backto the original current dir
+    cd "$currDir"
+}
+
+
+
+# Copy/Save clangd compile commands
+ClangdCompileFile() {
+    if [ "$action" != "default" ] && [ "$action" != "link" ] && [ "$action" != "save" ]; then
+        return
+    fi
+
+    skipClangNote="Skip '$ClangdFile': git-original-dir '${origDir}' not existed!"
+    if ! chk-var ${origDir} ; then
+        origDir=$(git config --get remote.origin.url)
+        if ! chk-var ${origDir} || [ ! -d $origDir ]; then
+        do-echo $skipClangNote
+            return
+        fi
+    fi
+
+    # Get the real path
+    origDir2=$(readlink -f ${origDir})
+    workDir2=$(readlink -f ${workDir})
+    if [ "$action" == "default" ] || [ "$action" == "link" ]; then
+        srcdir="$origDir"
+        dstdir="$workDir"
+        srcdir2="$origDir2"
+        dstdir2="$workDir2"
+        srcfile="${origDir}/${ClangdFile}"
+        dstfile="${workDir}/${ClangdFile}"
+    elif [ "$action" == "save" ]; then
+        dstdir="$origDir"
+        srcdir="$workDir"
+        dstdir2="$origDir2"
+        srcdir2="$workDir2"
+        dstfile="${origDir}/${ClangdFile}"
+        srcfile="${workDir}/${ClangdFile}"
+    fi
+
+    if [[ -f "$srcfile" ]]; then
+        cp  $srcfile  $dstfile
+        sed -i   "s#${srcdir//\//\\/}#${dstdir//\//\\/}#g"  $dstfile
+        sed -i   "s#${srcdir2//\//\\/}#${dstdir2//\//\\/}#g"  $dstfile
+        echo "[Done!] Clangd ${ClangdFile}: ${srcdir} -> ${dstdir}"
+    else
+        _do-echo $skipClangNote
+    fi
+}
+
+
+# Special handle: Rebuild the <file> assign by $1
+#   - <file> should be full-path
+if [[ -f "./.tags" && -f "$one_file" ]]; then
+    # only rebuild tags when the file belong curr dir
+    #if [[ "$1" == "$PWD/"* ]]; then
+        pwdlen=${#PWD}
+        LC_COLLATE=C ctags ${CTAGS_FLAG} -f .tags -a "./${one_file:$pwdlen}"
+        #duration=$SECONDS
+        #notify-send "Done tags R $(($duration / 60)):$(($duration % 60))."
+    #fi
+
+    return 0
+fi
+
+
+if [ "$action" == "clean" ] || [ "$action" == "link" ]; then
+    for tagfile in "${tag_files[@]}" ;  do
+        if [[ "$action" == "clean" ]]; then
+            rm -f "${currDir}/$tagfile" 2> /dev/null
+        elif [[ "$action" == "link" ]]; then
+            if [ $tagfile == "${tmpDir}" ]; then
+                continue
+            fi
+
+            if [[ -z ${origDir} ]]; then
+                origDir=$(git config --get remote.origin.url)
+                if [ ! -d $origDir ]; then
+                    echo "Dir '${origDir}' not existed, maybe we're not git-dir. Exit!"
+                    return 1
+                fi
+            fi
+
+            srcfile="${origDir}/$tagfile"
+            if [ ! -f ${srcfile} ]; then
+                echo "File '${srcfile}' not existed, skip and continue!"
+                continue
+            elif [[ "$tagfile" == "$ClangdFile" ]]; then
+                ClangdCompileFile
+            else
+                echo "Softlink '${srcfile}' -> '$tagfile'"
+                rm -f $tagfile 2> /dev/null
+                ln -s ${srcfile} $tagfile
+            fi
+        fi
+    done
+
+    exit 0
+fi
+
+
+#########################################################
+# Handle action=all/default/save/md {{{1
+if [ "$action" != "default" ] && [ "$action" != "pull" ] && [ "$action" != "push" ] && [ "$action" != "save" ] && [ "$action" != "md" ] && [ "$action" != "wiki" ]; then
+    echo "Can't handle action '$action', Exit!"
+    exit 1
+fi
+
+
+# @return bool: return 0 for true and non-zero for false
+PrepareFileList() {
+    # Prepare file list
+    rm -fr ${tmpDir} 2> /dev/null
+    rm -f ${FLIST} 2> /dev/null
+    mkdir -p ${tmpDir}
+
+    # Issue "[: -ge: unary operator expected"
+    # https://stackoverflow.com/questions/408975/compare-integer-in-bash-unary-operator-expected
+    filecnt_c=0
+    filecnt_python=0
+    filecnt_rust=0
+    filecnt_markdown=0
+    if [[ "$action" == "wiki" ]]; then
+        if [ -z ${MARKDOWN_TAGS_DIR+x} ]; then
+            echo "Please set multiple wiki dirs into var 'MARKDOWN_TAGS_DIR' under '$action' action, Exit!"
+            return 1
+        else
+            dstDir="$HOME/.cache"
+        fi
+    elif [ -f ${FLIST} ]; then
+        filecnt_c=1024
+    else
+        filecnt_c=$(       find . "${FIND_FLAG[@]}" -name '*.c'  | wc -l)
+        filecnt_python=$(  find . "${FIND_FLAG[@]}" -name '*.py' | wc -l)
+        filecnt_rust=$(    find . "${FIND_FLAG[@]}" -name '*.rs' | wc -l)
+        filecnt_markdown=$(find . "${FIND_FLAG[@]}" -name '*.md' | wc -l)
+
+        echo "Files count: c=$filecnt_c, python=$filecnt_python, rust=$filecnt_rust, markdown=$filecnt_markdown!"
+    fi
+
+    # Rust
+    if [ $filecnt_rust -ge 3 ]; then
+        rusty-tags vi --output=".tags"
+
+        #return 0
+    elif [ $filecnt_c -ge 3 ]; then
+        CTAGS_FLAG="$CTAGS_FLAG $CTAGS_FLAG_c $CTAGS_FLAG_script"
+
+        if [ $filecnt_c -lt 1024 ]; then
+            clean_files+=("${FLIST}")
+        fi
+
+        case "$tagscope" in
+            "all")
+                find -L . -name '*.c' -o -name '*.cc' -o -name '*.h' -o -name '*.cpp' -o -name '*.hpp' > ${tmpDir}/cscope.f1
+                ;;
+            "wad")
+                find daemon/wad -name '*.c' -o -name '*.cc' -o -name '*.h' -o -name '*.cpp' -o -name '*.hpp' > ${tmpDir}/cscope.f1
+                ;;
+            *)
+                find . -name '*.c' -o -name '*.cc' -o -name '*.h' -o -name '*.cpp' -o -name '*.hpp' > ${tmpDir}/cscope.f1
+                ;;
+        esac
+
+        wad_c=$(grep 'daemon/wad' ${tmpDir}/cscope.f1 | wc -l)
+        if [ $wad_c -ge 10 ]; then
+            cat ${tmpDir}/cscope.f1            | \
+                grep -v 'ccls-cache/'          | \
+                grep -v 'wad/ui/stdin/'        | \
+                grep -v 'wad/redirect/socket/' | \
+                grep -v 'wad/test/'            | \
+                grep -v 'wad/unittest/'        | \
+                grep -v 'wad/cache/test/'      | \
+                grep -v 'daemon/waagent/'      | \
+                grep -v 'linux/'               | \
+                grep -v 'linux-.*/'            | \
+                grep -v 'compress/'            | \
+                grep -v 'cooked/'              | \
+                grep -v 'fortitest/'           | \
+                grep -v 'linuxatm/'            | \
+                grep -v 'sysctl/'              | \
+                grep -v 'sysapi/stream_scan/tests/'  | \
+                grep -v 'router/'              | \
+                grep -v 'fortiweb/'            | \
+                grep -v 'fortitest/'           | \
+                grep -v 'tests/gtest/'         | \
+                grep -v 'tests/'               | \
+                grep -v 'tools/'               | \
+                grep -v '/_' \
+                > ${tmpDir}/cscope.f2
+
+        else
+            cat ${tmpDir}/cscope.f1            | \
+                grep -v 'ccls-cache/'          | \
+                grep -v '/_' \
+                > ${tmpDir}/cscope.f2
+        fi
+
+        sort ${tmpDir}/cscope.f2 > ${tmpDir}/cscope.f3
+        mv ${tmpDir}/cscope.f3 ${FLIST}
+    elif [[ "$action" == "wiki" ]]; then
+        CTAGS_FLAG="$CTAGS_FLAG $CTAGS_FLAG_md $CTAGS_FLAG_script"
+        clean_files+=("${tmpDir}/${FLIST}")
+
+        # multiple wiki dir
+        for oneDir in $(echo $MARKDOWN_TAGS_DIR | tr ";,\ " "\n"); do
+            if [[ $oneDir = file://* ]]; then
+                oneDir=${oneDir:7}
+                if [ -d $oneDir ]; then
+                    absDir=$(realpath "$oneDir")
+                    find -L "$absDir" -name '*.md' >> ${tmpDir}/cscope.f1
+                    continue
+                fi
+            fi
+        done
+
+        cat ${tmpDir}/cscope.f1            | \
+            grep -v 'ccls-cache/'          | \
+            grep -v '/_' \
+            > ${tmpDir}/cscope.f2
+
+        sort ${tmpDir}/cscope.f2 > ${tmpDir}/cscope.f3
+        mv ${tmpDir}/cscope.f3 ${tmpDir}/${FLIST}
+    elif [ $filecnt_markdown -ge 10 ]; then
+        CTAGS_FLAG="$CTAGS_FLAG $CTAGS_FLAG_md $CTAGS_FLAG_script"
+        clean_files+=("${FLIST}")
+
+        # current dir auto markdown
+        for i in "$list"; do
+            echo $i
+        done
+    else
+        FLIST=""
+    fi
+
+    return 0
+}
+
+
+GenTag()
+{
+    rm -f "${dstDir}/.tags" 2> /dev/null
+    rm -f "${dstDir}/.tagx" 2> /dev/null
+    rm -f "${dstDir}/GTAGS" 2> /dev/null
+    rm -f "${dstDir}/GPATH" 2> /dev/null
+    rm -f "${dstDir}/GRTAGS" 2> /dev/null
+    rm -f "${dstDir}/tags" 2> /dev/null
+    rm -f "${dstDir}/tagx" 2> /dev/null
+    rm -f "${dstDir}/tags.lock" 2> /dev/null
+    rm -f "${dstDir}/tags.temp" 2> /dev/null
+
+    #    /usr/bin/time gtags -f ${FLIST}
+    #    /usr/bin/time global -u -L ${FLIST}
+    rm -f "${dstDir}/.tags" 2> /dev/null
+    rm -f "${dstDir}/.tagx" 2> /dev/null
+
+
+    fList=${FLIST}
+    if [ ! -z ${fList} ] && [ ! -f ${fList} ]; then
+        fList=''
+        if [ -f "${tmpDir}/${FLIST}" ]; then
+            fList="${tmpDir}/${FLIST}"
+        fi
+    fi
+
+    echo "Creating tag: ${dstDir}/.tagx"
+    if [[ -z ${fList} ]]; then
+        # tage-emacs, tags-vim, tagx-fuzzy
+        #LC_COLLATE=C ctags -e ${CTAGS_FLAG} -f .tage -R . > /dev/null 2>&1
+        LC_COLLATE=C ctags ${CTAGS_FLAG} -f "${dstDir}/.tags"  --exclude=.git --exclude=node_modules --exclude=.ccls-cache -R . > /dev/null 2>&1
+        LC_COLLATE=C ctags --exclude=.git --exclude=node_modules --exclude=.ccls-cache -xR . > "${dstDir}/.tagx" 2>/dev/null
+    else
+        if [[ "$action" == "wiki" ]]; then
+            #cat "${dstDir}/.tags" | sort -t$'\t' -k 2 > "${dstDir}/.tagx"
+            grep -n '^#' $( cat $fList ) > "${dstDir}/.tagx"
+        else
+            # tage-emacs, tags-vim, tagx-fuzzy
+            #LC_COLLATE=C ctags -e ${CTAGS_FLAG} -L ${FLIST} -f .tage > /dev/null 2>&1
+            LC_COLLATE=C ctags ${CTAGS_FLAG} -L ${fList} -f "${dstDir}/.tags" > /dev/null 2>&1
+            LC_COLLATE=C ctags -xL ${fList} > "${dstDir}/.tagx" 2>/dev/null
+        fi
+    fi
+}
+
+
+GenScope()
+{
+    rm -f cscope.* 2> /dev/null
+
+    if [[ -z ${FLIST} ]]; then
+        cscope -bcqR > /dev/null 2>&1
+    else
+        cscope -kbq -i ${FLIST} > /dev/null 2>&1
+    fi
+}
+
+GenCcls()
+{
+    rm -fr .ccls-cache 2> /dev/null
+    ccls --index=. --init='{"clang":{"extraArgs": ["-fms-extensions", "-Wno-microsoft-anon-tag", "-Wno-microsoft", "-Wno-gnu-anonymous-struct"]}}' > /dev/null 2>&1
+}
+
+int ()
+{
+    printf '%d' $(expr ${1:-} : '[^0-9]*\([0-9]*\)' 2>/dev/null) || :
+}
+
+SyncClangdJson()
+{
+    echo "Handling '$ClangdFile' ..."
+    export _ZT_ARGS_Indent="    "
+    urlInfo=$(git-info | grep "url = ")
+    if echo "$urlInfo" | grep -q -ie "fpx\|fortiproxy" ; then
+        guessPlat="fortiproxy"
+    elif echo $urlInfo | grep -q -ie "fos\|fortios\|fgt\|ftg\|fortigate" ; then
+        guessPlat="fortigate"
+    else
+        echo "${_ZT_ARGS_Indent}Can't get plat info, clangd do nothing, Return!"
+        return 1
+    fi
+
+    verNum1=$(cat .version | grep "CONFIG_MAJOR_NUM"    | cut -c 18- )
+    verNum2=$(cat .version | grep "CONFIG_MINOR_NUM"    | cut -c 18- )
+    verNum3=$(cat .version | grep "CONFIG_PATCH_NUM"    | cut -c 18- )
+    buildNum=$(cat .version| grep "CONFIG_BRANCH_POINT" | cut -c 21- )
+
+    if [[ $action == "push" ]]; then
+        if [[ -f $ClangdFile ]]; then
+            echo "${_ZT_ARGS_Indent}Push '$ClangdFile' to server /clangd/$guessPlat/${verNum1}${verNum2}${verNum3}B${buildNum}"
+            tar czf "$ClangdFile.tgz" $ClangdFile
+            eval "${LFTP_ATCMD}'mkdir -fp /clangd/$guessPlat/${verNum1}${verNum2}${verNum3}B${buildNum}; \
+                cd /clangd/$guessPlat/${verNum1}${verNum2}${verNum3}B${buildNum}/; \
+                mput ${ClangdFile}.tgz'"
+        else
+            echo "${_ZT_ARGS_Indent}Can't push non-exist file '$ClangdFile'"
+            return 1
+        fi
+    elif [[ -f $ClangdFile ]]; then
+        echo "${_ZT_ARGS_Indent}The '$ClangdFile' exist, do nothing!"
+    else
+        echo "${_ZT_ARGS_Indent}Pull '$ClangdFile' from server"
+        eval "$LFTP_ATCMD'ls /clangd/$guessPlat/${verNum1}*B*' > /tmp/tag.log"
+        if [[ $? == 0 ]]; then
+            upBuild=$(upper.awk -v t=$buildNum /tmp/tag.log)
+            eval "${LFTP_ATCMD}'mget /clangd/$guessPlat/${verNum1}*B*${upBuild}/${ClangdFile}.tgz;'"
+            tar xzf "$ClangdFile.tgz"
+            rm "$ClangdFile.tgz"
+            grep "${upBuild}$" /tmp/tag.log | cut -d ' ' -f 8- | sed "s#^#${_ZT_ARGS_Indent}#"
+        fi
+    fi
+}
+
+pidTag=0
+PrepareFileList
+if [[ $? -ne 0 ]]; then
+    echo "PrepareFileList() fail! EXIT!"
+    exit 1
+fi
+
+if [[ $action == "push" ]]; then
+    SyncClangdJson
+    exit 0
+fi
+
+if [[ "$action" == "default" || "$action" == "tag" || "$action" == "md" || "$action" == "wiki" ]]; then
+    GenTag &
+    pidTag=$!
+fi
+
+pidCscope=0
+if [[ "$action" == "default" || "$action" == "cscope" ]]; then
+    GenScope &
+    pidCscope=$!
+fi
+
+#if [ "$action" == "default" ] && [ "$action" == "save" ]; then
+#	ClangdCompileFile
+#fi
+
+if [[ "$action" == "default"  || "$action" == "push" || "$action" == "pull" ]]; then
+    export _ZT_ARGS_Indent=""
+    SyncClangdJson
+    export _ZT_ARGS_Indent="    "
+    _clangd-it
+    echo "${_ZT_ARGS_Indent}clangd done! $(ls -lh $ClangdFile | cut -d ' ' -f 5- )"
+fi
+
+#pidCcls=0
+#if [[ "$action" == "default" || "$action" == "ccls" ]]; then
+#	GenCcls &
+#	pidCcls=$!
+#fi
+
+# wait all parallel tasks done
+jobs
+
+if [ ${pidTag:-0} -gt 0 ]; then
+    wait $pidTag
+    echo "ctag done!"
+fi
+if [ ${pidCscope:-0} -gt 0 ]; then
+    wait $pidCscope
+    echo "cscope done!"
+fi
+if [ ${pidCcls:-0} -gt 0 ]; then
+    wait $pidCcls
+    echo "ccls done!"
+fi
+

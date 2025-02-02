@@ -1,0 +1,20 @@
+---
+# Root layout
+layout: even-vertical
+
+# Root window options
+# pane-border-status: bottom
+pane-border-status: top
+
+# List of windows
+windows:
+  ## The 1st window: Name only, no panes
+  #- empty, named window
+
+  - Gdb:                # Name of the window
+      layout: tiled         # Window layout, overrides root layout
+      panes:                # List of panes
+        - Code:
+        - Gef:
+          - next
+

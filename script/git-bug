@@ -1,0 +1,28 @@
+#!/usr/bin/env hush
+
+# {
+#     ls -l;
+#     #smb-get "firmware FortiGate-3300E v7.0.12,build8862b0523,230715 (GA) (Release)";
+#     smbclient -A ~/.smbclient.conf //imagesvr/Images -c 'cd /FortiProxy/v7.00/images/NoMainBranch/fproxy_7-0_dbs_fwdsvr_b0153/build_tag_80;ls' 2>&1 | grep -E 'NOT|VMWARE-.*-build8033.*\\.out\\.extra\\.tgz ';
+# }
+
+let pattern = " " # Match any
+let args = std.args() # Returns an array of command line arguments.
+for arg in std.iter(args) do
+    pattern = arg
+end
+let reg = std.regex(pattern)
+let result = ${
+	cat ~/tmp/log.1
+}
+
+std.print(std.regex("hello").split("hello world"))
+
+for out in std.iter(result) do
+	#std.print("wilson:" ++ oneLine)
+	let lines = std.split(out.value, "\n")
+	for line in std.iter(lines) do
+		#std.print("wilson:" ++ line)
+	end
+end
+

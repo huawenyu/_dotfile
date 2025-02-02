@@ -1,0 +1,8 @@
+// vim: set ft=vim:
+
+# VOom support +python3, :Voomhelp,
+  yy      Copy node(s).
+  dd      Cut node(s).
+  pp      Paste node(s) after the current node or fold.
+  <Space>            Expand/contract the current node
+  ^^, __, <<, >>     Move up/down, left, right the select nodes

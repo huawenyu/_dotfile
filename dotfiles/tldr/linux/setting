@@ -1,0 +1,50 @@
+// vim: set ft=markdown expandtab:
+
+# Customize Config
+
+There have two customize profile:
+
+    ~/.vimrc.before     " Set variable before plugin load
+    ~/.vimrc.after      " Finally re-change keymap
+
+ For example,
+ ------------
+
+     $ cat ~/.vimrc.before
+```vim
+    "Mode samples:
+    "   'mode': ['all', ],
+    "   'mode': ['basic', 'theme', 'local', 'editor', ],
+    "   'mode': ['basic', 'theme', 'local', 'editor', 'advance'],
+    "   'mode': ['basic', 'theme', 'local', 'editor', 'admin', 'coder', 'c', 'plugin', 'script', 'morecool'],
+     let mylocal_vim_confi = {
+           \ 'debug': 1,
+           \
+           \ 'auto_chdir': 1,
+           \
+           \ 'view_folding': 1,
+           \ 'show_number': 1,
+           \ 'wrapline': 1,
+           \ 'indentline': 1,
+           \
+           \ 'fzf_files': ['~/mywiki',],
+           \ 'fzf_notes': ['~/mywiki',],
+           \}
+     let g:vim_confi_option = extend(g:vim_confi_option, mylocal_vim_confi)
+```
+
+# Misc
+
+Tabs
+-----
+https://arisweedler.medium.com/tab-settings-in-vim-1ea0863c5990
+
+- tabstop=4         The columns a tab should be rendered, and has no effect on the actual text.
+- (no)expandtab     Enable-mode: Insert the appropriate number of spaces as a <tab>
+- shiftwidth=4      The columns text will be indented when using indent operations (such as << or >>)
+                    in normal or visual mode;
+- softtabstop=4     A <tab> keypress will give you `softabstop` spaces,
+                    a backspace keypress will remove softabstop columns of whitespace
+                      (or 1 character, if you're in the middle of a block of text and stuff).
+
+

@@ -1,0 +1,14 @@
+// vim: set ft=vim:
+
+# Tags/cscope/indexer
+	" [Tags](https://zhuanlan.zhihu.com/p/36279445)
+	" [C++](https://www.zhihu.com/question/47691414/answer/373700711)
+	"
+	"Plug 'ludovicchabant/vim-gutentags', Cond(Mode(['coder',]))        | " autogen tags, bad performance
+		"Plug 'skywind3000/gutentags_plus', Cond(Mode(['coder',]))          | " <leader>c*: cs symbol, cc caller, ct text, ce egrep, ca assign, cz ctags
+		"Plug 'huawenyu/vim-autotag', Cond(Mode(['coder',])) | " First should exist tagfile which tell autotag auto-refresh: ctags -f .tags -R .
+		"Plug 'huawenyu/vim-preview', Cond(Mode(['coder',]))
+		"Plug 'whatot/gtags-cscope.vim', Cond(Mode(['coder',]))
+
+	"Plug 'lyuts/vim-rtags', Cond(Mode(['coder',]))         | " Bad performance
+	"Plug 'w0rp/ale', Cond(Mode(['coder',]))   | " 1. Not using clang's lint, 2. find references look not work

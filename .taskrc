@@ -1,0 +1,97 @@
+# https://gist.github.com/simonmichael/25cefa8b2aef4324cf3f
+# [Created by task 2.5.0 12/4/2015 07:05:26]
+# For more documentation, see http://taskwarrior.org or try 'man task', 'man task-color',
+# 'man task-sync' or 'man taskrc'
+# Here is an example of entries that use the default, override and blank values
+#   variable=foo   -- By specifying a value, this overrides the default
+#   variable=      -- By specifying no value, this means no default
+#   #variable=foo  -- By commenting out the line, or deleting it, this uses the default
+# Use the command 'task show' to see all defaults and overrides
+
+########################################
+# General
+
+data.location=~/.task
+
+#include /usr/local/Cellar/task/HEAD/share/doc/task/rc/holidays.en-US.rc
+calendar.holidays=sparse
+
+#default.command=calendar
+
+search.case.sensitive=no
+
+uda.priority.values=H,,L
+
+urgency.inherit=1
+urgency.blocking.coefficient=0.0
+# urgency.blocked.coefficient=0.0
+urgency.tags.coefficient=0.0
+
+# better defaults for piping into less -RS, head etc.
+_forcecolor=yes
+# this makes calendar hang..
+defaultwidth=
+# can't use this because it also affects terminal, disabling terminal height detection
+#defaultheight=
+
+# Colour themes
+#include /usr/local/Cellar/task/2.5.0/share/doc/task/rc/light-16.theme
+#include /usr/local/Cellar/task/2.5.0/share/doc/task/rc/light-256.theme
+#include /usr/local/Cellar/task/2.5.0/share/doc/task/rc/dark-16.theme
+#include /usr/local/Cellar/task/2.5.0/share/doc/task/rc/dark-256.theme
+#include /usr/local/Cellar/task/2.5.0/share/doc/task/rc/dark-red-256.theme
+#include /usr/local/Cellar/task/2.5.0/share/doc/task/rc/dark-green-256.theme
+#include /usr/local/Cellar/task/2.5.0/share/doc/task/rc/dark-blue-256.theme
+#include /usr/local/Cellar/task/2.5.0/share/doc/task/rc/dark-violets-256.theme
+#include /usr/local/Cellar/task/2.5.0/share/doc/task/rc/dark-yellow-green.theme
+#include /usr/local/Cellar/task/2.5.0/share/doc/task/rc/dark-gray-256.theme
+#include /usr/local/Cellar/task/2.5.0/share/doc/task/rc/dark-gray-blue-256.theme
+#include /usr/local/Cellar/task/2.5.0/share/doc/task/rc/solarized-dark-256.theme
+#include /usr/local/Cellar/task/2.5.0/share/doc/task/rc/solarized-light-256.theme
+#include /usr/local/Cellar/task/2.5.0/share/doc/task/rc/no-color.theme
+
+# Contexts
+# context.home=-errand or +pin
+# context.out=+errand or +pin
+
+########################################
+# Tweaks for standard reports
+
+# all
+# show full project name (project.parent -> project)
+# show tag names (tags.count -> tag)
+# default value    id,status.short,uuid.short,start.active,entry.age,end.age,depends.indicator,priority,project.parent,tags.count,recur.indicator,wait.remaining,scheduled.remaining,due,until.remaining,description
+report.all.columns=id,status.short,uuid.short,start.active,entry.age,end.age,depends.indicator,priority,project,tags,recur.indicator,wait.remaining,scheduled.remaining,due,until.remaining,description
+
+# completed
+# show most recently completed first
+# default value       end+ 
+report.completed.sort=end-
+
+# newest
+# show annotation counts only (description -> description.count)
+# default value       id,start.age,entry,entry.age,modified.age,depends.indicator,priority,project,tags,recur.indicator,wait.remaining,scheduled.countdown,due,until.age,description      
+report.newest.columns=id,start.age,entry,entry.age,modified.age,depends.indicator,priority,project,tags,recur.indicator,wait.remaining,scheduled.countdown,due,until.age,description.count
+
+# next
+# show annotation counts only (description -> description.count)
+# default value     id,start.age,entry.age,depends,priority,project,tags,recur,scheduled.countdown,due.remaining,until.remaining,description,urgency      
+report.next.columns=id,start.age,entry.age,depends,priority,project,tags,recur,scheduled.countdown,due.remaining,until.remaining,description.count,urgency
+
+########################################
+# Custom reports
+
+# detailed recurring report showing recurring parents and their children
+report.recurringall.description=All Recurring Tasks
+report.recurringall.labels=ID,UUID,Parent,Created,Mod,A,Status,Recur,Wait,Sched,Due,Until,Deps,P,Project,Tags,Description,Mask Index,Mask
+report.recurringall.columns=id,uuid.short,parent,entry,modified,start.active,status,recur,wait.remaining,scheduled,due,until,depends,priority,project,tags,description.count,imask,mask
+report.recurringall.filter=+PARENT or +CHILD
+report.recurringall.sort=parent,due
+
+########################################
+# Recent config
+taskd.server=localhost:53589
+taskd.certificate=\/home\/hyu\/.task\/wilson.cert.pem
+taskd.key=\/home\/hyu\/.task\/wilson.key.pem
+taskd.ca=\/home\/hyu\/.task\/ca.cert.pem
+taskd.credentials=Public\/Wilson\/2dbb951a-bb2b-428c-9544-2284f1f7a513

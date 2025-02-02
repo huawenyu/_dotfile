@@ -1,0 +1,45 @@
+// vim: set ft=python:
+
+def 'diag sys process pstack <pid>'
+
+init {{{1
+@begin Call Trace:
+@end Detaching from target
+@begin_cmd #----------------------------------
+@begin_cmd <Enter>
+@begin_cmd set listsize 3
+@end_cmd   #==================================
+@end_cmd <Enter>
+@match "^[" => "0xx$xx0il *0x"
+}}}
+
+
+
+dump {{{1
+@attach 2
+@vimbegin
+	let lnum = 1
+	while lnum <= 1000
+		call VimSend('diag test app wad 21')
+		let lnum = lnum + 1
+		sleep 1
+		redraw
+	endwhile
+@vimend
+}}}
+
+
+
+top {{{1
+    @attach 3
+
+	@vimbegin
+	let num = 1
+	while num <= 2000
+		let num = num + 1
+		call VimSend('diag sys process pstack 328')
+        sleep 200m
+	endwhile
+	@vimend
+}}}
+

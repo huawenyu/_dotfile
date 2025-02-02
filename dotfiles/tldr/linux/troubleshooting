@@ -1,0 +1,70 @@
+// vim: set filetype=markdown softtabstop=4 expandtab:
+
+# Quickstart
+
+## Check who change/set the map or other
+
+    verbose autocmd filetype markdown
+
+    verbose map <a-'>
+
+    ## it will show you from where the <var> was set last time
+    verbose set ft?
+    verbose set commentstring?
+    verbose setlocal commentstring?
+
+# Troubleshooting
+
+## option 1: Debug the plugin by log
+
+1. Enable debug in .vimrc
+```vim
+    let g:vim_confi_option.debug = 1
+```
+
+2. Enable debug at your plugin/script file
+```vim
+    "Put these in the head-part of your script file.
+    if !exists("s:init")
+        let s:init = 1
+        silent! let s:log = logger#getLogger(expand('<sfile>:t'))
+    endif
+```
+
+3. Use:
+```vim
+    silent! call s:log.debug("test=", var)
+```
+
+4. View log
+```sh
+    $ tail -f /tmp/vim.log
+```
+
+## option 2: start vi with verbosefile
+
+	$ vi -V20/tmp/vim.log Promise.txt
+
+	### using another window (feel better if using tmux)
+	$ tail -f /tmp/logfile.txt
+
+	<or> =but you can't do them at same time=
+
+	set directly from .vimrc:
+        set verbose=20
+        set verbosefile=/tmp/vim.log
+
+## log to list by vim-basic.vlog tool
+
+	call vlog#warn("before then")
+
+	### view by vim command, current map to <leader>el
+	:VlogDisplay \| Messages \| VlogClear
+
+
+## Check who change my option value
+
+	:verbose set tabstop sw softtabstop expandtab ?
+	:verbose map <leader>ee
+
+

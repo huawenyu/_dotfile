@@ -1,0 +1,987 @@
+#!/usr/bin/expect -f
+
+log_file "$runCtx(tool,logfile)"
+
+# @return 0  succ
+#        >0  fail with reason
+proc connect {} {
+    upvar spawn_id spawn_id
+    global runCtx spawn_id
+    set runCtx(tool,_func_) "connect"
+
+    set ret 99
+
+    set name "tool"
+    set hostname_ ""
+    set prompt $runCtx(tool,PROMPT)
+    if {([info exists runCtx($name,DutHostname)])} {
+        set hostname_ $runCtx(tool,DutHostname)
+    }
+    if {([info exists runCtx($name,PASSWORD1)])} {
+        set newpass_ $runCtx($name,PASSWORD1)
+    } else {
+        set newpass_ "a"
+    }
+
+    set stat 0
+    set is_newpass 0
+    set is_forcepass 0
+    set is_prompt_guess 0
+
+    set timeout $runCtx(tool,TIMEOUT)
+    exp_internal $runCtx(tool,VERBOSE)
+    if {$runCtx(tool,CONNECTION) ne ""} {
+        eval "spawn $runCtx(tool,CONNECTION)"
+    } else {
+        spawn ssh $runCtx(tool,USERNAME)@$runCtx(tool,DUT)
+    }
+
+    for {set i 0} {$i < 8} {incr i} {
+        dbg 3  "'$name': try=$i"
+
+        expect {
+            eof {
+                set runCtx(tool,exp) ""
+                dbg 3  "$name received eof"
+                break
+            }
+
+            timeout {
+                set runCtx(errmsg)  "---------$name:Can not login-------with timeout"
+                dbg 3  "$name: Current Try Times is: $i"
+                # add this line to force a carriage return to fortigate when it encounters an
+                # odd cli error debug message
+                ::send "\r"
+                continue
+            }
+            -re "Password renewal is required. Old password:" {
+                dbg 3  "Encounter the password renewal part"
+                ::send "$runCtx($name,PASSWORD)\r"
+                set is_forcepass 1
+                exp_continue
+            }
+            #Updated code to accommodate password enforcement change for mantis #0580028
+            -re "You are forced to change your password\[,\\\.] \[p|P]lease input a new password" {
+                # new prompt
+                dbg 3  "Encounter the password change password prompt part"
+                #You are forced to change your password, please input a new password
+                set is_forcepass 1
+                set is_prompt_guess 1
+                exp_continue
+            }
+            #Updated code to accommodate password enforcement change for mantis #0580028
+            -re "New \[Pp]assword:" {
+                if { $is_forcepass == 1 } {
+                    ::send "$newpass_\r"
+                    exp_continue
+                } else {
+                    dbg 3  "Encounter the New passowrd prompt"
+                    ::send "$runCtx($name,PASSWORD)\r"
+                    set is_newpass 1
+                    exp_continue
+                }
+            }
+            -re "Re-enter New Password:" {
+                if { $is_forcepass == 1 } {
+                    ::send "$newpass_\r"
+                    exp_continue
+                } else {
+                    dbg 3  "Enter New Password $runCtx($name,PASSWORD)"
+                    ::send "$runCtx($name,PASSWORD)\r"
+                    exp_continue
+                }
+            }
+            #Updated code to accommodate password enforcement change for mantis #0580028
+            -re "Confirm \[Pp]assword:" {
+                dbg 3  "Encounter the confirm password part after the change password prompt update"
+                if { $is_forcepass == 1 } {
+                    ::send "$newpass_\r"
+
+                    # After factoryreset, the prompt changed back to original, like: 'FortiProxy-KVM # '
+                    if { $is_prompt_guess == 1 && $hostname_ ne "" } {
+                        expect -re "Forti(.*?) # "
+
+                        ::send "config system global\r"
+                        ::send "    set hostname $hostname_\r"
+                        ::send "end\r"
+
+                        set is_prompt_guess 0
+                    }
+
+                    exp_continue
+                } else {
+                    dbg 3  "Enter New Password $runCtx($name,PASSWORD)"
+                    ::send "$runCtx($name,PASSWORD)\r"
+                    exp_continue
+                }
+            }
+            -re "\[pP]assword: " {
+                if { $is_newpass == 1 } {
+                    dbg 3  "Sending new password due to 5.6 eco change"
+                    ::send "$runCtx($name,PASSWORD)\r"
+                } elseif { $stat == 1 } {
+                    dbg 3  "Sending Carriage return first to see if it's new or old password due to the 5.6 eco change"
+                    ::send "\r"
+                    set is_newpass 1
+                }
+                exp_continue
+            }
+            -re "Last Successful Login:" {
+                dbg 3  "DEBUG $name, FGT new feature.  Ignore..."
+                # eating up these new output so, it won't screw up the buffer
+                exp_continue
+            }
+            -re "Last Failed Login:" {
+                dbg 3  "DEBUG $name, FGT new feature.  Ignore..."
+                # eating up these new output so, it won't screw up the buffer
+                exp_continue
+            }
+            -re "\[lL]ogin: $" {
+                dbg 3  "$name sending login"
+                ::send "$runCtx($name,USERNAME)\r"
+                set stat 1
+                dbg 3  "$name: adding extra carriage return"
+                # add this line to force a carriage return to fortigate when it encounters an
+                # odd cli error debug message
+                #::send "\r"
+                exp_continue
+            }
+            -re "\[lL]ogin incorrect" {
+                dbg 3  "$name with login incorrect"
+                exp_continue
+            }
+            -re "Press(.*?)a(.*?)accept" {
+                # this is for the FIPS MODE support
+                #(Press 'a' to accept):
+                dbg 3  "Encounter fips cc mode weird output.  Sending response back"
+                ::send "a"
+                exp_continue
+            }
+            -re "$prompt" {
+                dbg 3  "Login $name successful forcepass=$is_forcepass\n"
+                set ret 0
+                set runCtx(tool,exp) $spawn_id
+                if { $is_forcepass == 1 } {
+                    set is_forcepass 0
+
+                    # Forced disconnect login session
+                    ::send "config sys admin\r"
+                    expect -re "$prompt"
+                    ::send "edit admin\r"
+                    expect -re "$prompt"
+                    ::send "unset password $newpass_\r"
+                    expect -re "$prompt"
+                    ::send "end\r"
+
+                    # eof
+                    exp_continue
+                }
+                break;
+            }
+        }
+
+        dbg 4  "Sending <Ctr-C> now, interrupt the command and back to prompt."
+        ::send "\x03"
+    }
+
+    return $ret
+}
+
+# @return 0  succ
+#        >0  fail with reason
+proc reboot { {is_console 0} } {
+    global runCtx spawn_id
+    set runCtx(tool,_func_) "reboot"
+    set ret 99
+
+    set prompt $runCtx(tool,PROMPT)
+
+    # Ensure it correct env
+    set timeout $runCtx(tool,TIMEOUT)
+    ::send "\r"
+    expect {
+        timeout {
+            dbg 3 "wait prompt timeout"
+            set runCtx(errmsg) "wait prompt timeout!"
+            return 1
+        }
+        eof {
+            dbg 3 "reboot receive disconnect (eof)"
+            return 2
+        }
+        -re "$prompt" {
+            dbg 3 "Wait prompt succ"
+        }
+    }
+
+    # Start reboot
+    if { $runCtx(tool,DutVDOM) == 1 } {
+        ::send "config global\r"
+        expect -re "$prompt"
+    }
+
+    ::send "exec reboot\r"
+    expect {
+        -re "(y/n)" {
+            dbg 3 "confirm reboot yes"
+            ::send "y"
+            if { $is_console == 0 } {
+                set timeout -1
+                exp_continue
+            }
+        }
+        "System is rebooting" {
+            if { $is_console == 0 } {
+                set ret 0
+                exp_continue
+            }
+        }
+        timeout {
+            dbg 3 "reboot timeout"
+            return 1
+        }
+        eof {
+            dbg 3 "reboot receive disconnect (eof)"
+            return 0
+        }
+    }
+
+    # Only connect-console has such info,
+    #      connect-ssh will disconnect redirectly.
+    if { $is_console == 1 } {
+        expect {
+            "goind down NOW" {
+            }
+            "Please stand by while reb" {
+            }
+            timeout {
+                set runCtx(errmsg) "After Reboot firewall now, can not login firewall"
+                return 1
+            }
+            eof {
+                return 2
+            }
+        }
+    }
+
+    return $ret
+}
+
+
+# @return 0  succ
+#        >0  fail with reason
+#
+# <PC_host> $ sshpass -p "<passwd>" scp admin@<IpAddr>:fgt-config <dstdir>/<name>
+#
+proc config_save { {is_console 0} } {
+    upvar spawn_id spawn_id
+    global runCtx spawn_id
+    set ret 99
+
+    set prompt $runCtx(tool,shellprompt)
+    set filename_  $runCtx(tool,DestPATH)/$runCtx(tool,FILE)
+    exp_internal $runCtx(tool,VERBOSE)
+    eval "spawn $runCtx(tool,shell)"
+
+    # Ensure it correct env
+    set timeout $runCtx(tool,TIMEOUT)
+    ::send "\r"
+    expect {
+        timeout {
+            dbg 3 "wait prompt timeout"
+            set runCtx(errmsg) "wait prompt timeout!"
+            return 1
+        }
+        eof {
+            dbg 3 "receive disconnect (eof)"
+            return 2
+        }
+        -re "$prompt" {
+            dbg 3 "Wait prompt succ"
+        }
+    }
+
+    # Try to remove old file
+    ::send "rm -fr $filename_   \r"
+    expect {
+        timeout {
+            dbg 3 "wait prompt timeout"
+            set runCtx(errmsg) "wait prompt timeout!"
+            return 3
+        }
+        eof {
+            dbg 3 "receive disconnect (eof)"
+            return 4
+        }
+        -re "$prompt" {
+            dbg 3 "Wait prompt succ"
+        }
+    }
+
+    # Ensure the file not exist
+    ::send "test -e  $filename_ && echo '=FileExist=' || echo '=FileNotExist=!'  \r"
+    expect {
+        timeout {
+            dbg 4  "Timeout, sending <Ctr-C> now, interrupt the command and back to prompt."
+            ::send "\x03"
+        }
+        -re "echo .* echo .*=!" {
+            exp_continue
+        }
+        "=FileExist=" {
+            dbg 6  "Config_Save fail: cannot rm the '$filename_'"
+            return 5
+        }
+        "=FileNotExist=" {
+        }
+    }
+
+    # scp backup the config file
+    ::send "sshpass -p '$runCtx(tool,PASSWORD)'                 \
+        scp $runCtx(tool,SSHOPTION)                             \
+        $runCtx(tool,USERNAME)@$runCtx(tool,ADDRESS):fgt-config \
+        $filename_                                              \
+        &> /dev/null && echo '=InnerSucc=' || echo '=InnerFail=!' \
+        \r"
+
+    expect {
+        timeout {
+            dbg 4  "Timeout, sending <Ctr-C> now, interrupt the command and back to prompt."
+            ::send "\x03"
+        }
+        -re "echo .* echo .*=!" {
+            exp_continue
+        }
+        "=InnerSucc=" {
+        }
+        "=InnerFail=" {
+            dbg 6  "Config_Save fail: dut '$runCtx(tool,ADDRESS)', ..."
+            return 6
+        }
+    }
+
+    # Return succ only the file exist
+    ::send "test -e  $filename_ && echo '=FileExist=' || echo '=FileNotExist=!'  \r"
+    expect {
+        timeout {
+            dbg 4  "Timeout, sending <Ctr-C> now, interrupt the command and back to prompt."
+            ::send "\x03"
+        }
+        -re "echo .* echo .*=!" {
+            exp_continue
+        }
+        "=FileExist=" {
+            return 0
+        }
+        "=FileNotExist=" {
+            dbg 6  "Config_Save fail: the '$filename_' not exist!"
+            return 7
+        }
+    }
+
+    return $ret
+}
+
+# @return 0  succ
+#        >0  fail with reason
+#
+# <PC_host> $ set vdom-mode multi-vdom/no-vdom
+#
+proc config_vdom_mode { {is_console 0} } {
+    global runCtx spawn_id
+    set ret 99
+
+    set prompt $runCtx(tool,PROMPT)
+
+    # Ensure it correct env
+    set timeout $runCtx(tool,TIMEOUT)
+    ::send "\r"
+    expect {
+        timeout {
+            dbg 3 "wait prompt timeout"
+            set runCtx(errmsg) "wait prompt timeout!"
+            return 1
+        }
+        eof {
+            dbg 3 "receive disconnect (eof)"
+            return 2
+        }
+        -re "$prompt" {
+            dbg 3 "Wait prompt succ"
+        }
+    }
+
+    # set vdom-mode
+	if { $runCtx(tool,ARG1) == "no-vdom" } {
+		::send "config global\r"
+	}
+    ::send "config system global\r"
+    ::send "set vdom-mode $runCtx(tool,ARG1)\r"
+    ::send "end\r"
+    expect {
+        -re "(y/n)" {
+            dbg 3 "confirm vdom-mode yes"
+            ::send "y"
+            if { $is_console == 0 } {
+                set timeout -1
+                exp_continue
+            }
+        }
+        timeout {
+            dbg 3 "set vdom-mode timeout"
+            return 1
+        }
+        eof {
+            dbg 3 "set vdom-mode receive disconnect (eof)"
+            return 0
+        }
+    }
+
+    return $ret
+}
+
+
+proc Tmux_pane_title2id {target_title} {
+    # Run tmux command to list all panes
+    set panes [exec tmux list-panes -F "#{session_name}:#{window_index}.#{pane_index}-#{pane_title}"]
+
+    # Iterate through each pane
+    foreach pane [split $panes "\n"] {
+        # Split pane_id and pane_title
+        set parts [split $pane "-"]
+        set pane_id [lindex $parts 0]
+        set pane_title [lindex $parts 1]
+
+        # Check if the pane_title matches the target_title
+        if {$pane_title eq $target_title} {
+            return $pane_id
+        }
+    }
+
+    # Return an empty string if no match is found
+    return ""
+}
+
+
+proc Tmux_send_keys {pane_id  keys} {
+    if { $pane_id ne "" } {
+        exec tmux send-keys  -t  "$pane_id"  "$keys"  Enter
+    }
+}
+
+
+proc Get_pid_by_process_type { {type "worker"} } {
+    global runCtx spawn_id
+    set runCtx(tool,_func_) "Get_pid_by_process_type"
+    set ret 99
+
+    set prompt $runCtx(tool,PROMPT)
+
+    # Ensure it correct env
+    set timeout $runCtx(tool,TIMEOUT)
+    ::send "\r"
+    expect {
+        timeout {
+            dbg 3 "wait prompt timeout"
+            set runCtx(errmsg) "wait prompt timeout!"
+            return 1
+        }
+        eof {
+            dbg 3 "receive disconnect (eof)"
+            return 2
+        }
+        -re "$prompt" {
+            dbg 3 "Wait prompt succ"
+        }
+    }
+
+    # set interface port vdom
+    ::send "config global\r"
+    ::send "diag debug en\r"
+    ::send "diag test app wad 2200\r"
+    # dut6 (Interim)# diag test app wad 2200
+    # Set diagnosis process: type=worker index=0 pid=2160
+    expect {
+        -re "Set diagnosis process: type=$type index=0 pid=(.*)" {
+            set runCtx(tool,pid) $expect_out(1,string)
+            return 0
+        }
+        timeout {
+            dbg 3 "Timeout"
+            return 1
+        }
+        eof {
+            dbg 3 "Disconnect (eof)"
+            return 2
+        }
+    }
+
+    return $ret
+}
+
+
+proc Gdbserver_by_pid { } {
+    global runCtx spawn_id
+    set runCtx(tool,_func_) "Gdbserver_by_pid"
+    set ret 99
+
+    set prompt $runCtx(tool,PROMPT)
+
+    # Ensure it correct env
+    set timeout $runCtx(tool,TIMEOUT)
+    ::send "diag debug disable\r"
+    ::send "sysctl sh\r"
+    expect {
+        timeout {
+            dbg 3 "wait prompt timeout"
+            set runCtx(errmsg) "wait prompt timeout!"
+            return 1
+        }
+        eof {
+            dbg 3 "receive disconnect (eof)"
+            return 2
+        }
+        -re " # " {
+            dbg 3 "Wait shell prompt succ"
+        }
+    }
+
+    if { $runCtx(tool,pid) == 0 } {
+        dbg 3 "invalid pid"
+        return 3
+    }
+
+    # Kill existed listener to avoid fail:
+    #   Can't bind address: Address already in use.
+    ::send "killall gdbserver\r"
+    ::send "gdbserver 0.0.0.0:444 --attach $runCtx(tool,pid)\r"
+    # dut6 (Interim)# sys sh
+    # / # gdbserver 0.0.0.0:444 --attach 2160
+    # Attached; pid = 2160
+    # Listening on port 444
+    expect {
+        "Listening on port 444" {
+            return 0
+        }
+        timeout {
+            dbg 3 "Timeout"
+            return 1
+        }
+        eof {
+            dbg 3 "Disconnect (eof)"
+            return 2
+        }
+    }
+
+    return $ret
+}
+
+
+# @return 0  succ
+#        >0  fail with reason
+#
+# <PC_host> $ set vdom <vd-name>
+#
+proc config_port_vdom { {is_console 0} } {
+    global runCtx spawn_id
+    set ret 99
+
+    set prompt $runCtx(tool,PROMPT)
+
+    # Ensure it correct env
+    set timeout $runCtx(tool,TIMEOUT)
+    ::send "\r"
+    expect {
+        timeout {
+            dbg 3 "wait prompt timeout"
+            set runCtx(errmsg) "wait prompt timeout!"
+            return 1
+        }
+        eof {
+            dbg 3 "receive disconnect (eof)"
+            return 2
+        }
+        -re "$prompt" {
+            dbg 3 "Wait prompt succ"
+        }
+    }
+
+    # set interface port vdom
+    ::send "config global\r"
+    ::send "config system interface\r"
+    ::send "ed $runCtx(tool,ARG1)\r"
+    ::send "set vdom $runCtx(tool,ARG2) \r"
+    ::send "next\r"
+    expect {
+        timeout {
+            dbg 3 "set interface port vdom timeout"
+            return 1
+        }
+        eof {
+            dbg 3 "set port vdom receive disconnect (eof)"
+            return 0
+        }
+    }
+
+    return $ret
+}
+
+# @return 0  succ
+#        >0  fail with reason
+#
+# <PC_host> $ sshpass -p "<passwd>" scp admin@<IpAddr>:fgt-config <dstdir>/<name>
+#
+proc config_restore { {is_console 0} } {
+    upvar spawn_id spawn_id
+    global runCtx spawn_id
+    set ret 99
+
+    set prompt $runCtx(tool,shellprompt)
+    set filename_  $runCtx(tool,DestPATH)/$runCtx(tool,FILE)
+    exp_internal $runCtx(tool,VERBOSE)
+    eval "spawn $runCtx(tool,shell)"
+
+    # Ensure it correct env
+    set timeout $runCtx(tool,TIMEOUT)
+    ::send "\r"
+    expect {
+        timeout {
+            dbg 3 "wait prompt timeout"
+            set runCtx(errmsg) "wait prompt timeout!"
+            return 1
+        }
+        eof {
+            dbg 3 "receive disconnect (eof)"
+            return 2
+        }
+        -re "$prompt" {
+            dbg 3 "Wait prompt succ"
+        }
+    }
+
+    # Ensure the config file exist
+    ::send "test -e  $filename_ && echo '=FileExist=' || echo '=FileNotExist=!'  \r"
+    expect {
+        timeout {
+            dbg 4  "Timeout, sending <Ctr-C> now, interrupt the command and back to prompt."
+            ::send "\x03"
+        }
+        -re "echo .* echo .*=!" {
+            exp_continue
+        }
+        "=FileExist=" {
+        }
+        "=FileNotExist=" {
+            dbg 6  "Config_Restore fail: the '$filename_' not exist!"
+            return 3
+        }
+    }
+
+    # scp restore the config file
+    ::send "sshpass -p '$runCtx(tool,PASSWORD)'                   \
+        scp $runCtx(tool,SSHOPTION)                               \
+        $filename_                                                \
+        $runCtx(tool,USERNAME)@$runCtx(tool,ADDRESS):fgt-restore  \
+        &> /dev/null && echo '=InnerSucc=' || echo '=InnerFail=!' \
+        \r"
+
+    expect {
+        timeout {
+            dbg 4  "Timeout, sending <Ctr-C> now, interrupt the command and back to prompt."
+            ::send "\x03"
+        }
+        -re "echo .* echo .*=!" {
+            exp_continue
+        }
+        "=InnerSucc=" {
+            return 0
+        }
+        "=InnerFail=" {
+            return 4
+            dbg 6  "Config_Restore fail: dut '$runCtx(tool,ADDRESS)', ..."
+        }
+    }
+
+    return $ret
+}
+
+
+# @note Only support factoryreset2 + vm-license
+#       Reason: no console, MUST keep ip-address
+# @param mode 2  factoryreset2
+# @return 0  succ
+#        >0  fail with reason
+proc factoryreset { {mode 2} {is_console 0} } {
+    global runCtx spawn_id
+    set ret 99
+
+    set task_ "factoryreset2"
+    set prompt $runCtx(tool,PROMPT)
+
+    # Ensure it correct env
+    set timeout $runCtx(tool,TIMEOUT)
+    ::send "\r"
+    expect {
+        timeout {
+            dbg 3 "wait prompt timeout"
+            set runCtx(errmsg) "wait prompt timeout!"
+            return 1
+        }
+        eof {
+            dbg 3 "$task_ receive disconnect (eof)"
+            return 2
+        }
+        -re "$prompt" {
+            dbg 3 "Wait prompt succ"
+        }
+    }
+
+    # Start factoryreset
+    if { $runCtx(tool,DutVDOM) == 1 } {
+        ::send "config global\r"
+        expect -re "$prompt"
+    }
+
+    ::send "exec factoryreset2 keepvmlicense\r"
+    expect {
+        -re "(y/n)" {
+            dbg 3 "confirm $task_ yes"
+            ::send "y"
+            if { $is_console == 0 } {
+                return 0
+            }
+        }
+        "System is resetting to factory default" {
+            if { $is_console == 0 } {
+                set ret 0
+                exp_continue
+            }
+        }
+        timeout {
+            dbg 3 "$task_ timeout"
+            return 1
+        }
+        eof {
+            dbg 3 "$task_ receive disconnect (eof)"
+            return 0
+        }
+    }
+
+    # Only connect-console has such info,
+    #      connect-ssh will disconnect redirectly.
+    if { $is_console == 1 } {
+        expect {
+            "goind down NOW" {
+            }
+            "Please stand by while reb" {
+            }
+            timeout {
+                set runCtx(errmsg) "After Reboot firewall now, can not login firewall"
+                return 1
+            }
+            eof {
+                return 2
+            }
+        }
+    }
+
+    return $ret
+}
+
+
+# @return 0  succ
+#        >0  fail with reason
+proc check_address {{args ""}} {
+    upvar spawn_id spawn_id
+    global runCtx spawn_id
+    set ret 99
+
+    set prompt $runCtx(tool,shellprompt)
+    set ip_  $runCtx(tool,ADDRESS)
+    set t_before_ 10
+    set t_after_  20
+    exp_internal $runCtx(tool,VERBOSE)
+    eval "spawn $runCtx(tool,shell)"
+
+    # Wait <before>-seconds to clear buffer!
+    set timeout $t_before_
+    dbg 3 "Wait $timeout before to cooldown!"
+    expect {
+        -re ".+" {
+            exp_continue
+        }
+        timeout {
+        }
+    }
+
+    # Ensure it correct env
+    set timeout $runCtx(tool,TIMEOUT)
+    ::send "\r"
+    expect {
+        timeout {
+            dbg 3 "wait prompt timeout"
+            set runCtx(errmsg) "wait prompt timeout!"
+            return 1
+        }
+        eof {
+            dbg 3 "receive disconnect (eof)"
+            return 2
+        }
+        -re "$prompt" {
+            dbg 3 "Wait prompt succ"
+        }
+    }
+
+    set pingSucc 0
+    set count [expr $runCtx(tool,TIMEOUT) / 3]
+    set timeout 6
+    for {set i 0} { $i < $count } {incr i} {
+        ::send "ping -c1 -W3 $ip_ &> /dev/null && echo '=PingSucc=' || echo '=PingFail=!' \r"
+
+        expect {
+            eof {
+                break
+            }
+            timeout {
+                dbg 4  "Ping expect timeout, inner error when check the dut '$ip_'!"
+                dbg 4  "Sending control C now, as it should have gone back to the login prompt already"
+                ::send "\x03"
+            }
+            -re "echo .* echo .*=!" {
+                exp_continue
+            }
+            "=PingSucc=" {
+                dbg 6  "Ping succ, try-$i in $count-times the dut '$ip_', ..."
+                set pingSucc 1
+                break
+            }
+            "=PingFail=" {
+            }
+        }
+    }
+
+    if { $pingSucc == 0 } {
+        return 4
+    } else {
+        set ret 0
+    }
+
+    # Wait <after>-seconds to clear buffer!
+    set timeout $t_after_
+    dbg 3 "Wait $timeout after to warmup!"
+    expect {
+        -re ".+" {
+            exp_continue
+        }
+        timeout {
+        }
+    }
+
+    return $ret
+}
+
+
+# @param mode 0  No extra conf
+#             1  Config Network
+#             2  Config route/dns/update-license
+#             3  proxy
+# @return 0  succ
+#        >0  fail with reason
+proc config { {mode 3} {is_console 0} } {
+    global runCtx spawn_id
+    set ret 99
+
+    set task_ "Basic_Config"
+    set prompt $runCtx(tool,PROMPT)
+    set hostname_ $runCtx(tool,DutHostname)
+
+    # Ensure it correct env
+    set timeout $runCtx(tool,TIMEOUT)
+    ::send "\r"
+    expect {
+        timeout {
+            dbg 3 "wait prompt timeout"
+            set runCtx(errmsg) "wait prompt timeout!"
+            return 1
+        }
+        eof {
+            dbg 3 "$task_ receive disconnect (eof)"
+            return 2
+        }
+        -re "$prompt" {
+            dbg 3 "Wait prompt succ"
+        }
+    }
+
+    set ret 0
+    if { $mode >= 1 } {
+        # DNS/Route
+        ::send "config system global\r"                           ; expect -re "$prompt"
+        ::send "    set admin-scp enable\r"                       ; expect -re "$prompt"
+        ::send "    set hostname $hostname_\r"                    ; expect -re "$prompt"
+        ::send "end\r"                                            ; expect -re "$prompt"
+        ::send "config system dns\r"                              ; expect -re "$prompt"
+        ::send "    set primary 172.16.100.100\r"                 ; expect -re "$prompt"
+        ::send "    set secondary 172.16.100.80\r"                ; expect -re "$prompt"
+        ::send "    unset protocol\r"                             ; expect -re "$prompt"
+        ::send "end\r"                                            ; expect -re "$prompt"
+        ::send "config router static\r"                           ; expect -re "$prompt"
+        ::send "    edit 1\r"                                     ; expect -re "$prompt"
+        ::send "        set gateway 10.1.1.1\r"                   ; expect -re "$prompt"
+        ::send "        set device port1\r"                       ; expect -re "$prompt"
+        ::send "    next\r"                                       ; expect -re "$prompt"
+        ::send "end\r"                                            ; expect -re "$prompt"
+    }
+
+    if { $mode >= 3 } {
+        # WebProxy/FortiProxy
+        ::send "config firewall central-snat-map\r"               ; expect -re "$prompt"
+        ::send "    edit 1\r"                                     ; expect -re "$prompt"
+        ::send "        set srcintf port2\r"                      ; expect -re "$prompt"
+        ::send "        set dstintf port1\r"                      ; expect -re "$prompt"
+        ::send "        set src-addr all\r"                       ; expect -re "$prompt"
+        ::send "        set dst-addr all\r"                       ; expect -re "$prompt"
+        ::send "    next\r"                                       ; expect -re "$prompt"
+        ::send "end\r"                                            ; expect -re "$prompt"
+        ::send "config web-proxy explicit-proxy\r"                ; expect -re "$prompt"
+        ::send "    edit web-proxy\r"                             ; expect -re "$prompt"
+        ::send "        set status enable\r"                      ; expect -re "$prompt"
+        ::send "        set interface any\r"                      ; expect -re "$prompt"
+        ::send "        set http-incoming-port 8080\r"            ; expect -re "$prompt"
+        ::send "    next\r"                                       ; expect -re "$prompt"
+        ::send "end\r"                                            ; expect -re "$prompt"
+        ::send "config ftp-proxy explicit\r"                      ; expect -re "$prompt"
+        ::send "    set status enable\r"                          ; expect -re "$prompt"
+        ::send "    set incoming-port 8021\r"                     ; expect -re "$prompt"
+        ::send "end\r"                                            ; expect -re "$prompt"
+    }
+
+    # Put at the end of config:
+    #   because the connect will be force disconnect when license change to valid
+    if { $mode >= 2 } {
+        # Update-license
+        ::send "config system fortiguard\r"                       ; expect -re "$prompt"
+        ::send "    set fortiguard-anycast disable\r"             ; expect -re "$prompt"
+        ::send "    set protocol udp\r"                           ; expect -re "$prompt"
+        ::send "    set port 8888\r"                              ; expect -re "$prompt"
+        ::send "    set sdns-server-ip 192.168.100.212\r"         ; expect -re "$prompt"
+        ::send "end\r"                                            ; expect -re "$prompt"
+        ::send "config system central-management\r"               ; expect -re "$prompt"
+        ::send "    config server-list\r"                         ; expect -re "$prompt"
+        ::send "        edit 1\r"                                 ; expect -re "$prompt"
+        ::send "            set server-type update\r"             ; expect -re "$prompt"
+        ::send "            set server-address 192.168.100.205\r" ; expect -re "$prompt"
+        ::send "        next\r"                                   ; expect -re "$prompt"
+        ::send "        edit 2\r"                                 ; expect -re "$prompt"
+        ::send "            set server-type rating\r"             ; expect -re "$prompt"
+        ::send "            set server-address 192.168.100.206\r" ; expect -re "$prompt"
+        ::send "        next\r"                                   ; expect -re "$prompt"
+        ::send "    end\r"                                        ; expect -re "$prompt"
+        ::send "    set include-default-servers disable\r"        ; expect -re "$prompt"
+        ::send "end\r"                                            ; expect -re "$prompt"
+    }
+
+    return $ret
+}
+
+

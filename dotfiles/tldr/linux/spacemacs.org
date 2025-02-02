@@ -1,0 +1,135 @@
+* Docs
+     https://simpletutorials.com/c/3034/Spacemacs+(Vim+mode)+Cheatsheet
+     http://spacemacs.org/doc/FAQ.html#orgheadline14
+     Org-Mode: http://www.cnblogs.com/holbrook/archive/2012/04/12/2444992.html
+
+* Basic Keys
+    SPC f e d   Load config and edit
+    SPC f e R   Reload config (Vim style)
+    M-m f e R   Reload config (Emacs style)
+
+    M-x <mode>  Choose mode, e.g., org-mode
+
+    ;; File
+    SPC q q     Quit
+    SPC z x     Increase/decrease font size
+
+    SPC f f     Open/new file
+    SPC f s     Save
+    SPC b b     Jump switch-file
+    SPC p f     Fuzzy-search for files
+    SPC f t     Opens the sidebar in the directory
+    SPC p t     Open directory tree
+
+    ;; Find/Search/Jump
+    /           Type text search in buffer
+    *           Find next word the cursor over
+    #           Find previous word the cursor over
+    SPC /       Type text search in project
+    SPC *       Find next word the cursor over in project
+    SPC s l     Resume last search
+    SPC z x     Increase/decrease font size
+    :.,$s/<old>/<new>/gc    Find and replace text in buffer, from current line
+
+    SPC SPC <fuzzy>    Jump to any word
+    Ctrl o/i    Jump back/forward
+    SPC h b     Create/jump to a named bookmark
+    zz          Center the buffer around your cursor
+
+
+    ;; Window/Layout
+    SPC l ?     Show/hide layout help
+    SPC w S     Split window vertically
+    SPC <#>     Switch to other window
+    SPC w c     Close a window
+    SPC l l     Create a named layout
+    SPC l S     Save a layout by name
+    SPC l <#>   Switch to layout
+
+    ;; Comment
+    g c c       Comment out a line
+    g c         Comment out highlighted text
+    SPC r y     Show previous things you’ve copied (yanked)
+    SPC t w     Show whitespace
+
+    ;; Switch c/h
+    SPC m g a   open matching file (e.g. switch between .cpp and .h)
+    SPC m g A   open matching file in another window (e.g. switch between .cpp and .h)
+    SPC m D     disaster: disassemble c/c++ code
+    SPC m r     srefactor: refactor thing at point.
+
+    ;; Cscope
+    SPC m g c	find which functions are called by a function
+    SPC m g C	find where a function is called
+    SPC m g d	find global definition of a symbol
+    SPC m g e	search regular expression
+    SPC m g f	find a file
+    SPC m g F	find which files include a file
+    SPC m g i	create Cscope index
+    SPC m g r	find references of a symbol
+    SPC m g x	search text
+
+    ;; Magit
+    SPC g d     diff of the current file
+    SPC g s     Look at the overall project git-status
+        TAB     open/close diffs of files under git-status
+        s/u     stage/unstage a file (or hunk)
+        c       bring up the commit menu
+        ?       show what else you can do (pulling, pushing, tagging, reverting, bisecting
+    C-c C-c     Commit once you’ve settled on a commit message
+        q       Close magit windows.
+
+* Org-mode
+** Doc
+   - http://blog.sina.com.cn/s/blog_569c4e040101gt4u.html
+** Auto-enter org-mode
+    - 后缀名为org的文件
+    - 任意文件名，如果文件的第一个非空行包含： -*-org-*- 
+    - 设置某类文件的编辑模式为org: (add-to-list 'auto-mode-alist '("\\.txt\\'" . org-mode))
+** Keys
+     - TAB	局部命令，循环使用可以折叠/展开光标所在位置的标题树
+     - S+TAB	全局命令，循环使用可以折叠/展开整个文档的标题树
+     - M-LEFT/RIGHT	升级/降级当前标题，不允许有子标题的存在
+     - M-S-LEFT/RIGHT	升级/降级标题树，即标题树内的各级标题相应升/降级
+     - M-UP/DOWN	在同级标题间上/下移标题树，不能跨级别移动
+     - M-RET	在当前标题后插入同级标题符号（即换行符和星号）
+     - C-RET	在当前标题树后插入同级标题符号
+     - M-S-RET	在当前标题后插入同级TODO标题
+     - C-S-RET	在当前标题树后插入同级TODO标题
+     - C-c *	把光标所在行转成标题
+     - C-c -	把光标所在行转成列表
+** Org-mode的全部物件，但至少展示了几个方面的东西：
+     - 以 # 号后加一空格开始的行表示注释，文件导出时这些内容不被导出，上面第一行就是。
+     - 以 #+ 符号开始的行用于设置文档参数或内容属性，比如文档的标题、作者，org-mode打开时文档的呈现状态等。
+     - 用 [[]] 括起来的内容表示外部链接
+     - 用 <<>> 括起来的内容表示文档的内部链接
+     - 以 * 符号开始的行，表示该行为标题。
+     - 标题内容前的 TODO 标记是待办任务的标记符号。
+     - 标题行后面两个 : 符号间的内容表示标签（ TAG ）。
+     - 标题行如果标题文本前有 COMMENT 标记表示该标题下的所有内容为注释。
+     - 位于 #+BEGIN_XXX 和 #+END_XXX 之间的内容为特殊文档块，如代码块、例子、引用等。
+     - 虽然东西不少，但对某人来说不是所有的都要用到，所以建议用到了再去了解。
+
+#+BEGIN_SRC C++
+includes <stdio.h> 
+
+int main()
+{
+  int a=1;
+  int ~~ b=1;
+  printf("%d\n", a+b);
+}
+#+END_SRC
+
+
+#+BEGIN_SRC C
+
+  int a=1;
+  int b=1;
+  printf("%d\n", a+b);
+
+#+END_SRC
+
+#+BEGIN_SRC R :session                                                                                                                                                                                         
+a <- 3 + 4                                                                                                                                                                                                     
+#+END_SRC

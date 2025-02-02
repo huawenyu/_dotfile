@@ -1,0 +1,28 @@
+// vim: set ft=vim:
+
+# Mappings mostly fall into four categories
+  commands:
+    ]q is :cnext. [q is :cprevious
+  linewise:
+    [<Space> and ]<Space> add newlines before and after
+    [e and ]e exchange the current line with the one above or below it.
+  toggling options:
+    [os, ]os, and yos perform :set spell, :set nospell, and :set invspell, respectively.
+    There's also l (list), n (number), w (wrap), x (cursorline cursorcolumn)
+  encoding and decoding:
+    [x and ]x encode and decode XML
+    [u and ]u encode and decode URLs
+    [y and ]y do C String style escaping
+  miscellaneous:
+    [f and ]f to go to the next/previous file in the directory,
+    [n and ]n to jump between SCM conflict markers.
+
+  shortcuts-spell:  [os, ]os
+  shortcuts-sign:   [oS, ]oS
+  shortcuts-cursor: [oc, ]oc
+  shortcuts-copy:   [oC, ]oC
+  shortcuts-wrap:   [ow, ]ow
+  shortcuts-list:   [ol, ]ol
+  shortcuts-number: [on, ]on
+  shortcuts-number-relative: [or, ]or
+  shortcuts-virtual-edit:    [ov, ]ov

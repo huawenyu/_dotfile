@@ -1,0 +1,4 @@
+// vim: set ft=markdown
+
+tpope/vim-markdown
+- Fold:  zR openAll, zM closeAll, zr +foldLevel, zm -foldLevel, zo opencurr,

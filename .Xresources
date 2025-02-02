@@ -1,0 +1,25 @@
+! vim: set filetype=xdefaults :
+
+!***********************************************************************
+! Help
+! xrdb -load ~/.Xresources
+! xrdb -query -all
+! xrdb -merge ~/.Xdefault
+!***********************************************************************
+
+*xterm*|(u)rxvt|(u|dt|k|E)term): #override \
+		bindkey '\e[1~' beginning-of-line \n\
+		bindkey '\e[3~' delete-char \n\
+		bindkey '\e[4~' end-of-line \n\
+		bindkey '\177' backward-delete-char \n\
+		bindkey '\e[2~' overwrite-mode \n\
+		bindkey "\e[7~" beginning-of-line \n\
+		bindkey "\e[H" beginning-of-line \n\
+		bindkey "\e[8~" end-of-line \n\
+		bindkey "\e[F" end-of-line \n\
+		bindkey "\eOH" beginning-of-line \n\
+		bindkey "\eOF" end-of-line \n\
+		bindkey "^R" history-incremental-search-backward
+
+#include ".Xrxvt"
+#include ".Xxterm"

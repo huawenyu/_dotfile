@@ -1,0 +1,28 @@
+#!/usr/bin/awk -f
+@include "$HOME/script/awk/my.awk"
+
+BEGIN{
+    RS = "---\n";
+    FS = "\n|[|]";
+    version = 0;
+    author = 1;
+    summary = 2;
+	if (detail != "1") detail = "0";
+	print "help: -v'detail=0|1'";
+} 
+
+{
+    report[NR][version]=substr($1,2,length($1)-1);
+    report[NR][author]=$2;
+    report[NR][summary]=$6;
+}
+
+END{ print "svnlog end " NR;
+    for (i=1; i<=NR; i++) {
+        print green(report[i][version]) blue(report[i][author]) report[i][summary];
+        cmd = "svn diff -r" report[i][version]-1 ":"report[i][version];
+		if (detail == "1")
+        	exec_cmd(cmd);
+    }
+}
+

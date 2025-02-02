@@ -1,0 +1,43 @@
+#!/bin/bash
+
+if command -v mycmd &> /dev/null; then
+	;
+else
+	curl -fLo /usr/local/bin/yadm https://github.com/TheLocehiliosan/yadm/raw/master/yadm
+	chmod a+x /usr/local/bin/yadm
+fi
+
+yadm --version
+yadm config local.class main
+
+if [ -d "~/.local/share/yadm/repo.git" ]; then
+	echo "yadm already initialed: ~/.local/share/yadm/repo.git"
+	echo "Do you want to delete the exist repo and create a new one?"
+	#!/bin/bash
+
+	read -p "Do you want to delete the exist repo and create a new one? (yes/no) " yn
+	case $yn in
+		[yY] | [yY][eE][sS] )
+			echo "You chose yes."
+			rm -fr "~/.local/share/yadm/repo.git"
+			;;
+		[nN] | [nN][oO] )
+			echo "You chose no."
+			exit 0
+			;;
+		* )
+			echo "Invalid input. Please answer yes or no."
+			exit 1
+			;;
+	esac
+fi
+
+yadm init
+yadm config yadm.cipher openssl
+# If it's main env and require push `yadm init` repo
+yadm config local.class main
+
+yadm remote add origin https://github.com/<user>/dotfiles.git
+yadm push -u origin main
+yadm push --mirror origin
+

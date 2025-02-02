@@ -1,0 +1,131 @@
+#!/usr/bin/expect -f
+
+array set runCtx {"name" "_"}
+
+proc _init {} {
+    global runCtx
+
+    set _inner_spath [ file dirname [ file normalize [ info script ] ] ]
+
+    set runCtx(tool,now)            [clock seconds]
+    set runCtx(tool,name)           "_"
+    set runCtx(tool,exp)            ""
+    set runCtx(tool,starttime)      [clock format $runCtx(tool,now) -format "%Y-%m-%d %H:%M:%S"]
+    set runCtx(tool,version)        "1.0"
+    set runCtx(tool,logfile)        "/tmp/exp_connect.log"
+    set runCtx(tool,shell)          "bash --rcfile /test/conf/test_bash2rc"
+    set runCtx(tool,shellprompt)    "Yt4Xi5nTesla2 # "
+    set runCtx(tool,pid)            "0"
+}
+
+proc dbg { level msg {scriptinfo 0} {errmsg 0} {report 0} {prt 0} {log 0} {stack 0} } {
+    global runCtx
+
+    set prefix "=DUT_CTL="
+    if {[info exists runCtx(tool,_func_)]} {
+        set prefix "$runCtx(tool,_func_)"
+    }
+    if {[info exists runCtx(tool,_line_)]} {
+        set prefix "$prefix\($runCtx(tool,_line_)): "
+    } else {
+        set prefix "$prefix\(): "
+    }
+
+    set timestr [clock format [clock seconds] -format "%Y-%m-%d %H:%M:%S"]
+    if {$level == 0 || $level == 2 || $level == 3} {
+        send_log "$prefix  $timestr $msg\n"
+    }
+
+    if {$level == 0 || $level == 1 || $level == 3} {
+        if { $level == 1 && $runCtx(tool,SILENT) == 1 } {
+            return
+        }
+
+        puts "$prefix  $timestr $msg"
+    }
+}
+
+# getopt:
+# Usage:
+#   client.exp --verbose "0" --user "tom"
+#     getopt argv --verbose argVerbose "0"
+#
+### https://wiki.tcl-lang.org/page/alternative+getopt
+#   https://wiki.tcl-lang.org/page/getopt
+#
+proc getopt {_argv name {_var ""} {default ""}} {
+    upvar 1 $_argv argv $_var var
+    set pos [lsearch -regexp $argv ^$name]
+    if {$pos>=0} {
+        set to $pos
+        if {$_var ne ""} {
+            set var [lindex $argv [incr to]]
+        }
+        set argv [lreplace $argv $pos $to]
+        return 1
+    } else {
+        if {[llength [info level 0]] == 5} {set var $default}
+        return 0
+    }
+}
+
+
+proc parse_arguments { {name ""} } {
+    global runCtx spawn_id argv
+
+    set runCtx(tool,name)   $name
+
+    getopt argv --silent    runCtx(tool,SILENT)     "0"
+    getopt argv --verbose   runCtx(tool,VERBOSE)    "0"
+    getopt argv --dryrun    runCtx(tool,DRYRUN)     "0"
+
+    getopt argv --dut       runCtx(tool,DUT)         ""
+    getopt argv --connect   runCtx(tool,CONNECTION)  ""
+    getopt argv --file      runCtx(tool,FILE)        "tmpfile.txt"
+    getopt argv --sshopt    runCtx(tool,SSHOPTION)   "-o GlobalKnownHostsFile=/dev/null -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o LogLevel=ERROR"
+    getopt argv --user      runCtx(tool,USERNAME)    "admin"
+    getopt argv --pass      runCtx(tool,PASSWORD)    ""
+    getopt argv --prompt    runCtx(tool,PROMPT)      ""
+    getopt argv --address   runCtx(tool,ADDRESS)     "127.0.0.1"
+    getopt argv --vdom      runCtx(tool,DutVDOM)     "root"
+
+    getopt argv --action    runCtx(tool,ACTION)      "none"
+    getopt argv --timeout   runCtx(tool,TIMEOUT)     "3"
+
+    getopt argv --process   runCtx(tool,PROCESS)     "worker"
+    getopt argv --gdb       runCtx(tool,GDB)         "Gef"
+    getopt argv --remote    runCtx(tool,REMOTE)      ""
+
+
+    # Check arguments
+    if { $runCtx(tool,DUT) eq "" } {
+        puts "Please give --dut, exit ..."
+        exit 0
+    }
+
+    if { $runCtx(tool,PROMPT) eq "" } {
+        set runCtx(tool,PROMPT) $runCtx(tool,DUT)
+    }
+
+    dbg 3 "-------------dump opt:$runCtx(tool,starttime)-------------"
+	foreach key [lsort -dictionary [array names runCtx tool,*]] {
+		if {[info exists runCtx($key)]} {
+            dbg 3  [format "%-20s %s" $key $runCtx($key)]
+		}
+	}
+
+
+    if { $runCtx(tool,DRYRUN) == 1 } {
+        exit 0
+    }
+
+    if { $runCtx(tool,VERBOSE) == 0 } {
+        set exp_internal 0
+    } else {
+        set exp_internal 1
+    }
+}
+
+
+_init
+

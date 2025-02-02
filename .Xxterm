@@ -1,0 +1,142 @@
+! vim: set filetype=xdefaults :
+
+XTerm*loginShell:          false
+XTerm*locale:              true
+
+XTerm*saveLines:           12000
+XTerm*transparent:         false
+
+XTerm*fastScroll:          true
+XTerm*scrollBar:           false
+XTerm*scrollBar.DrawBorder:false
+XTerm*reverseVideo:        false
+XTerm*reverseWrap:         true
+XTerm*scrollTtyOutput:     on
+XTerm*scrollKey:           on
+XTerm*scrollstyle:         plain
+XTerm*eightBitInput:       false
+
+! solve screen switch flicker
+XTerm*visualBell:          false
+XTerm*urgentOnBell:        false
+
+XTerm*cutNewline:          true
+XTerm*allowTitleOps:       false
+
+XTerm*title:               Terminal
+xterm*VT100.geometry:      80*32
+
+XTerm*selectToClipboard:   true
+XTerm*charClass:           33:48,35:48,37:48,43:48,45-47:48,64:48,95:48,126:48
+
+!*cursorUnderLine:         true
+!*cursorBlink:              on
+!*cursorOffTime:            1200
+!*cursorOnTime:             2400
+
+Xft.antialias:             1
+Xft.autohint:              0
+Xft.dpi:                   96
+Xft.hinting:               1
+Xft.hintstyle:             hintfull
+Xft.lcdfilter:             lcddefault
+Xft.rgba:                  rgb
+
+XTerm*utf8:                true
+xterm*utf8Title:           true
+XTerm*allowBoldFonts:      true
+XTerm*renderFont:          true
+XTerm*faceSize:            13
+XTerm*faceName:            DejaVu Sans Mono
+xterm*faceNameDoublesize:  WenQuanYi Micro Hei Mono:pixelsize=17:antialias=true
+
+!true, CJK text column width of 2: if set this, tmux pane border will disappear
+!xterm*cjkWidth:            true
+
+!XTerm*faceName:           Monospace
+!XTerm*faceName:           Liberation Mono
+!XTerm*faceSize:           12.5
+!XTerm*faceName:           Liberation Mono
+!XTerm*fontdefault:        xft:Liberation Mono:pixelsize=18:antialias=true:hinting=true
+!XTerm*boldFont:           xft:Liberation Mono:bold:pixelsize=18:antialias=true:hinting=true
+!XTerm*font:               fixed
+!XTerm*font:               -*-terminus-medium-r-*-*-14-*-*-*-*-*-iso10646-*
+!XTerm*font:               -*-terminus-medium-r-normal--18-*-*-*-*-*-iso10646-1
+!XTerm*font:               -*-Monospace-medium-r-*-*-14-*-*-*-*-*-*-*
+!XTerm*font:               DejaVu Sans Mono:pixelsize=13
+
+
+XTerm*termName:            screen-256color
+XTerm*allowSendEvents:     true
+XTerm*metaSendsEscape:     true
+xterm*altSendsEscape:      true
+
+XTerm*iconName:            Terminal
+XTerm*cursorOnTime:        300
+XTerm*VT100*titeInhibit:   true
+
+!! Fix up xterm keybindings
+!xterm*VT100.translations: #override \
+!       <Key>BackSpace:    string(0x7F) \n\
+!       <Key>Insert:       string(0x1b) string("[2~")\n\
+!       <Key>Delete:       string(0x1b) string("[3~")\n\
+!       <Key>Home:         string(0x1b) string("[1~")\n\
+!       <Key>End:          string(0x1b) string("[4~")\n\
+!       <Key>Page_Up:      string(0x1b) string("[5~")\n\
+!       <Key>Page_Down:    string(0x1b) string("[6~")\n\
+!       <KeyPress>Prior:   scroll-back(1,page)\n\
+!       <KeyPress>Next:    scroll-forw(1,page)
+
+
+! Themes
+
+!XTerm*cursorColor:        #d0d0d0
+!XTerm*colorMode:          on
+!XTerm*dynamicColors:      on
+!XTerm*colorULMode:        on
+!XTerm*underLine:          off
+!XTerm*colorBDMode:        on
+!XTerm*colorUL:            yellow
+!XTerm*colorBD:            white
+
+! My theme
+!XTerm*background:         #000000
+XTerm*background:          #101010
+XTerm*foreground:          #9f9f9f
+XTerm*color0:              #000000
+XTerm*color1:              #9e1828
+XTerm*color2:              #aece92
+XTerm*color3:              #968a38
+XTerm*color4:              #414171
+XTerm*color5:              #963c59
+XTerm*color6:              #418179
+XTerm*color7:              #bebebe
+XTerm*color8:              #666666
+XTerm*color9:              #cf6171
+XTerm*color10:             #c5f779
+XTerm*color11:             #fff796
+XTerm*color12:             #4186be
+XTerm*color13:             #cf9ebe
+XTerm*color14:             #71bebe
+XTerm*color15:             #ffffff
+
+!! Molokai theme
+!XTerm*background:         #101010
+!XTerm*foreground:         #d0d0d0
+!XTerm*color0:             #101010
+!XTerm*color1:             #960050
+!XTerm*color2:             #66aa11
+!XTerm*color3:             #c47f2c
+!XTerm*color4:             #30309b
+!XTerm*color5:             #7e40a5
+!XTerm*color6:             #3579a8
+!XTerm*color7:             #9999aa
+!XTerm*color8:             #303030
+!XTerm*color9:             #ff0090
+!XTerm*color10:            #80ff00
+!XTerm*color11:            #ffba68
+!XTerm*color12:            #5f5fee
+!XTerm*color13:            #bb88dd
+!XTerm*color14:            #4eb4fa
+!XTerm*color15:            #d0d0d0
+

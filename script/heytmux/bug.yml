@@ -1,0 +1,31 @@
+---
+# Root layout
+layout: even-vertical
+
+# Root window options
+pane-border-status: top
+
+# List of windows
+windows:
+  ## The 1st window: Name only, no panes
+  #- empty, named window
+
+  - {{ $heyWindow }}:       # Name of the window
+      layout: tiled         # Window layout, overrides root layout
+      panes:                # List of panes
+        - build:
+          - mkdir -p {{ $MYPATH_WORK }}/{{ $heyWindow }}
+          - cd {{ $MYPATH_WORK }}/{{ $heyWindow }}
+        - model:
+          - sleep 1
+          - cd {{ $MYPATH_WORK }}/{{ $heyWindow }}
+        - doc:
+          - sleep 1
+          - cd {{ $MYPATH_WORK }}/{{ $heyWindow }}
+          - new-doc.sh {{ $heyBug }}
+        - main:
+          - sleep 1
+          - cd {{ $MYPATH_WORK }}/{{ $heyWindow }}
+          - df -hm
+          - tmux select-pane -t 2
+

@@ -1,0 +1,49 @@
+// vim: set ft=vim:
+About Fold:
+==========
+doc:
+------
+  [Folding](https://vim.fandom.com/wiki/Folding)
+  [vim-tips-folding-fun](https://www.linux.com/training-tutorials/vim-tips-folding-fun/)
+
+config:
+------
+default value is foldmethod=manual, check by `:set fdm?`
+:set foldmethod=indent
+:set fdm=indent
+:set fdm=syntax
+
+behaviour:
+----------
+manual (or marker):
+  zf{motion}
+      zf'a         will fold from the current line to wherever the mark a has been set
+      zfa}         create a fold for the current code block
+      zf/string    create a fold from the cursor position to a search result. If you run 
+
+
+Keys/Maps/Commands:
+==================
+For example, some config file, we can use `:set fdm=indent` to fold it.
+
+  zR        callapse all
+  zM        fold all
+  za        toggle folds
+  zo/zO     callapse current the entire sub-area
+  zc/zC     this whole time :
+
+  zf#j      creates a fold from the cursor down # lines.
+  zf/string creates a fold from the cursor to string.
+  zj        moves the cursor to the next fold.
+  zk        moves the cursor to the previous fold.
+  zo        opens a fold at the cursor.
+  zO        opens all folds at the cursor.
+  zm        increases the foldlevel by one.
+  zM        closes all open folds.
+  zr        decreases the foldlevel by one.
+  zR        decreases the foldlevel to zero — all folds will be open.
+  zd        deletes the fold at the cursor.
+  zE        deletes all folds.
+  [z        move to start of open fold.
+  ]z        move to end of open fold.
+

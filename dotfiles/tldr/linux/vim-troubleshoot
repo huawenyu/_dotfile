@@ -1,0 +1,8 @@
+
+# troubleshooting
+  1. some myself plugin support s:log.debug feature:
+	 - debug=1 vi <file>
+	 - tail -f /tmp/vim.log
+  2. only load some plugin:
+	 - let g:vim_confi_option.mode = ['test']
+	 - Example: $ mode=test vi file.txt

@@ -1,0 +1,43 @@
+// vim: set ft=vim:
+
+http://www.futurile.net/2016/03/19/vim-surround-plugin-tutorial/
+  <command><(s)urroundMode>[count]<surround-target>[replacement]
+      <command>: (d)elete, (c)hange, vi(S)ual, (y)add
+
+      <surround-object>: sS -- cS(new-line), yS<motion><addition>
+      <surround-target>: (<[{'"`<b> <word><sentence><paragrph>      -- the add/delete str,
+                         barB    t   w     s         p
+      [replacement]:     '"(                  -- only require under (c)hange/(y)add mode
+
+Sample:
+  ds"         -- remove "
+  dst         -- remove <tag>
+  ds( | dsb   -- remove ()
+
+  cs<surround target><replacement>:
+      cs"'        -- change from " to '
+      cS'<p>      -- change from ' to <p>, also put then end '</p>' into new-line
+
+  ys<motion|text-object><addition>:
+      ysf'"       -- wrap by " from from cur to (f)ound '
+      ysiw]       -- wrap current word by ]
+      ys$"        -- wrap by " from cur to <end>
+      ys3wb       -- wrap by ) from cur to 3w
+
+    yss<addition>: wrap current line
+      yssB        -- wrap by { of current line
+
+  yS<motion><addition>: wrap into new line
+      ySf"t       -- wrap by <tag> from cur to (f)ound "
+   +ySS<addition>: Whole line and do the above/after
+      ySSb        -- add () into two-lines
+  vS<surround target>:
+      viwS*       -- *<word>*
+      Shift-v+S<p>-- <p>
+                     <selected>
+                     </p>
+      Ctrl-v+S<li>-- <li>item 1</li>
+                     <li>item 2</li>
+  (S)elected:
+      <Selected>S"-- wrap by " of selected-text
+

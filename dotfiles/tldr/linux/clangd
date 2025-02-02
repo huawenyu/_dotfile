@@ -1,0 +1,36 @@
+// vim: set ft=markdown:
+
+# Install newer version:
+
+    ## https://clangd.llvm.org/installation.html
+    ## sudo apt-get install clangd      +== the default version is clangd v10.0
+
+	sudo apt-get install clangd-12
+	sudo update-alternatives --install /usr/bin/clangd clangd /usr/bin/clangd-12 100
+
+## Install create compile_command.json tool
+
+1. bear
+
+    ## if there have libear.so, libexec.so load fail issue
+    ##   bear support -l option, so we can assign the so full-path directly to bear by:
+    ## for bear 2.4
+    bear -l /usr/lib/x86_64-linux-gnu/bear/libear.so make all
+    ## for v3.0, bear not support -l option
+    bear -l /usr/local/lib/x86_64-linux-gnu/bear/libexec.so make all
+
+    bear: https://github.com/rizsotto/Bear
+    $ sudo apt install -y bear libear
+
+    ## We also can build ourself:
+    https://github.com/rizsotto/Bear/blob/master/INSTALL.md
+
+    ## our os is ubuntu x64, so we can add the libdir:
+    cmake -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu -DENABLE_UNIT_TESTS=OFF -DENABLE_FUNC_TESTS=OFF $BEAR_SOURCE_DIR
+    make all
+    sudo make install
+
+2. compiledb
+
+    compiledb: https://github.com/nickdiego/compiledb
+

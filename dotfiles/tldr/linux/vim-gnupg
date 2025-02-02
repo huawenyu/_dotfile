@@ -1,0 +1,25 @@
+// vim: set filetype=markdown:
+vim-gnupg
+
+# QuickStart
+   gx  open url in browser
+
+[从一个简单的备份需求演示GPG的使用](https://bg6cq.github.io/ITTS/security/gpg/)
+
+# Setup gnupg Evn
+https://www.madboa.com/geek/gpg-quickstart/
+[doc](https://www.ruanyifeng.com/blog/2013/07/gpg.html)
+
+   //$ yum install gnupg
+   $ sudo apt-get install gnupg
+   $ gpg --full-generate-key
+   $ gpg --recipient "<name> <email>" --output demo.gpg --encrypt demo.txt
+   $ gpg --decrypt demo.gpg --output demo.de.txt
+
+   // The plugin only work with the file which's extension '.gpg'
+   $ vi demo.gpg
+
+# Step by Step
+
+[用 PGP 保护代码完整性（四）：将主密钥移到离线存储中](https://zhuanlan.zhihu.com/p/53764856)
+[保护代码完整性（六）：在 Git 上使用 PGP](https://zhuanlan.zhihu.com/p/54216284)

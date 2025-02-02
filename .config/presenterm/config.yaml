@@ -1,0 +1,53 @@
+options:
+  command_prefix: "cmd:"
+  image_attributes_prefix: ""
+  strict_front_matter_parsing: false
+  incremental_lists: false
+  implicit_slide_ends: false
+  end_slide_shorthand: false
+snippet:
+  exec_replace:
+    enable: true
+  exec:
+    enable: true
+    custom:
+      #
+      # Demo: https://github.com/mfontanini/presenterm/blob/master/executors.yaml
+      #
+      # The keys should be the language identifier you'd use in a code block.
+      tcl:
+        # The name of the file that will be created with your snippet's contents.
+        filename: "snippet.tcl"
+
+        # A list of environment variables that should be set before building/running your code.
+        environment:
+          MY_FAVORITE_ENVIRONMENT_VAR: foo
+
+        # A prefix that indicates a line that starts with it should not be visible but should be executed if the
+        # snippet is marked with `+exec`.
+        hidden_line_prefix: "/// "
+
+        # A list of commands that will be ran one by one in the same directory as the snippet is in.
+        commands:
+          # Compile if first
+          # - ["g++", "-std=c++20", "snippet.cpp", "-o", "snippet"]
+          # Now run it
+          - ["tclsh",  "$pwd/snippet.tcl"]
+      ascii:
+        # The name of the file that will be created with your snippet's contents.
+        filename: "snippet.mermaid"
+
+        # A list of environment variables that should be set before building/running your code.
+        environment:
+          MY_FAVORITE_ENVIRONMENT_VAR: foo
+
+        # A prefix that indicates a line that starts with it should not be visible but should be executed if the
+        # snippet is marked with `+exec`.
+        hidden_line_prefix: "/// "
+
+        # A list of commands that will be ran one by one in the same directory as the snippet is in.
+        commands:
+          # Compile if first
+          # - ["g++", "-std=c++20", "snippet.cpp", "-o", "snippet"]
+          # Now run it mermaid-ascii -f ./test.mermaid
+          - ["mermaid-ascii", "-f", "$pwd/snippet.mermaid"]

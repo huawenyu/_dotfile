@@ -1,0 +1,9 @@
+layout = "5e09,281x67,0,0{133x67,0,0,17,147x67,134,0[147x33,134,0,18,147x33,134,34{73x33,134,34,136,73x33,208,34[73x16,208,34,164,73x16,208,51,165]}]}"
+session_name = "development"
+number_of_panes = 5
+commands = ["nvim"]
+
+[console]
+number_of_panes = 3
+session_name = "frontend"
+commands = ["nvim"]

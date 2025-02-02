@@ -1,0 +1,4 @@
+#!/bin/bash
+
+tldr.py -p linux common -L en "$@"
+

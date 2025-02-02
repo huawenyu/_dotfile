@@ -1,0 +1,28 @@
+atsh ( install | network | clean
+  | console (<targetallrun>) reset (fos | fpx)
+  | ssh (<targetallrun>)
+  | list (--all)
+  | stop (<targetallrun>)
+  | run (<targetconf>) ...
+  | image (<targetdutrun>) fos (<fosImgList>)
+  | image (<targetdutrun>) fpx (<fpxImgList>)
+  | define (<targetalldut>) fos (<fosImgList>)
+  | define (<targetalldut>) fpx (<fpxImgList>)
+  | destroy (<targetdut>)
+  | config (<targetdutrun> | push | pull ) ( license | password
+        | (all | network | policy ) (fos | fpx)
+        | save (<confList>|<custname>)
+        | restore (<confList>)
+        )
+  );
+
+targetalldut = dut1|dut2|dut3|dut4|dut5|dut6|dut7|dut8|dut9 ;
+targetdut = ! atsh list --all | grep '^Access dut'| cut -f2 -d' ' ;
+targetallrun = ! atsh list | grep '^Access'| cut -f2 -d' ' ;
+targetdutrun = ! atsh list | grep '^Access dut'| cut -f2 -d' ' ;
+targetconsole = ! atsh list | grep -E '^Access dut|Access test'| cut -f2 -d' ' ;
+targetconf = ! awk -F'='  '/^InstanceDir=/{print $2}' ~/.atrc | xargs ls | grep -E 'dut[1-9]' ;
+confList = ! locDir=$( awk -F'='  '/^InstanceDir=/{print $2"/config"}' ~/.atrc ) && echo $locDir | xargs -I {} find {} -name "*" | sed -e "s@$locDir/@@" | grep '\.' ;
+fosImgList = ! eval "${LFTP_ATCMD}'ls /image/fortigate'" | awk '{print $9}' ;
+fpxImgList = ! eval "${LFTP_ATCMD}'ls /image/fortiproxy'" | awk '{print $9}' ;
+

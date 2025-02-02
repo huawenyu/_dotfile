@@ -1,0 +1,16 @@
+#!/bin/bash
+#
+# vim: ft=zsh
+# vim: set copyindent preserveindent et sts=0 sw=4 ts=4 :
+#
+# Generate the c/c++ ccls indexer db: ccls clang makefile
+if [[ -f compile_commands.json ]]; then
+    sample_dir=$(awk 'match($0, /-I(.*)\/daemon\/wad\//, arr) {print arr[1]; exit}' compile_commands.json)
+    cur_dir=$(realpath .)
+    if [[ $sample_dir != $cur_dir ]]; then
+        echo "${_ZT_ARGS_Indent}Substitude: $sample_dir -> $cur_dir"
+        sed -i "s;$sample_dir;$cur_dir;g" compile_commands.json
+    fi
+else
+    echo "${_ZT_ARGS_Indent}Clangd file compile_commands.json not exist, return!"
+fi

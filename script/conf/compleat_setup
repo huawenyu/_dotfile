@@ -1,0 +1,24 @@
+# wrapper needed for zsh (and harmless in bash)
+_run_compleat() {
+    export COMP_POINT COMP_CWORD COMP_WORDS COMPREPLY BASH_VERSINFO COMP_LINE
+    compleat $@
+}
+
+[ -n "$COMPLEAT_VENDOR_DIR" ] || COMPLEAT_SYSTEM_DIR=/usr/share/compleat.d
+[ -n "$COMPLEAT_SYSTEM_DIR" ] || COMPLEAT_SYSTEM_DIR=/etc/compleat.d
+[ -n "$COMPLEAT_USER_DIR"   ] || COMPLEAT_USER_DIR=$HOME/.compleat
+
+# Load usage from the relative path <compleat>/conf/compleat.d
+compDIR=$(which compleat)
+compDIR=$(dirname $compDIR)
+[ -n "$COMPLEAT_USER2_DIR"  ] || COMPLEAT_USER2_DIR=$compDIR/conf/compleat.d
+
+for DIR in $COMPLEAT_VENDOR_DIR $COMPLEAT_SYSTEM_DIR $COMPLEAT_USER_DIR $COMPLEAT_USER2_DIR; do
+    if [ -d $DIR -a -r $DIR -a -x $DIR ]; then
+        for FILE in $DIR/*.usage; do
+            for COMMAND in `compleat $FILE`; do
+                complete -o nospace -o default -C "_run_compleat $FILE $COMMAND" $COMMAND
+            done
+        done
+    fi
+done

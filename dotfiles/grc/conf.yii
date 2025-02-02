@@ -1,0 +1,61 @@
+# warnings
+regexp=\[warning\]
+colours=yellow
+count=once
+=============================
+# errors
+regexp=\[error\].+?$
+colours=red
+count=once
+=============================
+# php error
+regexp=\[error\]\s+\[php\]\s+.+?:
+colours=red
+count=once
+=============================
+# trace, info
+regexp=\[(trace|info)\].+?$
+colours=default
+count=once
+=============================
+# filepat e.g. /www/app/protected/commands/SomeCommand.php:382
+regexp=/[\w/\-\.]+(\(\d+\):|:\d+)?
+colours=blue
+count=more
+=============================
+regexp=[\w/\-\.]+(/[\w\-\.])+/?
+colours=blue
+count=more
+=============================
+regexp=^Stack trace:
+colours=magenta
+count=once
+=============================
+regexp=^\#\d+
+colours=magenta
+count=once
+=============================
+regexp=Querying SQL:.+?$
+colours=cyan
+count=once
+=============================
+regexp=SQLSTATE\[\d+\].+$
+colours=cyan
+count=once
+=============================
+regexp=SQLSTATE\[\d+\]
+colours=white on_red
+count=once
+#=============================
+#regexp=(SELECT|INSERT|UPDATE|FROM|WHERE|ORDER\s+BY|GROUP\s+BY|LEFT\s+JOIN|FULL\s+JOIN|SHOW\s+FULL|INTO)
+#colours=cyan bold
+#count=more
+=============================
+#dates
+regexp=\d{4}/\d{2}/\d{2}\s\d{2}\:\d{2}\:\d{2}
+colours=green
+count=more
+=============================
+regexp=^$
+colours=default
+count=unblock

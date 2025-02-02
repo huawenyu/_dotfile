@@ -1,0 +1,75 @@
+// vim: set ft=markdown
+
+Tmux layout scripting made easy, Heytmux requires Ruby 2.0+ and tmux 2.3+.
+
+Heytmux requires Ruby 2.0+ and tmux 2.3+.
+
+As Ruby gem
+gem install heytmux
+Installs heytmux executable
+As Vim plugin
+Using vim-plug:
+
+Plug 'junegunn/heytmux'
+Registers :Heytmux command
+No need to install Gem if you only use Heytmux inside Vim
+But if you want it to be globally available, Plug 'junegunn/heytmux', { 'do': 'gem install heytmux' }
+Usage
+Create a YAML file that describes a desired tmux workspace.
+
+```yaml
+# workspace.yml
+- first window:
+    layout: tiled
+    panes:
+      - first pane: sleep 1
+      - second pane: sleep 2
+      - third pane: |
+          sleep 3
+          sleep 4
+
+- second window:
+    layout: even-vertical
+    pane-border-status: top
+    synchronize-panes: true
+    panes:
+      - pane 2-1: sleep 5
+      - pane 2-2: sleep 6
+```
+
+
+
+
+```yaml
+---
+# Root layout
+layout: even-vertical
+
+# Root window options
+pane-border-status: top
+
+# List of windows
+windows:
+  ## The 1st window: Name only, no panes
+  #- empty, named window
+
+  - {{ $heyWindow }}:       # Name of the window
+      layout: tiled         # Window layout, overrides root layout
+      panes:                # List of panes
+        - build:
+          - mkdir -p {{ $MYPATH_WORK }}/{{ $heyWindow }}
+          - cd {{ $MYPATH_WORK }}/{{ $heyWindow }}
+        - model:
+          - sleep 1
+          - cd {{ $MYPATH_WORK }}/{{ $heyWindow }}
+        - doc:
+          - sleep 1
+          - cd {{ $MYPATH_WORK }}/{{ $heyWindow }}
+          - new-doc.sh {{ $heyBug }}
+        - main:
+          - sleep 1
+          - cd {{ $MYPATH_WORK }}/{{ $heyWindow }}
+          - df -hm
+          - tmux select-pane -t 2
+```
+

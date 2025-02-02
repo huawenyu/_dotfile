@@ -1,0 +1,412 @@
+#!/bin/bash
+#
+# git-info - shows information about a Git repository a la `svn info'
+#
+# How to use:
+#     $ git info
+#     $ git info ~/src/somewhere/somefile
+#     $ git info some/relative/file_or_directory
+#     $ git info ~/repos/something.git
+#
+# Copyright (c) 2009-2022 Akinori MUSHA
+#
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+
+COLOR=
+verbose=0
+
+main () {
+    local opt
+    local OPTS_SPEC="\
+$0 [<options>] [<path>]
+
+$0 shows information about a Git repository.
+--
+h,help     show the help
+color?when show colored output (always|never|auto)
+"
+    #eval "$(echo "$OPTS_SPEC" | git rev-parse --parseopt --stuck-long -- "$@" || echo exit $?)"
+
+    while [ $# -gt 0 ]; do
+        opt="$1"
+        shift
+
+        case "$opt" in
+            --color)
+                COLOR=always
+                ;;
+            --color\=*)
+                COLOR="${opt#*=}"
+                ;;
+            branch)
+                showBranch=1
+                ;;
+            status)
+                showStatus=1
+                ;;
+            -vvv)
+                verbose=3
+                showBranch=1
+                showStatus=1
+                showCommit=1
+                ;;
+            -vv)
+                verbose=2
+                showBranch=1
+                showCommit=1
+                ;;
+            -v)
+                verbose=1
+                showStatus=1
+                ;;
+            --)
+                break
+                ;;
+            *)
+                die "Unexpected option: $opt"
+                ;;
+        esac
+    done
+
+    initialize_colors
+
+    case "$#" in
+        1)
+            ;;
+        0)
+            if [ -n "$GIT_DIR" ]; then
+                set -- "$GIT_DIR"
+            else
+                set -- .
+            fi
+            ;;
+        *)
+            die "Too many arguments"
+            ;;
+    esac
+
+    git_info "$1"
+
+    if [[ $showStatus -ge 2 ]] || [[ $showStatus == 1 ]] && [[ $verbose -ge 1 ]] ; then
+        echo "Ignored:"
+        git ls-files . --ignored --exclude-standard --others | grep -v "/obj/debug" | grep -v "node_modules" | sed 's/^/    /'
+    fi
+
+    if [[ $showStatus -eq 1 ]]; then
+        echo "Untracked:"
+        git ls-files . --exclude-standard --others | grep -v ".cache/clangd" | sed 's/^/    /'
+    fi
+}
+
+initialize_colors () {
+    if [ -z "$COLOR" ]; then
+        if git config --get-colorbool color.info; then
+            COLOR=always
+        else
+            COLOR=never
+        fi
+    fi
+
+    case "$COLOR" in
+        always|never)
+            COLOR_BRANCH=$COLOR
+            ;;
+        auto)
+            if git config --get-colorbool color.branch; then
+                COLOR_BRANCH=always
+            else
+                COLOR_BRANCH=never
+            fi
+            ;;
+        *)
+            die "option \`color' expects \"always\", \"auto\", or \"never\""
+            ;;
+    esac
+
+    if [ "$COLOR" = always ]; then
+        REMOTE_COLOR="$(get_color color.info.remote color.branch.remote red)"
+        LOCAL_COLOR="$(get_color color.info.local color.branch.local green)"
+        PATH_COLOR="$(get_color color.info.path '' 'bold')"
+        REPOSITORY_COLOR="$(get_color color.info.repository '' 'bold')"
+        ID_COLOR="$(get_color color.info.id '' 'yellow')"
+        RESET_COLOR=$(printf "\033[m")
+    else
+        REMOTE_COLOR=
+        LOCAL_COLOR=
+        PATH_COLOR=
+        REPOSITORY_COLOR=
+        ID_COLOR=
+        RESET_COLOR=
+    fi
+}
+
+get_color () {
+    local key1="$1" key2="$2" fb="$3"
+    local color="$(git config --get-color "$key1" '')"
+    case "$color" in
+        '[m'|'')
+            git config --get-color "$key2" "$fb"
+            ;;
+        *)
+            printf '%s' "$color"
+            ;;
+    esac
+}
+
+git_info () {
+    local path="$1" dir relpath root git_dir
+
+    if [ -d "$path" ]; then
+        dir="$(cd -P "$path" && pwd)" || die "$path: Cannot cd to the directory"
+        case "$path" in
+            *.git)
+                git_dir="$dir"
+                ;;
+        esac
+    elif [ -f "$path" ]; then
+        dir="$(dirname "$path")"
+        dir="$(cd -P "$dir" && pwd)" || die "$dir: Cannot cd to the directory"
+        relpath="$(basename "$path")"
+    else
+        die "$path: No such file or directory"
+    fi
+
+    if [ -n "$git_dir" ]; then
+        dir=
+        relpath=
+    elif case "$dir" in ?*.git) [ -d "$dir/objects" -a -d "$dir/refs" ] ;; *) false ;; esac; then
+        git_dir="$dir"
+        relpath=
+    else
+        root="$(
+            cd "$dir" || exit 1
+            while [ ! -e .git ]; do
+                [ "$(pwd)" = / ] && exit 1
+                cd ..
+            done
+            pwd
+        )" || die "Not a git repository."
+        git_dir="$root/.git"
+        if [ "$dir" = "$root" ]; then
+            relpath=.
+        elif [ -n "$relpath" ]; then
+            relpath="${dir#"$root/"}/$relpath"
+        else
+            relpath="${dir#"$root/"}"
+        fi
+    fi
+
+    set -- "$git_dir"
+    if [ -n "$relpath" ]; then
+        set -- "$@" "$relpath"
+    fi
+
+    do_git_info "$@"
+}
+
+do_git_info () {
+    local git_dir="$1" relpath="$2" root line field color reset
+
+    shift
+
+    : ' Comments
+    echo "test1"
+    echo "test2"
+    echo "test3"
+    branchName=$( git rev-parse --abbrev-ref HEAD )
+    echo $branchName
+    '
+    echo "Repository Path: $PATH_COLOR$git_dir$RESET_COLOR"
+    branchName=$( git rev-parse --abbrev-ref HEAD )
+
+    if [ $# -gt 0 ]; then
+
+        # Get parent name
+        commitMsg=$( grep -m 1 "$branchName^" <( git show-branch -a 2> /dev/null) )
+        shortCommit=$( echo $commitMsg | sed -n "s/.*${branchName}.*]\s*\(.*\):.*$/\1/p" )
+        commitParent=$( grep -m 1 "HEAD.*$shortCommit" <( git log --pretty=format:'%d %s') )
+        parentName=$( echo $commitParent | sed -n "s/\(.*\?\)origin\/\(.*\),.*$/\2/p" )
+
+        # Get up-stream
+        upStream=$( git branch -vv | grep "$branchName" | sed -n "s/.*\[\(.*\)\].*$/\1/p" )
+
+        root="$(dirname "$git_dir")"
+        echo "Branch from '$parentName', remote trace '$upStream'"
+        if  [ "$relpath" = . ]; then
+            echo "  Path: $PATH_COLOR$root$RESET_COLOR"
+        else
+            echo "  Path: $PATH_COLOR$root/$relpath$RESET_COLOR"
+        fi
+    fi
+
+    maketemp
+
+    GIT_DIR="$git_dir" git remote -v > "$TEMPFILE"
+    if [ -s "$TEMPFILE"  ]; then
+        echo "Remote Repositories:"
+        sed -e "s/^\([^ 	]\{1,\}\)\([ 	]\{1,\}\)\([^ 	]\{1,\}\)/$REMOTE_COLOR\1$RESET_COLOR\2$REPOSITORY_COLOR\3$RESET_COLOR/" \
+            -e 's/^/	/' \
+            "$TEMPFILE"
+    fi
+
+    if [[ $showBranch == 1 ]] ; then
+        GIT_DIR="$git_dir" git branch -r --color=$COLOR_BRANCH > "$TEMPFILE"
+        if [ -s "$TEMPFILE"  ]; then
+            echo "Remote Branches:"
+            sed -e "s/\([ 	]\{1,\}->[ 	]\{1,\}\)\([^ 	]\{1,\}\)/\1$REMOTE_COLOR\2$RESET_COLOR/" \
+                -e 's/^ */	/' "$TEMPFILE"
+        fi
+    fi
+
+    if [[ $verbose -ge 2 ]] ; then
+      GIT_DIR="$git_dir" git branch --color=$COLOR_BRANCH > "$TEMPFILE"
+      if [ -s "$TEMPFILE"  ]; then
+        echo "Local Branches:"
+        sed 's/^/	/' "$TEMPFILE"
+      fi
+    fi
+
+    echo "Repository Configuration: git config --local --list"
+    echo "" > $TEMPFILE
+    echo "" > $TEMPFILE2
+    GIT_DIR="$git_dir" git config --local --list > $TEMPFILE2
+    awk -F'=' -f <(cat - <<-'_EOF_'
+        #function walk_array(arr, name,    i)
+        #{
+        #    for (i in arr) {
+        #        if (isarray(arr[i]))
+        #            walk_array(arr[i], (name "[" i "]"))
+        #        else
+        #            printf("%s[%s] = %s\n", name, i, arr[i])
+        #    }
+        #}
+
+        BEGIN{c=0} {
+        }
+        match($1, /^([^.]+)?\.(.*)\.(.*)$/, grp){
+            table[ grp[1] ][ grp[2] ][ grp[3] ] = $2
+        }
+        END {
+            #walk_array(table, name, i)
+            for (type in table) {
+                print "   " type " :"
+                if (isarray(table[type])) {
+                    for (brName in table[type]) {
+                        print "      [" brName "]"
+                        if (isarray(table[type][brName])) {
+                            for (attrKey in table[type][brName]) {
+                                print "        " attrKey " = " table[type][brName][attrKey]
+                            }
+                        } else {
+                            print table[i]
+                        }
+                    }
+                } else {
+                    print table[i]
+                }
+            }
+        }
+_EOF_
+) $TEMPFILE2 > $TEMPFILE
+
+    if [[ $verbose -eq 0 ]] ; then
+        cat $TEMPFILE | grep -A4 "\[origin"
+    elif [[ $verbose -ge 2 ]] ; then
+        cat $TEMPFILE
+    fi
+
+
+    if [[ $showCommit == 1 ]]; then
+        (cd "$root" && GIT_DIR="$git_dir" git log --max-count=1 "$@") | {
+            while read -r field line; do
+                color=
+                reset=
+                case "$field" in
+                    commit)
+                        field='Commit ID:'
+                        color="$ID_COLOR"
+                        reset="$RESET_COLOR"
+                        ;;
+                    *:)
+                        ;;
+                    '')
+                        break
+                        ;;
+                esac
+                echo "Last Changed $field $color$line$reset"
+            done
+            cat > "$TEMPFILE"
+        }
+        echo "Last Changed Log:"
+        sed 's/^    /	/' "$TEMPFILE"
+    fi
+
+    echo "Worktree: git worktree list"
+    if [[ $verbose -eq 0 ]] ; then
+        git worktree list | grep -v "workref" | awk '{print $3 " --> " $1}' | sed 's/^/	/'
+    elif [[ $verbose -ge 1 ]] ; then
+        git worktree list | awk '{print $3 " --> " $1}' | sed 's/^/	/'
+    fi
+
+    finalize
+}
+
+die () {
+    [ "$#" -gt 0 ] && echo "$0: $@" >&2
+    finalize
+    exit 1
+}
+
+# Usage:
+#   debug myvar
+debug () {
+    echo "$1 => \"$(eval echo \$$1)\"" >&2;
+}
+
+TEMPFILE=
+
+maketemp () {
+    if [ -z "$TEMPFILE" ]; then
+        TEMPFILE="$(mktemp /tmp/git-info.XXXXXX)" || die
+        trap "finalize; exit 130" 1 2 3 15
+    fi
+
+    if [ -z "$TEMPFILE2" ]; then
+        TEMPFILE2="$(mktemp /tmp/git-info.XXXXXX)" || die
+        trap "finalize; exit 130" 1 2 3 15
+    fi
+}
+
+finalize () {
+    if [ -n "$TEMPFILE" ]; then
+        rm -f "$TEMPFILE"
+    fi
+
+    if [ -n "$TEMPFILE2" ]; then
+        rm -f "$TEMPFILE2"
+    fi
+}
+
+main "$@"

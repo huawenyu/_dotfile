@@ -1,0 +1,4 @@
+#!/bin/bash
+
+curDir=$(pwd)
+tmux killp -a; tx-mode $(tmux display-message -p '#S') -w $(tmux display-message -p '#W') -t -l 22 "cd $curDir; reset" "cd $curDir; reset" "cd $curDir; reset" "cd $curDir; reset"

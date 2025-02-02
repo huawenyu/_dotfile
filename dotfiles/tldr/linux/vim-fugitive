@@ -1,0 +1,19 @@
+// vim: set filetype=markdown:
+vim-fugitive
+
+vim-fugitive: git-base
+  :Gblame     Show help in blame window and input 'g?'
+      o       open commit in horizontal split
+      O       open commit in new tab
+      ~       reblame at [count]th first grandparent
+
+      -       reblame at commit
+      P       reblame at [count]th parent (like HEAD^[count])
+  :Glog       Show current file's all history version
+  :Git        Execute git command
+gv.vim:       commit browser
+  :GV         to open commit browser, suppot log options, e.g. :GV -S foobar.
+  :GV!        will only list commits that affected the current file
+  :GV?        fills the location list with the revisions of the current file
+     o/<cr>   on a commit to display the content/diff on the new open side window.
+

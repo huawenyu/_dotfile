@@ -1,0 +1,39 @@
+// vim: set ft=vim:
+Searching
+
+For basic searching:
+    /pattern       - search forward for pattern
+    ?pattern       - search backward
+    n              - repeat forward search
+    N              - repeat backward
+
+Some variables you might want to set:
+    :set ignorecase - case insensitive
+    :set smartcase  - use case if any caps used
+    :set incsearch  - show match as search proceeds
+    :set hlsearch   - search highlighting
+
+More cool searching tricks:
+    *               - search for word currently under cursor
+    g*              - search for partial word under cursor (repeat with n)
+    ctrl-o, ctrl-i  - go through jump locations
+    [I              - show lines with matching word under cursor
+    :%s///gn        - Count all occurrences of the last used search pattern.
+
+Search and quickfix:
+    :vimgrep /an error/ *.c
+    :vimgrep /\<FileName\>/ *.h include/*
+    :vimgrep /myfunc/ **/*.c
+    :1vimgrep                   " to find only the first.
+
+Search and replace...
+    :%s/search_for_this/replace_with_this/    - search whole file and replace
+    :%s/search_for_this/replace_with_this/c   - confirm each replace
+
+Maps:
+    " Count all occurrences of the last used search pattern.
+    nnoremap  ;#   :<c-u>%s///gn<cr>
+    " Show directly all occurrences of the last used search pattern.
+    nnoremap  ;^   :<c-u>g//p<cr>
+    " Populate all occurrences of the last used search pattern into quickfix
+    nnoremap  ;*   :cexpr []<cr> <bar>:<c-u>g//caddexpr expand("%") . ":" . line(".") . ":" . getline(".")<cr> <bar>:copen<cr>

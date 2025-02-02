@@ -1,0 +1,62 @@
+// vim: set filetype=markdown:
+vim-easy-align
+===
+
+This is the default map:
+
+```vim
+:EasyAlign
+
+" Start interactive EasyAlign in visual mode (e.g. vipga)
+xmap ga <Plug>(EasyAlign)
+
+" Start interactive EasyAlign for a motion/text object (e.g. gaip)
+nmap ga <Plug>(EasyAlign)
+```
+
+# Usage
+
+Nested list:
+
+ 0. The command synopsis:
+
+```vim
+    :EasyAlign[!] [N-th] delimiter [OPTIONS]
+
+    delimiter
+      : And the delimiter could be one letter which belong to predefined-rules
+        or could be regex by <Ctrl-/> which should like: /regex/, but just input regex, no '/'
+    [N-th]
+      : Only align the Nth delimiter, '*' means align all occurrence.
+    [OPTIONS]
+      : the detail of how to align
+
+        Key            	 Option              	 Values
+        ---------------------------------------------------------
+        CTRL-/         	 regex-delimiter     	 Input regex string
+
+        CTRL-I         	 indentation         	 shallow, deep, none, keep
+        CTRL-L,CTRL-X  	 insert left_margin  	 Input number or string
+        CTRL-R         	 insert right_margin 	 Input number or string
+        CTRL-D,<Enter> 	 delimiter_align     	 left, center, right
+
+        CTRL-F         	 filter              	 Input string ([gv]/.*/?)
+        CTRL-U         	 ignore_unmatched    	 0, 1
+        CTRL-G         	 ignore_groups       	 [], ['String'], ['Comment'], ['String', 'Comment']
+
+        CTRL-A         	 align               	 Input string (/[lrc]+\*{0,2}/)
+
+        <Left>         	 stick_to_left       	 { 'stick_to_left': 1, 'left_margin': 0 }
+        <Right>        	 stick_to_left       	 { 'stick_to_left': 0, 'left_margin': 1 }
+        <Down>         	 *_margin            	 { 'left_margin': 0, 'right_margin': 0 }
+
+```
+
+ 1. vi-Visual-mode, Press 'ga', to plug-Interactive-mode,
+ 2. Easier to choose predefined-rules [,;=| ], just press '*=' to align all '=',
+ 3. Or we can choose regex as the delimiter by <Ctrl-x>,
+ 4. If like 'live interactive mode', by <Ctrl-p>, press <Ctrl-p> again to confirm.
+
+# Todo
+
+So we can add one format line before or after the table, and create a function to execute the format.
