@@ -237,6 +237,13 @@ Using yadm (Yet Another Dotfiles Manager) is a simple and efficient way to manag
 
 # yadm
 
+## Install
+
+```bash
+sudo curl -fLo /usr/local/bin/yadm https://github.com/TheLocehiliosan/yadm/raw/master/yadm
+sudo chmod a+x /usr/local/bin/yadm
+```
+
 <!-- cmd:column_layout: [1, 1] -->
  <!-- cmd:column: 0 -->
 
@@ -304,6 +311,7 @@ yadm push --mirror origin
 ```bash
 ### Clone from another env
 yadm clone https://github.com/huawenyu/_dotfile.git
+yadm checkout --force
 ```
 
 
@@ -361,6 +369,9 @@ yadm decrypt  # Decrypted and apply the encrypted file
 $ ls
     ~/.bashrc##my-laptop        ### endwith <hostname>, <os>
     ~/.bashrc##linux
+
+$ yadm config local.class main
+$ yadm alt ~/.bashrc --os Linux --class main
 
 $ yadm alt      ### Auto link the appropriate file for the current env
 ```

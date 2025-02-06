@@ -1,43 +1,134 @@
 #!/bin/bash
 
-if command -v mycmd &> /dev/null; then
-	;
-else
-	curl -fLo /usr/local/bin/yadm https://github.com/TheLocehiliosan/yadm/raw/master/yadm
-	chmod a+x /usr/local/bin/yadm
-fi
+var_action="pull"
 
-yadm --version
-yadm config local.class main
+Usage=$(cat <<-END
+yadm-init: yadm helper
 
-if [ -d "~/.local/share/yadm/repo.git" ]; then
-	echo "yadm already initialed: ~/.local/share/yadm/repo.git"
-	echo "Do you want to delete the exist repo and create a new one?"
-	#!/bin/bash
+    $ yadm-init pull
+    $ yadm-init clone
+    $ yadm-init push
+END
+)
 
-	read -p "Do you want to delete the exist repo and create a new one? (yes/no) " yn
-	case $yn in
-		[yY] | [yY][eE][sS] )
-			echo "You chose yes."
-			rm -fr "~/.local/share/yadm/repo.git"
-			;;
-		[nN] | [nN][oO] )
-			echo "You chose no."
-			exit 0
-			;;
-		* )
-			echo "Invalid input. Please answer yes or no."
-			exit 1
-			;;
-	esac
-fi
+parse_args () {
+    case "$#" in
+        1)
+            var_action="$1"
+            ;;
+        0)
+            echo "$Usage"
+            die "Too many arguments"
+            ;;
+        *)
+            echo "$Usage"
+            if [[ -z "$var_DEBUG" ]]; then
+                die "Too many arguments"
+            fi
+            ;;
+    esac
 
-yadm init
-yadm config yadm.cipher openssl
-# If it's main env and require push `yadm init` repo
-yadm config local.class main
 
-yadm remote add origin https://github.com/<user>/dotfiles.git
-yadm push -u origin main
-yadm push --mirror origin
+    if [[ -n "$var_DEBUG" ]]; then
+        ( set -o posix ; set ) | grep -e '^var_'
+        exit 1
+    fi
+}
+
+main () {
+    parse_args
+
+    yadm_install
+    yadm_conf
+
+    if [[ $var_action == "pull" ]]; then
+        ;
+    elif [[ $var_action == "clone" ]]; then
+        yadm_clone
+    fi
+
+}
+
+die () {
+    [ "$#" -gt 0 ] && echo "$0: $@" >&2
+    finalize
+    exit 1
+}
+
+finalize () {
+}
+
+yadm_install () {
+    if command -v yadm &> /dev/null; then
+    	;
+    else
+    	sudo curl -fLo /usr/local/bin/yadm https://github.com/TheLocehiliosan/yadm/raw/master/yadm
+    	sudo chmod a+x /usr/local/bin/yadm
+    fi
+}
+
+yadm_conf () {
+    yadm --version
+    yadm config local.class main
+    yadm config yadm.cipher openssl
+    # If it's main env and require push `yadm init` repo
+    yadm config local.class main
+}
+
+yadm_clone () {
+    read -p "Will delete/override all exist dotfile? (yes/no) " yn
+    case $yn in
+        [yY] | [yY][eE][sS] )
+            echo "You chose yes."
+            ;;
+        [nN] | [nN][oO] )
+            echo "You chose no."
+            exit 0
+            ;;
+        * )
+            echo "Invalid input. Please answer yes or no."
+            exit 1
+            ;;
+    esac
+
+    yadm clone --force https://github.com/huawenyu/_dotfile.git
+    echo "Applied the remote config and override local: yadm checkout"
+}
+
+yadm_init () {
+    if [ -d "~/.local/share/yadm/repo.git" ]; then
+    	echo "yadm already initialed: ~/.local/share/yadm/repo.git"
+    	echo "Do you want to delete the exist repo and create a new one?"
+    	#!/bin/bash
+
+    	read -p "Do you want to delete the exist repo and create a new one? (yes/no) " yn
+    	case $yn in
+    		[yY] | [yY][eE][sS] )
+    			echo "You chose yes."
+    			rm -fr "~/.local/share/yadm/repo.git"
+    			;;
+    		[nN] | [nN][oO] )
+    			echo "You chose no."
+    			exit 0
+    			;;
+    		* )
+    			echo "Invalid input. Please answer yes or no."
+    			exit 1
+    			;;
+    	esac
+    fi
+
+    yadm init
+    yadm_conf
+
+    yadm remote add origin https://github.com/huawenyu/_dotfile.git
+}
+
+yadm_push () {
+    # yadm push -u origin main
+    yadm push --mirror origin
+}
+
+# Run
+main "$@"
 
