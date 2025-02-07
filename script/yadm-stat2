@@ -1,0 +1,6 @@
+#!/bin/bash
+#
+verbose=0
+
+yadm status --untracked-files=all .
+

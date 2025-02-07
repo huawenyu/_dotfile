@@ -66,6 +66,8 @@
 		}; f"
 	vimdiff = "!f() { vim -p $(git diff --name-only) +\"tabdo Gvdiff $@\" +tabfirst; }; f"
 
+	stat2 = status --untracked-files=all .
+
 [credential]
 	helper = store
 [pack]
