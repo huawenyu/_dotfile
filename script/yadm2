@@ -1,32 +1,43 @@
 #!/bin/bash
 
-var_action="pull"
+var_action="status"
+var_subact="pull"
 
 Usage=$(cat <<-END
-yadm-init: yadm helper
+yadm2: yadm helper
 
-    $ yadm-init pull
-    $ yadm-init clone
-    $ yadm-init push
+    $ yadm2 init [pull|clone|push]
+    $ yadm2 status
+    $ yadm2 info
 END
 )
 
 parse_args () {
     case "$#" in
+        2)
+            var_action="$1"
+            var_subact="$2"
+            ;;
         1)
             var_action="$1"
             ;;
         0)
-            echo "$Usage"
-            die "Too many arguments"
             ;;
         *)
             echo "$Usage"
-            if [[ -z "$var_DEBUG" ]]; then
-                die "Too many arguments"
-            fi
+            die "Incorrect arguments"
             ;;
     esac
+
+    # Help
+    while getopts "h" opt; do
+        case $opt in
+            h)
+                echo "$Usage"
+                exit 0
+                ;;
+        esac
+    done
 
 
     if [[ -n "$var_DEBUG" ]]; then
@@ -36,17 +47,25 @@ parse_args () {
 }
 
 main () {
-    parse_args
+    parse_args "$@"
 
-    yadm_install
-    yadm_conf
+    if [[ $var_action == "info" ]]; then
+        find . -maxdepth 1 -type f | xargs -I {} sh -c 'yadm ls-files --error-unmatch "{}" > /dev/null 2>&1 && echo "\e[1;32m[Tracked]\e[0m  {}" || echo "\e[1;31m[Untracked]\e[0m  {}"'
+    elif [[ $var_action == "status" ]]; then
+        yadm status --untracked-files=all .
+    elif [[ $var_action == "init" ]]; then
+        yadm_install
+        yadm_conf
 
-    if [[ $var_action == "pull" ]]; then
-        ;
-    elif [[ $var_action == "clone" ]]; then
-        yadm_clone
+        if [[ $var_action == "pull" ]]; then
+            : # No-op
+        elif [[ $var_action == "clone" ]]; then
+            yadm_clone
+        fi
+    else
+        echo "$Usage"
+        die "Incorrect arguments"
     fi
-
 }
 
 die () {
@@ -56,14 +75,15 @@ die () {
 }
 
 finalize () {
+    : # No-op
 }
 
 yadm_install () {
     if command -v yadm &> /dev/null; then
-    	;
+        : # No-op
     else
-    	sudo curl -fLo /usr/local/bin/yadm https://github.com/TheLocehiliosan/yadm/raw/master/yadm
-    	sudo chmod a+x /usr/local/bin/yadm
+        sudo curl -fLo /usr/local/bin/yadm https://github.com/TheLocehiliosan/yadm/raw/master/yadm
+        sudo chmod a+x /usr/local/bin/yadm
     fi
 }
 
