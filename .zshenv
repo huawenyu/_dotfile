@@ -1,6 +1,11 @@
-. "$HOME/.cargo/env"
+if [[ -f "$HOME/.cargo/env" ]]; then
+	. "$HOME/.cargo/env"
+fi
 
-eval "$(/home/hyu/sub-me/bin/me init -)"
+if [[ -f "$HOME/sub-me/bin/me" ]]; then
+	eval "$($HOME/sub-me/bin/me init -)"
+fi
+
 #eval "$(/home/hyu/sub-star/bin/star init -)"
 #export SCRIPT_DIR="/home/hyu/sub-demo/bin"
 #export _MC_ROOT="/home/hyu/sub-demo/bin"
