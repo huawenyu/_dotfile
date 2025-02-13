@@ -1,0 +1,344 @@
+#!/usr/bin/env bash
+# vim: setlocal autoindent cindent et ts=4 sw=4 sts=4:
+#
+# Get the script's directory, resolving symlinks
+var_ScriptDir="$( cd "$( dirname "$(readlink -f "${BASH_SOURCE[0]}")" )" &> /dev/null && pwd )"
+var_ScriptName=$(basename "$0")
+var_ScriptName="${var_ScriptName%.*}"
+var_WorkDir=$(pwd)
+SECONDS=0
+
+# echo -e "${colorRed}This is red${colorReset}"
+colorRed='\e[31m'
+colorGreen='\e[32m'
+colorYellow='\e[33m'
+colorReset='\e[0m'
+
+
+_Usage=$(cat <<-END
+    Usage: tmux helper
+    Options:
+      -a, --action
+        'mode'             Re-layout of the current window
+        'share'            Share tmux to -t <user>, or disable share if-no-<user>
+        'update'           Update the tool 'tmex'
+        '*'                Operate by window/pane/session title
+          'kill'             operate-Kill
+          'select'           operate-Select
+          'zoom'             operate-Zoom
+          'cmd'              operate-Cmd
+      -t, --title          The title of window/pane/session
+      -l, --layout         (default=0)
+       '0'                 Layout default: 3+1
+       '4'                 Layout: 2+2
+       '6'                 Layout: 2+2+2
+       'h'                 Layout-standard: main-horizontal
+       'v'                 Layout-standard: main-vertical
+       'eh'                Layout-standard: even-horizontal
+       'ev'                Layout-standard: even-vertical
+       't'                 Layout-standard: titled
+       'c'                 Layout-standard: columns
+
+    Sample:
+      txctl -a mode
+      txctl -a mode -l h
+      txctl -a share -t <user>
+      txctl -a update
+      txctl -a cmd -l "source ~/.zshrc"
+
+END
+)
+
+parse_define() {
+  setup   REST help:usage -- "Usage: $var_ScriptName [options] ..." ''
+
+  msg -- 'Options:'
+  flag  var_VERBOSE    -v --verbose  counter:true init:=0    -- "e.g. -vvv is verbose level 3"
+  flag  var_DRYRUN     -n --dryrun                           -- "Dryrun mode"
+  flag  var_DEBUG      -d --debug                            -- "Debug mode and list all local variable"
+  param var_Action     -a --action   init:="mode"  pattern:"mode | share | update | kill | select | zoom | cmd"     -- "Action: *mode|share|update|kill|select|zoom|cmd"
+  param var_Title      -t --title    init:=""      -- "The title of window/pane/session"
+  param var_Layout     -l --layout   init:="0"     pattern:"0 | 4 | 6 | h | v | eh | ev | t | c"     -- "Layout: *0|4|6"
+
+  disp  VERSION        --version
+  disp  :usage         -h --help   -- "$_Usage"
+}
+
+
+# Usage: varNum1=$( int var1 )
+int ()
+{
+    printf '%d' $(expr ${1:-} : '[^0-9]*\([0-9]*\)' 2>/dev/null) || :
+}
+
+
+do_args () {
+    var_User="$var_Title"
+
+    if [[ -n "$var_DRYRUN" ]]; then
+        ( set -o posix ; set ) | grep -e '^var_'
+        exit 1
+    fi
+
+    if [[ "$var_VERBOSE" -ge 3 ]]; then
+        set -x                              ### Print each command before eval
+    fi
+
+    if [[ "$var_VERBOSE" -ge 4 ]]; then
+        set -v                              ### Print each line of the script before eval
+    fi
+
+}
+
+
+main () {
+    do_args
+    do_task "$@"
+    cleanup
+}
+
+
+do_task () {
+    #maketemp
+
+    if [[ "$var_Action" == "mode" ]]; then
+        do_mode
+    elif [[ "$var_Action" == "update" ]]; then
+        curl -L -o "${var_ScriptDir}/tmex" https://raw.githubusercontent.com/evnp/tmex/refs/heads/main/tmex
+    elif [[ "$var_Action" == "kill" \
+        || "$var_Action" == "select" \
+        || "$var_Action" == "zoom" \
+        || "$var_Action" == "cmd" ]]; then
+        do_title
+    elif [[ "$var_Action" == "share" ]]; then
+        do_share
+    else
+        die "Invalid arguments"
+    fi
+
+
+}
+
+
+do_share () {
+    set -e
+    : ${TMUX:?Error: This must be run from within tmux}
+
+    socket_path=$(tmux display-message -p -F '#{socket_path}')
+    session_name=$(tmux display-message -p -F '#{session_name}')
+    : ${socket_path:?Cannot determine tmux socket path}
+
+
+    if [[ -z "$var_User" ]]; then
+        read -p "Are you sure DISABLE tmux-share? (y/n): " answer
+        case "$answer" in
+            y|Y ) echo "Confirmed!";;
+            n|N ) echo "Cancelled."; exit 1;;
+            * ) echo "Invalid input"; exit 1;;
+        esac
+
+        sudo setfacl --remove-all "${socket_path}"
+        sudo setfacl --remove-all "${socket_path%/*}"
+        tmux detach-client -a	# Detach all other clients
+        echo >&2 "Unshared"
+    else
+        id "$var_User" > /dev/null
+        sudo setfacl -m u:"$var_User":rw "${socket_path}"
+        sudo setfacl -m u:"$var_User":rX "${socket_path%/*}"
+        tmux server-access -a "$var_User" || true
+
+        attach_cmd="tmux -S $(printf %s "$socket_path") attach -t $(printf %s "$session_name")"
+
+        # Write to the owner screen
+        cat <<-EOF
+			Now, $var_User can attach your session by running:
+			
+			    $attach_cmd
+			
+			Append "-r" for read-only access.
+			
+EOF
+
+        # Write to the remote user screen
+        write "$var_User" <<-EOF || :
+			You can attach $USER's session by running:
+			    $attach_cmd
+			Append "-r" for read-only access.
+			
+EOF
+
+    fi
+}
+
+
+do_title () {
+
+    # Find window index by title
+    win_index=$(tmux list-windows -F '#I:#W' | grep -i "$TITLE" | cut -d':' -f1)
+
+    # Find pane index by title
+    pane_id=$(tmux list-panes -a -F '#S:#I.#P:#T' | grep -i "$TITLE" | cut -d':' -f2)
+
+    # Dummy-Loop-once
+    for i in $(seq 1); do
+        if [[ "$var_Action" == "kill" ]]; then
+            [ -n "$win_index" ] && tmux kill-window -t "$win_index"
+            [ -n "$pane_id" ] && tmux kill-pane -t "$pane_id"
+            break
+        fi
+
+        if [[ "$var_Action" == "select" ]]; then
+            [ -n "$win_index" ] && tmux select-window -t "$win_index"
+            [ -n "$pane_id" ] && tmux select-pane -t "$pane_id"
+            break
+        fi
+
+        if [[ "$var_Action" == "zoom" ]]; then
+            [ -n "$pane_id" ] && tmux resize-pane -Z -t "$pane_id"
+            break
+        fi
+
+        if [[ "$var_Action" == "cmd" ]]; then
+            [ -n "$pane_id" ] && tmux resize-pane -Z -t "$pane_id"
+            break
+        fi
+
+        # Sanity loop once
+        break
+    done
+}
+
+# Runs the specified command (provided by the first argument) in all tmux panes
+# in every window.  If an application is currently running in a given pane
+# (e.g., vim), it is suspended and then resumed so the command can be run.
+all-panes()
+{
+  all-panes-bg_ "$var_Layout" &
+}
+
+# The actual implementation of `all-panes` that runs in a background process.
+# This prevents the function from being suspended when we press ^z in each pane.
+all-panes-bg_()
+{
+  # Assign the argument to something readable
+  local COMMAND=$1
+
+  # Remember which window/pane we were originally at
+  local ORIG_WINDOW_INDEX=`tmux display-message -p '#I'`
+  local ORIG_PANE_INDEX=`tmux display-message -p '#P'`
+
+  # Loop through the windows
+  for WINDOW in `tmux list-windows -F '#I'`; do
+    # Select the window
+    tmux select-window -t $WINDOW
+
+    # Remember the window's current pane sync setting
+    local ORIG_PANE_SYNC=`tmux show-window-options | grep '^synchronize-panes' | awk '{ print $2 }'`
+
+    # Send keystrokes to all panes within the current window simultaneously
+    tmux set-window-option synchronize-panes on
+
+    # Send the escape key in case we are in a vim-like program.  This is
+    # repeated because the send-key command is not waiting for vim to complete
+    # its action...  And sending a `sleep 1` command seems to screw up the loop.
+    for i in {1..25}; do tmux send-keys 'C-['; done
+
+    # Temporarily suspend any GUI that's running
+    tmux send-keys C-z
+
+    # If no GUI was running, kill any input the user may have typed on the
+    # command line to avoid A) concatenating our command with theirs, and
+    # B) accidentally running a command the user didn't want to run
+    # (e.g., rm -rf ~).
+    tmux send-keys C-c
+
+    # Run the command and switch back to the GUI if there was any
+    tmux send-keys "$COMMAND; fg 2>/dev/null; echo -n" C-m
+
+    # Restore the window's original pane sync setting
+    if [[ -n "$ORIG_PANE_SYNC" ]]; then
+      tmux set-window-option synchronize-panes "$ORIG_PANE_SYNC"
+    else
+      tmux set-window-option -u synchronize-panes
+    fi
+  done
+
+  # Select the original window and pane
+  tmux select-window -t $ORIG_WINDOW_INDEX
+  tmux select-pane -t $ORIG_PANE_INDEX
+}
+
+do_mode () {
+    if [[ "$var_Layout" == "0" ]]; then
+        tmux killp -a; tmex -w $(tmux display-message -p '#W') -t -l {16}31 "cd $var_WorkDir; reset" "cd $var_WorkDir; reset" "cd $var_WorkDir; reset" "cd $var_WorkDir; reset"
+    elif [[ "$var_Layout" == "4" ]]; then
+        tmux killp -a; tmex -w $(tmux display-message -p '#W') -t -l 22 "cd $var_WorkDir; reset" "cd $var_WorkDir; reset" "cd $var_WorkDir; reset" "cd $var_WorkDir; reset"
+    elif [[ "$var_Layout" == "6" ]]; then
+        tmux killp -a; tmex -w $(tmux display-message -p '#W') -t -l 222 "cd $var_WorkDir; reset" "cd $var_WorkDir; reset" "cd $var_WorkDir; reset" "cd $var_WorkDir; reset"
+
+    elif [[ "$var_Layout" == "h" ]]; then
+        tmux select-layout "main-horizontal"
+    elif [[ "$var_Layout" == "v" ]]; then
+        tmux select-layout "main-vertical"
+    elif [[ "$var_Layout" == "eh" ]]; then
+        tmux select-layout "even-horizontal"
+    elif [[ "$var_Layout" == "ev" ]]; then
+        tmux select-layout "even-vertical"
+    elif [[ "$var_Layout" == "t" ]]; then
+        tmux select-layout "titled"
+    elif [[ "$var_Layout" == "c" ]]; then
+        tmux select-layout "columns"
+    fi
+
+}
+
+
+die () {
+    [ "$#" -gt 0 ] && echo -e "${colorRed}  $0: $@  ${colorReset}" >&2
+    cleanup
+    exit 1
+}
+
+
+maketemp () {
+    TEMPFILE=
+    if [ -z "$TEMPFILE" ]; then
+        TEMPFILE="$(mktemp /tmp/git-info.XXXXXX)" || die
+    fi
+
+    if [ -z "$TEMPFILE2" ]; then
+        TEMPFILE2="$(mktemp /tmp/git-info.XXXXXX)" || die
+    fi
+}
+
+
+cleanup() {
+    trap - EXIT
+
+    duration=$SECONDS
+    echo "trap-cleanup(action=$var_Action time=$(($duration / 60))m:$(($duration % 60))s)"
+
+    if [ -n "$TEMPFILE" ]; then
+        rm -f "$TEMPFILE" 2> /dev/null
+    fi
+
+    if [ -n "$TEMPFILE2" ]; then
+        rm -f "$TEMPFILE2" 2> /dev/null
+    fi
+
+    # Backto the original current dir
+    cd "$var_WorkDir"
+}
+
+
+# wget -O $HOME/bin/getoptions https://github.com/ko1nksm/getoptions/releases/latest/download/getoptions
+trap "cleanup; exit 130" 1 2 3 15
+if command -v getoptions &>/dev/null; then
+    eval "$(getoptions parse_define) exit 1"
+else
+    parse_args "$@"
+fi
+
+main "$@"
+
+

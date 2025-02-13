@@ -28,10 +28,6 @@ case "$1" in
 	exit 1
 	;;
     -x)
-	sudo setfacl --remove-all "${socket_path}"
-	sudo setfacl --remove-all "${socket_path%/*}"
-	tmux detach-client -a	# Detach all other clients
-	echo >&2 "Unshared"
 	exit 0
 	;;
     *)
