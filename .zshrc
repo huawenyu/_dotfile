@@ -118,7 +118,6 @@ function git_prompt_info() {
 #  echo "have init" > "/tmp/zsh_init_flag"
 #fi
 
-alias dot='/usr/bin/git --git-dir=$HOME/.dotfile/ --work-tree=$HOME'
 #alias emacs='emacs -nw'
 
 # Avoid mosh flash when <c-l> tmux-pane jump
