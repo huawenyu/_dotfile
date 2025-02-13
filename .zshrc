@@ -122,7 +122,7 @@ alias dot='/usr/bin/git --git-dir=$HOME/.dotfile/ --work-tree=$HOME'
 #alias emacs='emacs -nw'
 
 # Avoid mosh flash when <c-l> tmux-pane jump
-bindkey -r "^L"
+# bindkey -r "^L"
 # bindkey "^L" clear-screen
 
 
