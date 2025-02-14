@@ -329,6 +329,9 @@ endif
 let g:vim_wiki_dirs = get(g:, "vim_wiki_dirs", g:vim_confi_option.wiki_dirs)
 
 " Auto download the plug
+if filereadable("/.dockerenv")
+    let g:vim_confi_option.auto_install_vimplug = 0
+endif
 if g:vim_confi_option.auto_install_vimplug
     if LINUX()
         if empty(glob('~/.vim/autoload/plug.vim'))
