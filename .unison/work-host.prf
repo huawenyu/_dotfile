@@ -71,13 +71,13 @@ fastcheck=true
 # When this flag is set to true, the group attributes of the
 # files are synchronized. Whether the group names or the group
 # identifiers are synchronizeddepends on the preference numerids.
-group=true
+group=false
 
 # When this flag is set to true, the owner attributes of the
 # files are synchronized. Whether the owner names or the owner
 # identifiers are synchronizeddepends on the preference
 # extttnumerids.
-owner=true
+owner=false
 
 # Including the preference -prefer root causes Unison always to
 # resolve conflicts in favor of root, rather than asking for
