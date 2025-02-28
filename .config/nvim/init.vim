@@ -551,6 +551,8 @@ endif
         Plug 'preservim/vim-markdown',      Cond(has('nvim') && Mode(['editor']) && Mode(['markdown']), {'for': 'markdown'})
         Plug 'ellisonleao/glow.nvim',       Cond(has('nvim') && Mode(['editor']) && Mode(['markdown']), {'on':  'Glow', 'for': 'markdown', 'setup': ':LoadGlow', })
 
+        "Plug 'MeanderingProgrammer/render-markdown.nvim' | " Seems not pretty
+
         "Plug 'SidOfc/mkdx',                Cond(has('nvim') && Mode(['editor']) && Mode(['markdown']), {'for': 'markdown'})
         "Plug 'tpope/vim-markdown',         Cond(has('nvim') && Mode(['editor']) && Mode(['markdown']), {'as':  'tpope_vim-markdown', 'for': 'markdown'} )     |        "       Light  but good enough
     "}}}
@@ -748,7 +750,7 @@ endif
             "       \ })
             " endif
 
-            "Plug 'nvim-treesitter/nvim-treesitter',             Cond (has('nvim') && Mode(['admin']), { 'do': ':TSUpdate', 'for': ['c', 'cpp', 'rust', 'java', 'awk', 'bash', 'meson', 'python', 'tcl', 'expect'] })
+            Plug 'nvim-treesitter/nvim-treesitter',             Cond (has('nvim') && Mode(['admin']), { 'do': ':TSUpdate', 'for': ['c', 'cpp', 'rust', 'java', 'awk', 'bash', 'meson', 'python', 'tcl', 'expect'] })
             " Plug 'nvim-treesitter/nvim-treesitter-refactor',  Cond (has('nvim') && HasPlug('nvim-treesitter') && Mode(['editor',]))
             " Plug 'nvim-treesitter/playground',                Cond (has('nvim') && HasPlug('nvim-treesitter') && Mode(['editor',]))
             " Plug 'romgrk/nvim-treesitter-context',            Cond (has('nvim') && HasPlug('nvim-treesitter') && Mode(['editor',]))
