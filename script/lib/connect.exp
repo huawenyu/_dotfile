@@ -4,7 +4,7 @@ log_file "$runCtx(tool,logfile)"
 
 # @return 0  succ
 #        >0  fail with reason
-proc connect {} {
+proc connect { {is_console 0} } {
     upvar spawn_id spawn_id
     global runCtx spawn_id
     set runCtx(tool,_func_) "connect"
@@ -32,6 +32,8 @@ proc connect {} {
     exp_internal $runCtx(tool,VERBOSE)
     if {$runCtx(tool,CONNECTION) ne ""} {
         eval "spawn $runCtx(tool,CONNECTION)"
+    } elseif { $is_console == 1 } {
+        ssh -t kvm-host "/home/hyu/bin/atsh console $runCtx(tool,DUT)"
     } else {
         spawn ssh $runCtx(tool,USERNAME)@$runCtx(tool,DUT)
     }
@@ -412,9 +414,9 @@ proc config_vdom_mode { {is_console 0} } {
     }
 
     # set vdom-mode
-	if { $runCtx(tool,ARG1) == "no-vdom" } {
-		::send "config global\r"
-	}
+    if { $runCtx(tool,ARG1) == "no-vdom" } {
+        ::send "config global\r"
+    }
     ::send "config system global\r"
     ::send "set vdom-mode $runCtx(tool,ARG1)\r"
     ::send "end\r"
@@ -984,4 +986,128 @@ proc config { {mode 3} {is_console 0} } {
     return $ret
 }
 
+
+# @param mode 0  No extra conf
+#             1  Config Network
+#             2  Config route/dns/update-license
+#             3  proxy
+# @return 0  succ
+#        >0  fail with reason
+proc do_log {} {
+    global runCtx spawn_id
+    set ret 99
+
+    set task_ "Basic_Config"
+    set prompt $runCtx(tool,PROMPT)
+
+    # Ensure it correct env
+    set timeout $runCtx(tool,TIMEOUT)
+    ::send "\r"
+    send "c g\r"
+    expect -re $prompt
+    send "diag debug disable\r"
+    send "config system global\r"
+    expect -re $prompt
+    send "set admintimeout 480\r"
+    expect -re $prompt
+    send "end\r"
+    expect -re $prompt
+    send "diag wad debug enable all\r"
+    expect -re $prompt
+    send "diag debug console no-user-log-msg enable\r"
+    expect -re $prompt
+    send "diag debug enable\r"
+    send "diag wad debug show\r"
+    expect -re $prompt
+    send "diag test app wad 2200"
+
+
+    interact
+    exit
+}
+
+
+proc do_nolog {} {
+    global runCtx spawn_id
+    set ret 99
+
+    set task_ "Basic_Config"
+    set prompt $runCtx(tool,PROMPT)
+
+    # Ensure it correct env
+    set timeout $runCtx(tool,TIMEOUT)
+    ::send "\r"
+    expect -re $prompt
+    send "diag wad debug clear\r"
+    expect -re $prompt
+    send "diag debug disable\r"
+
+
+    interact
+    exit
+}
+
+
+proc do_gdb {} {
+    set ret [Get_pid_by_process_type]
+    dbg 3  "Get_pid_by_process_type=$ret"
+    if { $ret != 0 } {
+        dbg 3  "ToolCmdFail: Get_pid_by_process_type()!"
+        exit
+    }
+
+    set ret [Gdbserver_by_pid]
+    dbg 3  "Gdbserver_by_pid=$ret"
+    if { $ret != 0 } {
+        dbg 3  "ToolCmdFail: Gdbserver_by_pid() fail!"
+        exit
+    }
+    dbg 3  "ToolCmdSucc: Gdbserver_by_pid() Succ!"
+
+
+    set pane_id [Tmux_pane_title2id $runCtx(tool,GDB)]
+    if {$pane_id ne ""} {
+        puts "Pane ID for title '$runCtx(tool,GDB)' is: $pane_id"
+        Tmux_send_keys  "$pane_id"  "help remote-listening"
+    }
+
+
+    # Keep and handle over the connection to customer:
+    interact
+    exit
+}
+
+
+proc do_coverage {} {
+    global runCtx spawn_id
+    set ret 99
+
+    set task_ "Basic_Config"
+    set prompt $runCtx(tool,PROMPT)
+
+    # Ensure it correct env
+    set timeout $runCtx(tool,TIMEOUT)
+    ::send "\r"
+    expect -re $prompt
+
+    send "c g\r"
+    expect -re $prompt
+    send "exec coverage package\r"
+    expect -re $prompt
+    send "sys sh\r"
+    expect "/ #"
+    send "scp /fgtcov/fgtcoverage.tar.gz '$(id -un)@10.1.1.1:$_PWD/'\r"
+    expect "password:"
+    send "$FORTIPKG_PASSWORD\r"
+    expect {
+        "$prompt" { }
+        "password:" {
+                    puts "\rplease run '. forti_login' first."
+                    exit
+        }
+    }
+    send "exit\r"
+    expect -re $prompt
+    send "exit\r"
+}
 

@@ -38,6 +38,8 @@ _Usage=$(cat <<-END
         pull     # Pull dev-git-dir 'compile_commands.json' from store-server
         push     # Push dev-git-dir 'compile_commands.json' to store-server
         link     # Link from .cache under docker-container
+        wiki
+        md
         save
         clean
       -f, --file # One file enforce update it's tag
@@ -55,7 +57,7 @@ parse_define() {
   flag  var_VERBOSE    -v --verbose  counter:true init:=0    -- "e.g. -vvv is verbose level 3"
   flag  var_DRYRUN     -n --dryrun                           -- "Dryrun mode"
   flag  var_DEBUG      -d --debug                            -- "Debug mode and list all local variable"
-  param var_Action     -a --action   init:="all"     pattern:"all | pull | push | save | link | clean"     -- "Action: *all|pull|push|save|link|clean"
+  param var_Action     -a --action   init:="all"     pattern:"all | pull | push | save | link | wiki | md | clean"     -- "Action: *all|pull|push|save|link|wiki|md|clean"
   param var_TagFile    -t --tag      init:=""        -- "One file enforce update it's tag"
   param var_Scope      -s --scope    init:="all"     pattern:"all | wad"     -- "The files/dirs scope"
   flag  var_Force      -f --force                            -- "Enforce update all tag"

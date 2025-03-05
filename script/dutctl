@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+# vim: setlocal autoindent cindent et ts=4 sw=4 sts=4:
+#
+# Get the script's directory, resolving symlinks
+var_ScriptDir="$( cd "$( dirname "$(readlink -f "${BASH_SOURCE[0]}")" )" &> /dev/null && pwd )"
+var_ScriptName=$(basename "$0")
+var_ScriptName="${var_ScriptName%.*}"
+var_WorkDir=$(pwd)
+SECONDS=0
+
+# echo -e "${colorRed}This is red${colorReset}"
+colorRed='\e[31m'
+colorGreen='\e[32m'
+colorYellow='\e[33m'
+colorReset='\e[0m'
+
+var_Prompt="(.*) (.*)#"
+
+_Usage=$(cat <<-END
+    Usage: DUT helper
+    Options:
+      -a, --action
+        'log'             Re-layout of the current window
+        'cov'            Share tmux to -t <user>, or disable share if-no-<user>
+        'nolog'           Update the tool 'tmex'
+
+    Sample:
+      txctl dut1 log
+      txctl dut1 console
+      txctl -d dut1 -a log
+      txctl -d dut1 -a gdb
+
+END
+)
+
+parse_define() {
+  setup   REST help:usage -- "Usage: $var_ScriptName [options] ..." ''
+
+  msg -- 'Options:'
+  flag  var_VERBOSE    -v --verbose  counter:true init:=0    -- "e.g. -vvv is verbose level 3"
+  flag  var_DRYRUN     -n --dryrun                           -- "Dryrun mode"
+
+  param var_Dut        -d --dut      init:=""     -- "dut#: dut1,dut2, ..."
+  param var_Action     -a --action   init:=""  pattern:"log | nolog | cov | gdb | console"     -- "Action: *log|nolog|cov|gdb|console"
+
+  disp  VERSION        --version
+  disp  :usage         -h --help   -- "$_Usage"
+}
+
+
+# Usage: varNum1=$( int var1 )
+int () {
+    printf '%d' $(expr ${1:-} : '[^0-9]*\([0-9]*\)' 2>/dev/null) || :
+}
+
+
+# Function to validate an IP address
+validate_ip() {
+    local ip="$1"
+    local regex="^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$"
+    if [[ $ip =~ $regex ]]; then
+        return 0  # Valid IP
+    else
+        return 1  # Invalid IP
+    fi
+}
+
+do_args () {
+    ### Extra arguments
+    case "$#" in
+        2)
+            if [ -z "$var_Dut" ]; then
+                var_Dut="$1"
+            fi
+
+            if [ -z "$var_Action" ]; then
+                var_Action="$2"
+            fi
+            ;;
+        1)
+            if [ -z "$var_Dut" ]; then
+                var_Dut="$1"
+            fi
+            ;;
+        0)
+            ;;
+        *)
+            echo "$_Usage"
+            die "Incorrect arguments"
+            ;;
+    esac
+
+    if [[ -z "$var_Action" ]]; then
+        var_Action="log"
+    fi
+
+    if [[ -z "$var_Dut" ]]; then
+        die "Please specific DUT"
+    elif validate_ip "$ip_address"; then
+        : # noop
+    else
+        var_Prompt="$var_Dut (.*)#"
+    fi
+
+
+    if [[ -n "$var_DRYRUN" ]]; then
+        ( set -o posix ; set ) | grep -e '^var_'
+        exit 1
+    fi
+
+    if [[ "$var_VERBOSE" -ge 3 ]]; then
+        set -x                              ### Print each command before eval
+    fi
+
+    if [[ "$var_VERBOSE" -ge 4 ]]; then
+        set -v                              ### Print each line of the script before eval
+    fi
+}
+
+
+main () {
+    do_args "$@"
+    do_task "$@"
+    cleanup
+}
+
+
+do_task () {
+    #maketemp
+
+    if [[ "$var_Action" == "gdb" ]]; then
+        dutctl.exp --verbose "$var_VERBOSE" --dut "$var_Dut" --prompt "$var_Prompt" --action "gdb" --gdb "Gef" --process "worker"
+    elif [[ "$var_Action" == "log" ]]; then
+        dutctl.exp --verbose "$var_VERBOSE" --dut "$var_Dut" --prompt "$var_Prompt" --action "log"
+    elif [[ "$var_Action" == "nolog" ]]; then
+        dutctl.exp --verbose "$var_VERBOSE" --dut "$var_Dut" --prompt "$var_Prompt" --action "nolog"
+    elif [[ "$var_Action" == "cov" ]]; then
+        dutctl.exp --verbose "$var_VERBOSE" --dut "$var_Dut" --prompt "$var_Prompt" --action "cov"
+    elif [[ "$var_Action" == "console" ]]; then
+        dutctl.exp --verbose "$var_VERBOSE" --dut "$var_Dut" --prompt "$var_Prompt" --action "console"
+    else
+        die "Invalid arguments"
+    fi
+}
+
+
+die () {
+    [ "$#" -gt 0 ] && echo -e "${colorRed}  $0: $@  ${colorReset}" >&2
+    cleanup
+    exit 1
+}
+
+
+maketemp () {
+    TEMPFILE=
+    if [ -z "$TEMPFILE" ]; then
+        TEMPFILE="$(mktemp /tmp/git-info.XXXXXX)" || die
+    fi
+
+    if [ -z "$TEMPFILE2" ]; then
+        TEMPFILE2="$(mktemp /tmp/git-info.XXXXXX)" || die
+    fi
+}
+
+
+cleanup() {
+    trap - EXIT
+
+    duration=$SECONDS
+    echo "trap-cleanup(action=$var_Action time=$(($duration / 60))m:$(($duration % 60))s)"
+
+    if [ -n "$TEMPFILE" ]; then
+        rm -f "$TEMPFILE" 2> /dev/null
+    fi
+
+    if [ -n "$TEMPFILE2" ]; then
+        rm -f "$TEMPFILE2" 2> /dev/null
+    fi
+
+    # Backto the original current dir
+    cd "$var_WorkDir"
+}
+
+
+# wget -O $HOME/bin/getoptions https://github.com/ko1nksm/getoptions/releases/latest/download/getoptions
+trap "cleanup; exit 130" 1 2 3 15
+if command -v getoptions &>/dev/null; then
+    eval "$(getoptions parse_define) exit 1"
+fi
+
+main "$@"
+
+

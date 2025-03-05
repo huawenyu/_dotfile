@@ -21,6 +21,10 @@ proc _init {} {
 proc dbg { level msg {scriptinfo 0} {errmsg 0} {report 0} {prt 0} {log 0} {stack 0} } {
     global runCtx
 
+    if {$level > $runCtx(tool,VERBOSE) || $runCtx(tool,SILENT) == 1} {
+        return
+    }
+
     set prefix "=DUT_CTL="
     if {[info exists runCtx(tool,_func_)]} {
         set prefix "$runCtx(tool,_func_)"
@@ -32,17 +36,9 @@ proc dbg { level msg {scriptinfo 0} {errmsg 0} {report 0} {prt 0} {log 0} {stack
     }
 
     set timestr [clock format [clock seconds] -format "%Y-%m-%d %H:%M:%S"]
-    if {$level == 0 || $level == 2 || $level == 3} {
-        send_log "$prefix  $timestr $msg\n"
-    }
 
-    if {$level == 0 || $level == 1 || $level == 3} {
-        if { $level == 1 && $runCtx(tool,SILENT) == 1 } {
-            return
-        }
-
-        puts "$prefix  $timestr $msg"
-    }
+    send_log "$prefix  $timestr $msg\n"
+    puts "$prefix  $timestr $msg"
 }
 
 # getopt:
@@ -108,11 +104,11 @@ proc parse_arguments { {name ""} } {
     }
 
     dbg 3 "-------------dump opt:$runCtx(tool,starttime)-------------"
-	foreach key [lsort -dictionary [array names runCtx tool,*]] {
-		if {[info exists runCtx($key)]} {
+    foreach key [lsort -dictionary [array names runCtx tool,*]] {
+        if {[info exists runCtx($key)]} {
             dbg 3  [format "%-20s %s" $key $runCtx($key)]
-		}
-	}
+        }
+    }
 
 
     if { $runCtx(tool,DRYRUN) == 1 } {
