@@ -57,10 +57,11 @@ parse_define() {
   flag  var_VERBOSE    -v --verbose  counter:true init:=0    -- "e.g. -vvv is verbose level 3"
   flag  var_DRYRUN     -n --dryrun                           -- "Dryrun mode"
   flag  var_DEBUG      -d --debug                            -- "Debug mode and list all local variable"
+  flag  var_Force      -y --yes                              -- "Enforce update all tag"
   param var_Action     -a --action   init:="all"     pattern:"all | pull | push | save | link | wiki | md | clean"     -- "Action: *all|pull|push|save|link|wiki|md|clean"
   param var_TagFile    -t --tag      init:=""        -- "One file enforce update it's tag"
   param var_Scope      -s --scope    init:="all"     pattern:"all | wad"     -- "The files/dirs scope"
-  flag  var_Force      -f --force                            -- "Enforce update all tag"
+  param var_File       -f --file     init:=""                                -- "The file require tag"
 
   disp  VERSION        --version
   disp  :usage         -h --help   -- "$_Usage"
@@ -374,6 +375,12 @@ PrepareFileList() {
         else
             var_dstDir="$HOME/.cache"
         fi
+    elif [[ "$var_Action" == "md" ]]; then
+        if [[ -z "$var_File" ]]; then
+            find . -name '*.md'  > "${FLIST}"
+        else
+            find . -name "$var_File"  > "${FLIST}"
+        fi
     elif [ -f ${FLIST} ]; then
         filecnt_c=1024
     else
@@ -468,7 +475,7 @@ PrepareFileList() {
 
         sort ${var_tmpDir}/cscope.f2 > ${var_tmpDir}/cscope.f3
         mv ${var_tmpDir}/cscope.f3 ${var_tmpDir}/${FLIST}
-    elif [ $filecnt_markdown -ge 10 ]; then
+    elif [[ "$var_Action" == "md" ]] || [ $filecnt_markdown -ge 10 ]; then
         CTAGS_FLAG="$CTAGS_FLAG $CTAGS_FLAG_md $CTAGS_FLAG_script"
         clean_files+=("${FLIST}")
 
@@ -486,7 +493,7 @@ PrepareFileList() {
 
 GenTag() {
     if [[ -f "${var_dstDir}/.tags" ]]; then
-        echo "Tags '.tags' existed, Skip! Enforce by '-f'."
+        echo "Tags '.tags' existed, Skip! Enforce by '-y'."
         return
     fi
 
