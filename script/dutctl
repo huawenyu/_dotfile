@@ -20,15 +20,15 @@ _Usage=$(cat <<-END
     Usage: DUT helper
     Options:
       -a, --action
-        'log'             Re-layout of the current window
+        'log'            Re-layout of the current window
         'cov'            Share tmux to -t <user>, or disable share if-no-<user>
-        'nolog'           Update the tool 'tmex'
+        'nolog'          Update the tool 'tmex'
 
     Sample:
-      txctl dut1 log
-      txctl dut1 console
-      txctl -d dut1 -a log
-      txctl -d dut1 -a gdb
+      dutctl dut1 log
+      dutctl dut1 console
+      dutctl -d dut1 -a log
+      dutctl -d dut1 -a gdb
 
 END
 )

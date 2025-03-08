@@ -33,7 +33,7 @@ proc connect { {is_console 0} } {
     if {$runCtx(tool,CONNECTION) ne ""} {
         eval "spawn $runCtx(tool,CONNECTION)"
     } elseif { $is_console == 1 } {
-        ssh -t kvm-host "/home/hyu/bin/atsh console $runCtx(tool,DUT)"
+        spawn ssh -t kvm-host "/home/hyu/bin/atsh console $runCtx(tool,DUT)"
     } else {
         spawn ssh $runCtx(tool,USERNAME)@$runCtx(tool,DUT)
     }
@@ -1006,14 +1006,19 @@ proc do_log {} {
     send "c g\r"
     expect -re $prompt
     send "diag debug disable\r"
+
+    send "config system console\r"
+    send "set output standard\r"
+    send "end\r"
+
     send "config system global\r"
     expect -re $prompt
     send "set admintimeout 480\r"
     expect -re $prompt
     send "end\r"
     expect -re $prompt
+    send "diag debug console timestamp enable\r"
     send "diag wad debug enable all\r"
-    expect -re $prompt
     send "diag debug console no-user-log-msg enable\r"
     expect -re $prompt
     send "diag debug enable\r"

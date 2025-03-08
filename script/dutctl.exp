@@ -18,6 +18,7 @@ parse_arguments "$_inner_toolname"
 
 if { $runCtx(tool,ACTION) == "console" } {
     connect 1
+    interact
 } else {
     set ret [connect]
     dbg 3  "Connect=$ret"
