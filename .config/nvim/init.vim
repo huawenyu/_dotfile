@@ -659,7 +659,7 @@ endif
             "Plug 'kevinhwang91/nvim-bqf',          Cond(has('nvim') && Mode(['editor',]))    | " Seems telescope.quickfix cover the feature, Better quickfix: zf   fzf-mode
             "Plug 'romainl/vim-qf',                 Cond(has('nvim') && Mode(['editor',]))    | " Tame the quickfix window
 
-            Plug 'folke/todo-comments.nvim',        Cond(has('nvim') && Mode(['editor',]), { 'on': ['TodoLocList', 'TodoQuickFix'], 'setup': ':LoadTodo', } )       | " :TodoLocList, :TodoQuickFix
+            Plug 'folke/todo-comments.nvim',        Cond(has('nvim') && Mode(['editor',]), { 'on': ['TodoLocList', 'TodoQuickFix'], 'setup': ':LoadTodo', } )       | " :TodoLocList, :TodoQuickFix; Keywords: "TODO-", "NOTE-"
             "Plug 'freitass/todo.txt-vim',          Cond(has('nvim') && Mode(['editor',]) && Mode(['extra']))       | " codeblock with 'todo', http://todotxt.org/
             "Plug 'bfrg/vim-qf-preview',            Cond(has('nvim') && Mode(['editor',]) && Mode(['extra']))
 
