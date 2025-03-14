@@ -1,7 +1,18 @@
 # ripgrep:
 
+```bash
+    ### Search all files
+    rg -uuu --glob='*' -w "somewords"
+        # --glob='*'      Forces ripgrep to include all files by matching everything.
+        # -uuu            Ensures that all ignore rules are bypassed, hidden files are included, and binary files are searched.
+
+    ### Like:
+    grep -Inr "somewords" .
+```
+
 > better grep
 
+```bash
 	## Seach recursively under current dir
 	rg <text>
 	## Seach recursively under(or not) dir
@@ -16,9 +27,11 @@
 	## Only(or-inverse) show matched file-name
 	rg -l <text>
 	rg -v <text>
+```
 
 - With option:
 
+```bash
 	## Ignorecase
 	rg -i <text>
 	## Literally: not regex
@@ -29,6 +42,7 @@
 	rg --count 'test'
 	## show the search stats
 	rg --stats 'test'
+```
 
 - Issues:
 
