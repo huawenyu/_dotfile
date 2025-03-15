@@ -1,30 +1,268 @@
-#!/bin/bash
-# https://yadm.io/docs/bootstrap#
-# Save this file as ~/.config/yadm/bootstrap and make it executable. It will
-# execute all executable files (excluding templates and editor backups) in the
-# ~/.config/yadm/bootstrap.d directory when run.
+#!/usr/bin/env bash
+# vim: setlocal autoindent cindent et ts=4 sw=4 sts=4:
+#
+# Get the script's directory, resolving symlinks
+var_ScriptDir="$( cd "$( dirname "$(readlink -f "${BASH_SOURCE[0]}")" )" &> /dev/null && pwd )"
+var_ScriptName=$(basename "$0")
+var_ScriptName="${var_ScriptName%.*}"
+var_OS="$(uname -s)"
+var_WorkDir=$(pwd)
+SECONDS=0
 
-set -eu
+# echo -e "${colorRed}This is red${colorReset}"
+colorRed='\e[31m'
+colorGreen='\e[32m'
+colorYellow='\e[33m'
+colorReset='\e[0m'
 
-# Directory to look for bootstrap executables in
-BOOTSTRAP_D="${BASH_SOURCE[0]}.d"
 
-if [[ ! -d "$BOOTSTRAP_D" ]]; then
-    echo "Error: bootstrap directory '$BOOTSTRAP_D' not found" >&2
-    exit 1
-fi
+_Usage=$(cat <<-END
+    Sample:
+      bash -x script        # Run the script with debug mode enabled.
+      bash -n script        # Check for syntax errors without execution.
 
-declare -a bootstraps
-while IFS= read -r bootstrap; do
-    if [[ -x "$bootstrap" && ! "$bootstrap" =~ "##" && ! "$bootstrap" =~ ~$ ]]; then
-        bootstraps+=("$bootstrap")
+      script afile
+
+END
+)
+
+# Define options
+    OPTIONS="hdf:o:"
+    LONGOPTIONS="help,debug,file:,output:"
+
+    # Parse options
+    PARSED=$(getopt -o "$OPTIONS" --long "$LONGOPTIONS" -- "$@")
+    if [[ $? -ne 0 ]]; then
+        die "Invalid option"
     fi
-done < <(find -L "$BOOTSTRAP_D" -type f | sort)
 
-for bootstrap in "${bootstraps[@]}"; do
-    if ! "$bootstrap"; then
-        echo "Error: bootstrap '$bootstrap' failed" >&2
+    # Evaluate parsed options
+    eval set -- "$PARSED"
+
+    # Default values
+    var_file=""
+    var_output=""
+
+# Process options
+parse_args () {
+    case "$#" in
+        2)
+            var_Action="$1"
+            var_SubAct="$2"
+            ;;
+        1)
+            var_Action="$1"
+            ;;
+        0)
+            ;;
+        *)
+            echo "$_Usage"
+            die "Incorrect arguments"
+            ;;
+    esac
+
+    while true; do
+        case "$1" in
+            -h|--help)
+                echo "$_Usage"
+                exit 0
+                ;;
+            -d|--debug)
+                var_DRYRUN=1
+                shift 2
+                ;;
+            -f|--file)
+                var_file="$2"
+                shift 2
+                ;;
+            -o|--output)
+                var_output="$2"
+                shift 2
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *)
+                die "Invalid option"
+                exit 1
+                ;;
+        esac
+    done
+}
+
+
+# Usage: varNum1=$( int var1 )
+int ()
+{
+    printf '%d' $(expr ${1:-} : '[^0-9]*\([0-9]*\)' 2>/dev/null) || :
+}
+
+
+do_args () {
+    ### Extra arguments
+    case "$#" in
+        2)
+            var_Action="$1"
+            var_SubAct="$2"
+            ;;
+        1)
+            var_Action="$1"
+            ;;
+        0)
+            ;;
+        *)
+            echo "$_Usage"
+            die "Incorrect arguments"
+            ;;
+    esac
+
+
+    ### Handle arguments
+    if [[ -n "$var_DRYRUN" ]]; then
+        ( set -o posix ; set ) | grep -e '^var_'
         exit 1
     fi
-done
+
+    if [[ "$var_VERBOSE" -ge 3 ]]; then
+        set -x                              ### Print each command before eval
+    fi
+
+    if [[ "$var_VERBOSE" -ge 4 ]]; then
+        set -v                              ### Print each line of the script before eval
+    fi
+}
+
+
+main () {
+    do_args "$@"
+
+    ### Normalize the args
+    # set --                                ### Clears positional parameters
+    # input="arg1 arg2 'arg with spaces'"   ### If arg have space
+    # eval set -- $input
+
+    #set -- $(ls *.txt)                      ### Assigns all .txt filename to $1, $2, etc.
+    do_task "$@"
+
+    cleanup
+}
+
+
+do_task () {
+    # OS-specific setup
+    case "$OS" in
+      Linux)
+          do_task_linux
+        ;;
+      Darwin)
+          do_task_macos
+        ;;
+      MINGW*|CYGWIN*|MSYS*)
+          do_task_wsl
+        ;;
+      *)
+        echo "Unsupported operating system: $OS"
+        exit 1
+        ;;
+    esac
+}
+
+do_task_linux () {
+    echo "Running Linux setup..."
+    # yadm alt --os Linux
+
+
+    sudo apt-get update -qq && \
+        sudo apt-get install -qq -y \
+            software-properties-common apt-utils curl sudo parallel \
+            build-essential gdb clangd valgrind libssl-dev \
+            cmake meson ninja-build autoconf automake libtool python3-dev \
+            ripgrep python3-pip unzip expect psmisc gawk tree universal-ctags bat cscope \
+            neovim \
+            git git-lfs \
+            zsh tmux fzf bash-completion lftp sshpass bear xxd bc
+
+    sudo apt clean autoclean
+    sudo apt autoremove -y
+
+    sudo pip3 install -U pip
+    sudo pip3 install meson
+    sudo pip3 install pynvim
+
+    sudo ln -s /usr/bin/python3 /usr/bin/python
+}
+
+do_task_macos () {
+    echo "Running macOS setup..."
+    yadm alt --os Darwin
+    if command -v brew &> /dev/null; then
+      brew update
+      brew install git vim tmux
+    else
+      echo "Homebrew not installed. Please install Homebrew first."
+      exit 1
+    fi
+}
+
+do_task_wsl () {
+    echo "Running Windows (WSL) setup..."
+    yadm alt --os Windows
+    if command -v apt &> /dev/null; then
+      sudo apt update
+      sudo apt install -y git vim tmux
+    else
+      echo "WSL not properly configured. Please ensure WSL is set up."
+      exit 1
+    fi
+}
+
+die () {
+    [ "$#" -gt 0 ] && echo -e "${colorRed}  $0: $@  ${colorReset}" >&2
+    cleanup
+    exit 1
+}
+
+
+maketemp () {
+    TEMPFILE=
+    if [ -z "$TEMPFILE" ]; then
+        TEMPFILE="$(mktemp /tmp/git-info.XXXXXX)" || die
+    fi
+
+    if [ -z "$TEMPFILE2" ]; then
+        TEMPFILE2="$(mktemp /tmp/git-info.XXXXXX)" || die
+    fi
+}
+
+
+cleanup() {
+    trap - EXIT
+
+    if [[ -n "$var_DEBUG" ]]; then
+        echo -e "Tempfile: \n    $TEMPFILE\n    $TEMPFILE2\n"
+
+        duration=$SECONDS
+        echo "trap-cleanup(action=$var_Action time=$(($duration / 60))m:$(($duration % 60))s)"
+    else
+        if [ -n "$TEMPFILE" ]; then
+            rm -f "$TEMPFILE" 2> /dev/null
+        fi
+
+        if [ -n "$TEMPFILE2" ]; then
+            rm -f "$TEMPFILE2" 2> /dev/null
+        fi
+    fi
+
+    # Backto the original current dir
+    cd "$var_WorkDir"
+}
+
+
+# wget -O $HOME/bin/getoptions https://github.com/ko1nksm/getoptions/releases/latest/download/getoptions
+trap "cleanup; exit 130" 1 2 3 15
+parse_args "$@"
+
+main "$@"
+echo "Bootstrap complete!"
 
