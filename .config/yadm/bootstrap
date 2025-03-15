@@ -151,7 +151,7 @@ main () {
 
 do_task () {
     # OS-specific setup
-    case "$OS" in
+    case "$var_OS" in
       Linux)
           do_task_linux
         ;;
@@ -162,7 +162,7 @@ do_task () {
           do_task_wsl
         ;;
       *)
-        echo "Unsupported operating system: $OS"
+        echo "Unsupported operating system: $var_OS"
         exit 1
         ;;
     esac
@@ -195,7 +195,7 @@ do_task_linux () {
 
 do_task_macos () {
     echo "Running macOS setup..."
-    yadm alt --os Darwin
+    #yadm alt --os Darwin
     if command -v brew &> /dev/null; then
       brew update
       brew install git vim tmux
@@ -207,7 +207,7 @@ do_task_macos () {
 
 do_task_wsl () {
     echo "Running Windows (WSL) setup..."
-    yadm alt --os Windows
+    #yadm alt --os Windows
     if command -v apt &> /dev/null; then
       sudo apt update
       sudo apt install -y git vim tmux
