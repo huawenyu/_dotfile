@@ -85,7 +85,7 @@ ftPython=("python3-pip"
 _Usage=$(cat <<-END
     option:
       -h,--help     Help
-      -d,--debug    Debug only show all variables and exit
+      -n,--dryrun   Dryrun: only show all variables and exit
       -s,--shell    Choose shell, default=bash
         bash
         zsh
@@ -111,8 +111,8 @@ END
 parse_args () {
 
     # Define options
-    OPTIONS="hds:m:f:o:"
-    LONGOPTIONS="help,debug,shell:,mode:,feature:,output:"
+    OPTIONS="hns:m:f:o:"
+    LONGOPTIONS="help,dryrun,shell:,mode:,feature:,output:"
 
     # Parse options
     PARSED=$(getopt -o "$OPTIONS" --long "$LONGOPTIONS" -- "$@")
@@ -140,7 +140,7 @@ parse_args () {
                 echo "$_Usage"
                 exit 0
                 ;;
-            -d|--debug)
+            -n|--dryrun)
                 var_DRYRUN=1
                 shift 1
                 ;;
@@ -263,6 +263,41 @@ do_args () {
     var_FeatureList+=":"
 
 
+    if [[ "$var_FeatureList" =~ ":ftCommon:" ]]; then
+        var_PackageName+=" ${ftCommon[@]}"
+    fi
+    if [[ "$var_FeatureList" =~ ":ftToolNet:" ]]; then
+        var_PackageName+=" ${ftToolNet[@]}"
+    fi
+    if [[ "$var_FeatureList" =~ ":ftToolBasic:" ]]; then
+        var_PackageName+=" ${ftToolBasic[@]}"
+    fi
+    if [[ "$var_FeatureList" =~ ":ftToolTest:" ]]; then
+        var_PackageName+=" ${ftToolTest[@]}"
+    fi
+    if [[ "$var_FeatureList" =~ ":ftIDE:" ]]; then
+        var_PackageName+=" ${ftIDE[@]}"
+    fi
+    if [[ "$var_FeatureList" =~ ":ftVirt:" ]]; then
+        var_PackageName+=" ${ftVirt[@]}"
+    fi
+    if [[ "$var_FeatureList" =~ ":ftBuild:" ]]; then
+        var_PackageName+=" ${ftBuild[@]}"
+    fi
+    if [[ "$var_FeatureList" =~ ":ftLibdev:" ]]; then
+        var_PackageName+=" ${ftLibdev[@]}"
+    fi
+    if [[ "$var_FeatureList" =~ ":ftPython:" ]]; then
+        var_PackageName+=" ${ftPython[@]}"
+    fi
+    if [[ "$var_FeatureList" =~ ":ftZsh:" ]]; then
+        var_PackageName+=" ${ftZsh[@]}"
+    fi
+    if [[ "$var_FeatureList" =~ ":ftBash:" ]]; then
+        var_PackageName+=" ${ftBash[@]}"
+    fi
+
+
     ### Handle arguments
     if [[ -n "$var_DRYRUN" ]]; then
         ( set -o posix ; set ) | grep -e '^var_'
@@ -309,43 +344,7 @@ do_task_linux () {
     echo "Running Linux setup..."
     # yadm alt --os Linux
 
-    PACKAGE_NAME=""
-    if [[ "var_FeatureList" == *":ftCommon:"* ]]; then
-        PACKAGE_NAME+=" ${ftCommon[@]}"
-    fi
-    if [[ "var_FeatureList" == *":ftToolNet:"* ]]; then
-        PACKAGE_NAME+=" ${ftToolNet[@]}"
-    fi
-    if [[ "var_FeatureList" == *":ftToolBasic:"* ]]; then
-        PACKAGE_NAME+=" ${ftToolBasic[@]}"
-    fi
-    if [[ "var_FeatureList" == *":ftToolTest:"* ]]; then
-        PACKAGE_NAME+=" ${ftToolTest[@]}"
-    fi
-    if [[ "var_FeatureList" == *":ftIDE:"* ]]; then
-        PACKAGE_NAME+=" ${ftIDE[@]}"
-    fi
-    if [[ "var_FeatureList" == *":ftVirt:"* ]]; then
-        PACKAGE_NAME+=" ${ftVirt[@]}"
-    fi
-    if [[ "var_FeatureList" == *":ftBuild:"* ]]; then
-        PACKAGE_NAME+=" ${ftBuild[@]}"
-    fi
-    if [[ "var_FeatureList" == *":ftLibdev:"* ]]; then
-        PACKAGE_NAME+=" ${ftLibdev[@]}"
-    fi
-    if [[ "var_FeatureList" == *":ftPython:"* ]]; then
-        PACKAGE_NAME+=" ${ftPython[@]}"
-    fi
-    if [[ "var_FeatureList" == *":ftZsh:"* ]]; then
-        PACKAGE_NAME+=" ${ftZsh[@]}"
-    fi
-    if [[ "var_FeatureList" == *":ftBash:"* ]]; then
-        PACKAGE_NAME+=" ${ftBash[@]}"
-    fi
-
-
-    sudo apt-get update -qq && sudo apt-get install -qq -y "$PACKAGE_NAME"
+    sudo apt-get update -qq && sudo apt-get install -qq -y "$var_PackageName"
     sudo apt clean autoclean
     sudo apt autoremove -y
 
