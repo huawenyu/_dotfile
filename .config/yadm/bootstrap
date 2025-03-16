@@ -15,7 +15,7 @@ colorYellow='\e[33m'
 colorReset='\e[0m'
 
 var_OS="$(uname -s)"
-var_PackageName=""
+var_PackageName=()
 var_FeatureList=":"
 
 ftBash=("bash-completion")
@@ -264,37 +264,37 @@ do_args () {
 
 
     if [[ "$var_FeatureList" =~ ":ftCommon:" ]]; then
-        var_PackageName+=" ${ftCommon[@]}"
+        var_PackageName+=("${ftCommon[@]}")
     fi
     if [[ "$var_FeatureList" =~ ":ftToolNet:" ]]; then
-        var_PackageName+=" ${ftToolNet[@]}"
+        var_PackageName+=("${ftToolNet[@]}")
     fi
     if [[ "$var_FeatureList" =~ ":ftToolBasic:" ]]; then
-        var_PackageName+=" ${ftToolBasic[@]}"
+        var_PackageName+=("${ftToolBasic[@]}")
     fi
     if [[ "$var_FeatureList" =~ ":ftToolTest:" ]]; then
-        var_PackageName+=" ${ftToolTest[@]}"
+        var_PackageName+=("${ftToolTest[@]}")
     fi
     if [[ "$var_FeatureList" =~ ":ftIDE:" ]]; then
-        var_PackageName+=" ${ftIDE[@]}"
+        var_PackageName+=("${ftIDE[@]}")
     fi
     if [[ "$var_FeatureList" =~ ":ftVirt:" ]]; then
-        var_PackageName+=" ${ftVirt[@]}"
+        var_PackageName+=("${ftVirt[@]}")
     fi
     if [[ "$var_FeatureList" =~ ":ftBuild:" ]]; then
-        var_PackageName+=" ${ftBuild[@]}"
+        var_PackageName+=("${ftBuild[@]}")
     fi
     if [[ "$var_FeatureList" =~ ":ftLibdev:" ]]; then
-        var_PackageName+=" ${ftLibdev[@]}"
+        var_PackageName+=("${ftLibdev[@]}")
     fi
     if [[ "$var_FeatureList" =~ ":ftPython:" ]]; then
-        var_PackageName+=" ${ftPython[@]}"
+        var_PackageName+=("${ftPython[@]}")
     fi
     if [[ "$var_FeatureList" =~ ":ftZsh:" ]]; then
-        var_PackageName+=" ${ftZsh[@]}"
+        var_PackageName+=("${ftZsh[@]}")
     fi
     if [[ "$var_FeatureList" =~ ":ftBash:" ]]; then
-        var_PackageName+=" ${ftBash[@]}"
+        var_PackageName+=("${ftBash[@]}")
     fi
 
 
@@ -344,7 +344,7 @@ do_task_linux () {
     echo "Running Linux setup..."
     # yadm alt --os Linux
 
-    sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -qq -y "$var_PackageName"
+    sudo apt-get update -qq && sudo apt-get upgrade -qq -y && sudo apt-get install -qq -y "${var_PackageName[@]}"
     sudo apt clean autoclean
     sudo apt autoremove -y
 
