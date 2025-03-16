@@ -344,11 +344,11 @@ do_task_linux () {
     echo "Running Linux setup..."
     # yadm alt --os Linux
 
-    sudo apt-get update -qq && sudo apt-get install -qq -y "$var_PackageName"
+    sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install -qq -y "$var_PackageName"
     sudo apt clean autoclean
     sudo apt autoremove -y
 
-    if [[ "var_FeatureList" == *":ftIDE:"* ]]; then
+    if [[ "$var_FeatureList" =~ ":ftIDE:" ]]; then
         sudo pip3 install -U pip
         sudo pip3 install meson
         sudo pip3 install pynvim
@@ -358,20 +358,20 @@ do_task_linux () {
     fi
 
 
-    if [[ "var_FeatureList" == *":ftVirt:"* ]]; then
+    if [[ "$var_FeatureList" =~ ":ftVirt:" ]]; then
         sudo usermod -aG libvirt $USER
         sudo usermod -aG kvm $USER
     fi
 
 
-    if [[ "var_FeatureList" == *":ftZsh:"* ]]; then
+    if [[ "$var_FeatureList" =~ ":ftZsh:" ]]; then
         sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
         git clone https://github.com/huawenyu/zsh-local.git     ~/.oh-my-zsh/custom/plugins/zsh-local
         git clone https://github.com/zsh-users/zsh-completions  ~/.oh-my-zsh/custom/plugins/zsh-completions
         git clone https://github.com/jeffreytse/zsh-vi-mode     ~/.oh-my-zsh/custom/plugins/zsh-vi-mode
     fi
 
-    if [[ "var_FeatureList" == *":ftBash:"* ]]; then
+    if [[ "$var_FeatureList" =~ ":ftBash:" ]]; then
         bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)"
     fi
 
@@ -387,7 +387,7 @@ do_task_linux () {
     fi
 
 
-    if [[ "var_FeatureList" == *":ftPython:"* ]]; then
+    if [[ "$var_FeatureList" =~ ":ftPython:" ]]; then
         if [ ! -f /usr/bin/python ]; then
             sudo ln -s /usr/bin/python3 /usr/bin/python
         fi
