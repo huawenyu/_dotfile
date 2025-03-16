@@ -5,7 +5,6 @@
 var_ScriptDir="$( cd "$( dirname "$(readlink -f "${BASH_SOURCE[0]}")" )" &> /dev/null && pwd )"
 var_ScriptName=$(basename "$0")
 var_ScriptName="${var_ScriptName%.*}"
-var_OS="$(uname -s)"
 var_WorkDir=$(pwd)
 SECONDS=0
 
@@ -15,51 +14,125 @@ colorGreen='\e[32m'
 colorYellow='\e[33m'
 colorReset='\e[0m'
 
+var_OS="$(uname -s)"
+var_PackageName=""
+var_FeatureList=":"
+
+ftBash=("bash-completion")
+ftZsh=("zsh")
+
+ftCommon=("software-properties-common"
+    "apt-utils"
+    "openssh-server"
+    "sshpass"
+    "tree"
+    "gawk"
+    "sudo")
+
+ftToolNet=("curl"
+    "wget"
+    "git"
+    "git-lfs"
+    "net-tools"
+    "lftp")
+
+ftToolBasic=("unzip"
+    "expect"
+    "psmisc"
+    "tmux"
+    "fzf"
+    "yadm")
+
+ftToolTest=("parallel")
+
+ftIDE=("neovim"
+    "universal-ctags"
+    "bat"
+    "bear"
+    "xxd"
+    "bc"
+    "patchutils"
+    "clangd"
+    "ripgrep"
+    "sudo")
+
+ftVirt=("virt-manager"
+    "qemu-kvm"
+    "libvirt-daemon-system"
+    "libvirt-clients"
+    "bridge-utils"
+    "qemu-utils"
+    "libguestfs-tools")
+
+ftBuild=("build-essential"
+    "gdb"
+    "valgrind"
+    "bear"
+    "cmake"
+    "meson"
+    "ninja-build"
+    "libtool"
+    "autoconf"
+    "automake")
+
+ftLibdev=("libssl-dev")
+
+ftPython=("python3-pip"
+    "python3-dev"
+    "python3-dev")
+
 
 _Usage=$(cat <<-END
+    option:
+      -h,--help     Help
+      -d,--debug    Debug only show all variables and exit
+      -s,--shell    Choose shell, default=bash
+        bash
+        zsh
+      -m,--mode     OS mode choose, default=basic
+        none
+        basic
+        editor
+        dev
+        all
+      -f,--feature  Feature: "kvm,editor,python"
+
     Sample:
       bash -x script        # Run the script with debug mode enabled.
       bash -n script        # Check for syntax errors without execution.
 
-      script afile
+      script -m all
+      script -m dev -f "kvm:"
 
 END
 )
 
-# Define options
-    OPTIONS="hdf:o:"
-    LONGOPTIONS="help,debug,file:,output:"
+# Process options
+parse_args () {
+
+    # Define options
+    OPTIONS="hds:m:f:o:"
+    LONGOPTIONS="help,debug,shell:,mode:,feature:,output:"
 
     # Parse options
     PARSED=$(getopt -o "$OPTIONS" --long "$LONGOPTIONS" -- "$@")
     if [[ $? -ne 0 ]]; then
-        die "Invalid option"
+        die "Invalid option (1)"
     fi
 
     # Evaluate parsed options
     eval set -- "$PARSED"
 
     # Default values
-    var_file=""
     var_output=""
+    if [[ -f "/opt/forticlient/epctrl" ]]; then
+        var_Shell="bash"
+    else
+        var_Shell="zsh"
+    fi
 
-# Process options
-parse_args () {
-    case "$#" in
-        2)
-            var_Action="$1"
-            var_SubAct="$2"
-            ;;
-        1)
-            var_Action="$1"
-            ;;
-        0)
-            ;;
-        *)
-            echo "$_Usage"
-            die "Incorrect arguments"
-            ;;
-    esac
+    var_Mode="all"
+    var_Feature=","
 
     while true; do
         case "$1" in
@@ -69,10 +142,18 @@ parse_args () {
                 ;;
             -d|--debug)
                 var_DRYRUN=1
+                shift 1
+                ;;
+            -s|--shell)
+                var_Shell="$2"
                 shift 2
                 ;;
-            -f|--file)
-                var_file="$2"
+            -m|--mode)
+                var_Mode="$2"
+                shift 2
+                ;;
+            -f|--feature)
+                var_Feature+="$2"
                 shift 2
                 ;;
             -o|--output)
@@ -84,11 +165,13 @@ parse_args () {
                 break
                 ;;
             *)
-                die "Invalid option"
+                die "Invalid option (2)"
                 exit 1
                 ;;
         esac
     done
+
+    var_Feature+=","
 }
 
 
@@ -118,6 +201,68 @@ do_args () {
     esac
 
 
+    # Handle shell
+    if [[ "$var_Shell" == "bash" ]]; then
+        var_FeatureList+="ftBash:"
+    elif [[ "$var_Shell" == "zsh" ]]; then
+        var_FeatureList+="ftZsh:"
+    else
+        echo "-s,--shell [bash|zsh], but '$var_Shell'"
+        echo "$_Usage"
+        die "Incorrect arguments"
+    fi
+
+    # Check current env
+        var_IsPhysicalPC="true"
+        if lscpu | grep -q "Hypervisor"; then
+            var_IsPhysicalPC="false"
+        fi
+
+    # Handle mode
+    if [[ "$var_Mode" == "none" ]]; then
+        # Reset feature list
+        var_FeatureList+=":"
+    elif [[ "$var_Mode" == "basic" ]]; then
+        var_FeatureList+="ftCommon:ftToolBasic:ftToolNet:"
+    elif [[ "$var_Mode" == "editor" ]]; then
+        var_FeatureList+="ftCommon:ftToolBasic:ftToolNet:ftToolTest:ftIDE:ftPython:"
+    elif [[ "$var_Mode" == "dev" ]]; then
+        var_FeatureList+="ftCommon:ftToolBasic:ftToolNet:ftToolTest:ftIDE:ftBuild:ftLibdev:ftPython:"
+        if [[ "$var_IsPhysicalPC" == "false" ]]; then
+            var_FeatureList+="ftVirt:"
+        fi
+    elif [[ "$var_Mode" == "all" ]]; then
+        var_FeatureList+="ftCommon:ftToolBasic:ftToolNet:ftToolTest:ftIDE:ftBuild:ftLibdev:ftPython:"
+        if [[ "$var_IsPhysicalPC" == "false" ]]; then
+            var_FeatureList+="ftVirt:"
+        fi
+    else
+        echo "-m,--mode [none|basic|dev|kvm|all], but '$var_Mode'"
+        echo "$_Usage"
+        die "Incorrect arguments"
+    fi
+
+
+    # Handle features
+    {
+        if [[ "$var_Feature" == *",python,"* ]]; then
+            var_FeatureList+="ftPython:"
+        fi
+
+        if [[ "$var_Feature" == *",kvm,"* ]]; then
+            if [[ "$var_IsPhysicalPC" == "false" ]]; then
+                var_FeatureList+="ftVirt:"
+            fi
+        fi
+
+        if [[ "$var_Feature" == *",editor,"* ]]; then
+            var_FeatureList+="ftIDE:"
+        fi
+    }
+
+    var_FeatureList+=":"
+
+
     ### Handle arguments
     if [[ -n "$var_DRYRUN" ]]; then
         ( set -o posix ; set ) | grep -e '^var_'
@@ -136,15 +281,7 @@ do_args () {
 
 main () {
     do_args "$@"
-
-    ### Normalize the args
-    # set --                                ### Clears positional parameters
-    # input="arg1 arg2 'arg with spaces'"   ### If arg have space
-    # eval set -- $input
-
-    #set -- $(ls *.txt)                      ### Assigns all .txt filename to $1, $2, etc.
     do_task "$@"
-
     cleanup
 }
 
@@ -172,25 +309,92 @@ do_task_linux () {
     echo "Running Linux setup..."
     # yadm alt --os Linux
 
+    PACKAGE_NAME=""
+    if [[ "var_FeatureList" == *":ftCommon:"* ]]; then
+        PACKAGE_NAME+=" ${ftCommon[@]}"
+    fi
+    if [[ "var_FeatureList" == *":ftToolNet:"* ]]; then
+        PACKAGE_NAME+=" ${ftToolNet[@]}"
+    fi
+    if [[ "var_FeatureList" == *":ftToolBasic:"* ]]; then
+        PACKAGE_NAME+=" ${ftToolBasic[@]}"
+    fi
+    if [[ "var_FeatureList" == *":ftToolTest:"* ]]; then
+        PACKAGE_NAME+=" ${ftToolTest[@]}"
+    fi
+    if [[ "var_FeatureList" == *":ftIDE:"* ]]; then
+        PACKAGE_NAME+=" ${ftIDE[@]}"
+    fi
+    if [[ "var_FeatureList" == *":ftVirt:"* ]]; then
+        PACKAGE_NAME+=" ${ftVirt[@]}"
+    fi
+    if [[ "var_FeatureList" == *":ftBuild:"* ]]; then
+        PACKAGE_NAME+=" ${ftBuild[@]}"
+    fi
+    if [[ "var_FeatureList" == *":ftLibdev:"* ]]; then
+        PACKAGE_NAME+=" ${ftLibdev[@]}"
+    fi
+    if [[ "var_FeatureList" == *":ftPython:"* ]]; then
+        PACKAGE_NAME+=" ${ftPython[@]}"
+    fi
+    if [[ "var_FeatureList" == *":ftZsh:"* ]]; then
+        PACKAGE_NAME+=" ${ftZsh[@]}"
+    fi
+    if [[ "var_FeatureList" == *":ftBash:"* ]]; then
+        PACKAGE_NAME+=" ${ftBash[@]}"
+    fi
 
-    sudo apt-get update -qq && \
-        sudo apt-get install -qq -y \
-            software-properties-common apt-utils curl sudo parallel \
-            build-essential gdb clangd valgrind libssl-dev \
-            cmake meson ninja-build autoconf automake libtool python3-dev \
-            ripgrep python3-pip unzip expect psmisc gawk tree universal-ctags bat cscope \
-            neovim \
-            git git-lfs \
-            zsh tmux fzf bash-completion lftp sshpass bear xxd bc
 
+    sudo apt-get update -qq && sudo apt-get install -qq -y "$PACKAGE_NAME"
     sudo apt clean autoclean
     sudo apt autoremove -y
 
-    sudo pip3 install -U pip
-    sudo pip3 install meson
-    sudo pip3 install pynvim
+    if [[ "var_FeatureList" == *":ftIDE:"* ]]; then
+        sudo pip3 install -U pip
+        sudo pip3 install meson
+        sudo pip3 install pynvim
 
-    sudo ln -s /usr/bin/python3 /usr/bin/python
+        curl -fLo ~/.config/nvim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/autoload/plug.vim
+        curl -fLo ~/.config/nvim/init.vim          --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/init.vim
+    fi
+
+
+    if [[ "var_FeatureList" == *":ftVirt:"* ]]; then
+        sudo usermod -aG libvirt $USER
+        sudo usermod -aG kvm $USER
+    fi
+
+
+    if [[ "var_FeatureList" == *":ftZsh:"* ]]; then
+        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+        git clone https://github.com/huawenyu/zsh-local.git     ~/.oh-my-zsh/custom/plugins/zsh-local
+        git clone https://github.com/zsh-users/zsh-completions  ~/.oh-my-zsh/custom/plugins/zsh-completions
+        git clone https://github.com/jeffreytse/zsh-vi-mode     ~/.oh-my-zsh/custom/plugins/zsh-vi-mode
+    fi
+
+    if [[ "var_FeatureList" == *":ftBash:"* ]]; then
+        bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)"
+    fi
+
+    if command -v nvim &> /dev/null; then
+        curl -fLo ~/.config/nvim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/autoload/plug.vim
+    fi
+
+
+    if command -v tmux &> /dev/null; then
+        if [ ! -d ~/.tmux/plugins/tpm ]; then
+            git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+        fi
+    fi
+
+
+    if [[ "var_FeatureList" == *":ftPython:"* ]]; then
+        if [ ! -f /usr/bin/python ]; then
+            sudo ln -s /usr/bin/python3 /usr/bin/python
+        fi
+    fi
+
+    curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh
 }
 
 do_task_macos () {
