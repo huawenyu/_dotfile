@@ -378,9 +378,11 @@ $ yadm alt      ### Auto link the appropriate file for the current env
 
  <!-- cmd:end_slide -->
  <!-- cmd:jump_to_middle -->
-  **THANKS**
-  -
+      **THANKS**
+      -
+
 ---
+
  <!-- cmd:end_slide -->
 <!-- vim: ft=markdown setlocal autoindent cindent et ts=4 sw=4 sts=4 -->
 
