@@ -28,7 +28,7 @@ ls -a ~/ | egrep '^\.'
 Stew is a tool for managing your dotfiles and configuration files using symlinks.
  <!-- cmd:end_slide -->
 
-# Stew
+## Stew
 
  **1. Create dotfiles git-repo**
  -
@@ -62,7 +62,7 @@ git push -u origin main
 ```
 
  <!-- cmd:end_slide -->
-## Stew create symlinks
+### Stew create symlinks
 
 <!-- cmd:column_layout: [1, 1] -->
  <!-- cmd:column: 0 -->
@@ -97,7 +97,7 @@ git push -u origin main
 An efficient way to maintain consistency across multiple systems.
  <!-- cmd:end_slide -->
 
-# chezmoi
+## chezmoi
 
  <!-- cmd:pause -->
  **1. Manage our dotfile **
@@ -133,7 +133,7 @@ chezmoi apply
 ```
 
  <!-- cmd:end_slide -->
-## Special features
+### Special features
 
  <!-- cmd:pause -->
 - Encrypt sensitive info
@@ -172,7 +172,7 @@ $ cat ~/.local/share/chezmoi/dot_bashrc.tmpl
 Using git manage our dotfiles directly.
  <!-- cmd:end_slide -->
 
-# DIY by git
+## DIY by git
 
  <!-- cmd:pause -->
  **git dotfiles**
@@ -235,9 +235,9 @@ Using git manage our dotfiles directly.
 Using yadm (Yet Another Dotfiles Manager) is a simple and efficient way to manage your dotfiles.
  <!-- cmd:end_slide -->
 
-# yadm
+## yadm
 
-## Install
+### Install
 
 ```bash
 sudo curl -fLo /usr/local/bin/yadm https://github.com/TheLocehiliosan/yadm/raw/master/yadm
@@ -316,7 +316,7 @@ yadm checkout --force
 
 
  <!-- cmd:end_slide -->
-## Special features
+### Special features
 
  <!-- cmd:pause -->
 - [bootstrap](https://yadm.io/docs/bootstrap#)
@@ -384,10 +384,38 @@ $ yadm alt      ### Auto link the appropriate file for the current env
  <!-- cmd:end_slide -->
 <!-- vim: ft=markdown setlocal autoindent cindent et ts=4 sw=4 sts=4 -->
 
+# Windows
 
-## Reference
+## Notepad++
+
+### create python plugin
+
+1. Install plugin 'PythonScript':
+
+```python
+    # $ cat C:\Users\hyu\AppData\Roaming\Notepad++\plugins\config\PythonScript\scripts\OpenMantis.py
+
+    import webbrowser
+
+    # Get the currently selected text in Notepad++
+    selected_text = editor.getSelText()
+
+    # Check if there is a selected text
+    if selected_text:
+        # Open the selected text as a URL in the default browser
+        webbrowser.open("https://URL_mantis?bug_id=" + selected_text)
+    else:
+        # If no text is selected, open a specific URL (e.g., Notepad++ website)
+        webbrowser.open("https://npppythonscript.sourceforge.net/docs/latest/notepad.html")
+```
+
+2. Create shortcut: GUI>Settings>Shortcut Mappers
+
+
+# Reference
 
 [Best way to store in a bare git](https://www.atlassian.com/git/tutorials/dotfiles)  
 [Git Bare Repository - A Better Way To Manage Dotfiles](https://www.youtube.com/watch?v=tBoLDpTWVOM)  
 [Manage Your Secrets with git-crypt](https://dev.to/heroku/how-to-manage-your-secrets-with-git-crypt-56ih)  
+
 

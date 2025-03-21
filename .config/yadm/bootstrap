@@ -75,7 +75,14 @@ ftBuild=("build-essential"
     "autoconf"
     "automake")
 
-ftLibdev=("libssl-dev")
+ftLibdev=("openssl"
+    "libssl-dev"
+    "libpcre3"
+    "libpcre3-dev"
+    "zlib1g"
+    "zlib1g-dev"
+    "libjemalloc-dev"
+    "libatomic-ops-dev")
 
 ftPython=("python3-pip"
     "python3-dev"
@@ -461,7 +468,6 @@ cleanup() {
     # Backto the original current dir
     cd "$var_WorkDir"
 }
-
 
 # wget -O $HOME/bin/getoptions https://github.com/ko1nksm/getoptions/releases/latest/download/getoptions
 trap "cleanup; exit 130" 1 2 3 15
