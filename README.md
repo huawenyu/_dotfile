@@ -386,7 +386,7 @@ $ yadm alt      ### Auto link the appropriate file for the current env
  <!-- cmd:end_slide -->
 <!-- vim: ft=markdown setlocal autoindent cindent et ts=4 sw=4 sts=4 -->
 
-# Windows
+# OS-Windows
 
 ## Notepad++
 
@@ -413,6 +413,12 @@ $ yadm alt      ### Auto link the appropriate file for the current env
 
 2. Create shortcut: GUI>Settings>Shortcut Mappers
 
+# OS-Ubuntu
+
+## clang tool
+
+    nix-env -iA nixpkgs.clang-format
+    nix-env -iA nixpkgs.clang-tools
 
 # Reference
 

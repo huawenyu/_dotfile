@@ -541,9 +541,10 @@ endif
 
     " Markdown/Writing/Wiki {{{3
         " tool-render?
-        "Plug 'vimwiki/vimwiki',            Cond(has('nvim') && Mode(['editor']) && Mode(['markdown']), {'for': 'markdown'})  | " Another choice is  [Gollum](https://github.com/gollum/gollum)
-        "Plug 'lervag/wiki.vim',             Cond(has('nvim') && IfNoPlug('vimwiki') && Mode(['editor']) && Mode(['markdown']), {'for': 'markdown'})  | " Better vimwiki the philosophy of 'do one thing and do it well'
+        Plug 'vimwiki/vimwiki',             Cond(has('nvim') && Mode(['editor']) && Mode(['markdown']), {'for': 'markdown'})
+        "Plug 'lervag/wiki.vim',             Cond(has('nvim') && IfNoPlug('vimwiki') && Mode(['editor']) && Mode(['markdown']), {'for': 'markdown'})  | " Seems not better than vimwiki
         "Plug 'godlygeek/tabular',           Cond(has('nvim') && Mode(['editor']) && Mode(['markdown']), {'on': 'Tabularize', 'for': 'markdown'}) | " EasyAlign is better.
+        "Plug 'epwalsh/obsidian.nvim',        Cond(has('nvim') && IfNoPlug('vimwiki') && Mode(['editor']))
 
         " ge: open link
         " ]], ]c, ]u, ][: next-header/cur-header/parent/sibling/
@@ -567,7 +568,7 @@ endif
     Plug 'vimpostor/vim-tpipeline',         Cond(has('nvim') && Mode(['coder',]) && !empty($TMUX_PANE)) | " Show vim.statusline to the tmux.statusbar
 
     "Plug 'rcarriga/nvim-notify',           Cond(has('nvim') && Mode(['coder',]))  | " Substitute the vim's original print-type message
-    Plug 'j-hui/fidget.nvim',               Cond(has('nvim') && Mode(['coder',]), {'tag': 'legacy'})	 | " Standalone UI for nvim-lsp progress
+    "Plug 'j-hui/fidget.nvim',               Cond(has('nvim') && Mode(['coder',]), {'tag': 'legacy'})	 | " Standalone UI for nvim-lsp progress
     Plug 'huawenyu/vim-mark',               Cond(has('nvim') && Mode(['editor'])) | " mm  colorize current word
     Plug 'huawenyu/vim-signature',          Cond(has('nvim') && Mode(['editor'])) | " place, toggle and display marks
 
@@ -618,12 +619,10 @@ endif
 
         "Plug 'sudormrfbin/cheatsheet.nvim'
         "Plug 'nvim-lua/popup.nvim'
-        "Plug 'nvim-lua/plenary.nvim'
 
         " Cody AI-code
         "Plug 'sourcegraph/sg.nvim', { 'do': 'nvim -l build/init.lua' }
         " Required for various utilities
-        Plug 'nvim-lua/plenary.nvim',                       Cond(has('nvim') && Mode(['editor', 'floatview']))
         " Required if you want to use some of the search functionality
         Plug 'nvim-telescope/telescope.nvim',               Cond(has('nvim') && Mode(['coder',]))        | "
         Plug 'nvim-telescope/telescope-fzf-native.nvim',    Cond(has('nvim') && Mode(['coder',]), { 'do': 'make' })        | "
@@ -853,10 +852,6 @@ endif
     " Presentation? draw? pencil  {{{3
         Plug 'sk1418/blockit',              Cond(has('nvim') && Mode(['editor',]), { 'on': 'Block' })       | " :Block -- Draw a Box around text region
         Plug 'sk1418/HowMuch',              Cond(has('nvim') && Mode(['editor',]), { 'on': 'HowMuch' })       | " V-Select, then get summary by: <Leader><Leader>?s
-
-        " Terminal Powerpoint: Suggestion use `presenterm` (https://mfontanini.github.io/presenterm/guides/basics.html)
-        "Plug 'sotte/presenting.vim',        Cond(has('nvim') && Mode(['editor',]), {'for': 'markdown'})    | "PPT: n-next, p-prev, q-quit
-
         "Plug 'jbyuki/venn.nvim',            Cond(has('nvim') && Mode(['editor',]), { 'on': ['ToggleVennDraw', ], })       | " Draw pencil
     "}}}
 

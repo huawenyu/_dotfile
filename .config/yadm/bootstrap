@@ -41,6 +41,7 @@ ftToolBasic=("unzip"
     "psmisc"
     "tmux"
     "fzf"
+    "gem"
     "yadm")
 
 ftToolTest=("parallel")
@@ -48,7 +49,6 @@ ftToolTest=("parallel")
 ftIDE=("neovim"
     "universal-ctags"
     "bat"
-    "bear"
     "xxd"
     "bc"
     "patchutils"
@@ -66,14 +66,13 @@ ftVirt=("virt-manager"
 
 ftBuild=("build-essential"
     "gdb"
+    "bear" "clang"
     "valgrind"
-    "bear"
     "cmake"
-    "meson"
-    "ninja-build"
+    "ruby" "ruby-dev" "rubygems"
+    "meson" "ninja-build"
     "libtool"
-    "autoconf"
-    "automake")
+    "autoconf" "automake")
 
 ftLibdev=("openssl"
     "libssl-dev"
@@ -84,10 +83,19 @@ ftLibdev=("openssl"
     "libjemalloc-dev"
     "libatomic-ops-dev")
 
-ftPython=("python3-pip"
-    "python3-dev"
+ftLibdev2=("libboost-all-dev"
+    "libjemalloc-dev"
+    "libclang-dev"
+    "llvm-dev"
+    "libedit-dev"
+    "libcurl4-openssl-dev")
+
+ftPython=("python3"
+    "python3-pip"
     "python3-dev")
 
+ftNix=()
+ftNixTool=("presenterm")
 
 _Usage=$(cat <<-END
     option:
@@ -234,12 +242,12 @@ do_args () {
     elif [[ "$var_Mode" == "editor" ]]; then
         var_FeatureList+="ftCommon:ftToolBasic:ftToolNet:ftToolTest:ftIDE:ftPython:"
     elif [[ "$var_Mode" == "dev" ]]; then
-        var_FeatureList+="ftCommon:ftToolBasic:ftToolNet:ftToolTest:ftIDE:ftBuild:ftLibdev:ftPython:"
+        var_FeatureList+="ftCommon:ftToolBasic:ftToolNet:ftToolTest:ftIDE:ftBuild:ftLibdev:ftLibdev2:ftPython:ftNix:ftNixTool:"
         if [[ "$var_IsPhysicalPC" == "true" ]]; then
             var_FeatureList+="ftVirt:"
         fi
     elif [[ "$var_Mode" == "all" ]]; then
-        var_FeatureList+="ftCommon:ftToolBasic:ftToolNet:ftToolTest:ftIDE:ftBuild:ftLibdev:ftPython:"
+        var_FeatureList+="ftCommon:ftToolBasic:ftToolNet:ftToolTest:ftIDE:ftBuild:ftLibdev:ftLibdev2:ftPython:ftNix:ftNixTool:"
         if [[ "$var_IsPhysicalPC" == "true" ]]; then
             var_FeatureList+="ftVirt:"
         fi
@@ -291,6 +299,9 @@ do_args () {
     fi
     if [[ "$var_FeatureList" =~ ":ftLibdev:" ]]; then
         var_PackageName+=("${ftLibdev[@]}")
+    fi
+    if [[ "$var_FeatureList" =~ ":ftLibdev2:" ]]; then
+        var_PackageName+=("${ftLibdev2[@]}")
     fi
     if [[ "$var_FeatureList" =~ ":ftPython:" ]]; then
         var_PackageName+=("${ftPython[@]}")
@@ -395,11 +406,24 @@ do_task_linux () {
         git clone https://github.com/zsh-users/zsh-completions  ~/.oh-my-zsh/custom/plugins/zsh-completions
         git clone https://github.com/jeffreytse/zsh-vi-mode     ~/.oh-my-zsh/custom/plugins/zsh-vi-mode
 
+        # Require interact, 'exit' for next step
         sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
     fi
 
     if [[ "$var_FeatureList" =~ ":ftBash:" ]]; then
         bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)"
+    fi
+
+    if [[ "$var_FeatureList" =~ ":ftNix:" ]]; then
+        # Require interact, 'exit' for next step
+        sh <(curl -L https://nixos.org/nix/install) --daemon
+
+        if [[ "$var_FeatureList" =~ ":ftNixTool:" ]]; then
+            # Require interact, 'exit' for next step
+            nix-env -iA nixpkgs.presenterm
+            nix-env -iA nixpkgs.clang-format
+            nix-env -iA nixpkgs.clang-tools
+        fi
     fi
 
 }
