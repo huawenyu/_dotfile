@@ -19,6 +19,9 @@
 
 import os, sys, shutil, subprocess, collections, time, datetime, shlex, getopt, stat
 
+RED = "\033[91m"    # Red color
+RESET = "\033[0m"   # Reset to default
+
 # from python3.3 tree: Lib/shlex.py (shlex.quote not in python3.2)
 import re
 _find_unsafe = re.compile(r'[^\w@%+=:,./-]', re.ASCII).search
@@ -93,8 +96,12 @@ def printv(s):
 	global verbose
 	if verbose: print(s)
 
-def printerr(s):
-	print(s, file=sys.stderr)
+def printerr(error_message):
+	print(RED + "Error: " + error_message + RESET, file=sys.stderr)
+
+def exit_err(error_message):
+	sys.stderr.write(RED + "Error: " + error_message + RESET + "\n")
+	sys.exit(1)
 
 def ssh_master_init(ssh):
 	import tempfile, atexit
@@ -103,9 +110,9 @@ def ssh_master_init(ssh):
 	try:
 		subprocess.check_call( ssh.getcmdlist()+["-fNM"] )
 	except subprocess.CalledProcessError:
-		sys.exit("Error: could not open SSH connection.")
+		exit_err("could not open SSH connection.")
 	except FileNotFoundError:
-		sys.exit("Error: ssh is not installed.")
+		exit_err("ssh is not installed.")
 
 	atexit.register(ssh_master_clean, tmpdir, ssh)
 
@@ -157,7 +164,7 @@ def rsync_check_install(ssh):
 	with open(os.devnull, 'w') as devnull:
 		ret = subprocess.call("which rsync"+remote_check, shell=True, stdout=devnull, stderr=devnull)
 	if ret != 0:
-		sys.exit("Error: please check that rsync is installed (both local and remote sides)")
+		exit_err("please check that rsync is installed (both local and remote sides)")
 
 # check if find supports printf option, and also remote find if ssh needed
 def find_check_command(ssh):
@@ -174,7 +181,7 @@ def find_check_command(ssh):
 				subprocess.check_call(["gfind"]+findargs, stdout=devnull, stderr=devnull)
 				localfind = "gfind"
 			except:
-				sys.exit("Error: local GNU find not found. "+findhelp)
+				exit_err("local GNU find not found. "+findhelp)
 	
 		if ssh != None:
 			if subprocess.call(ssh.getcmdlist()+["find"]+findargs, stdout=devnull, stderr=devnull) == 0:
@@ -182,7 +189,7 @@ def find_check_command(ssh):
 			elif subprocess.call(ssh.getcmdlist()+["gfind"]+findargs, stdout=devnull, stderr=devnull) == 0:
 				remotefind = "gfind"
 			else:
-				sys.exit("Error: remote GNU find not found. "+findhelp)
+				exit_err("remote GNU find not found. "+findhelp)
 		
 	return localfind, remotefind
 
@@ -220,7 +227,7 @@ def rsync_check(sshSrc,dirnameSrc, sshDst,dirnameDst):
 	diff.remove("./")
 
 	if len(diff) != 0:
-		sys.exit("Error: rsync_check differences:\n"+str(diff))
+		exit_err("rsync_check differences:\n"+str(diff))
 
 # take a snapshot of files states from dir, using find. store it in .bsync-snap-XXXX
 # snap format: inode, path, type, date...
@@ -238,7 +245,7 @@ def make_snapshot(ssh,dirname, oldsnapname, newsnapname):
 	else:
 		ret = subprocess.call(ssh.getcmdlist()+[findcmdremote+cmd])
 
-	if ret != 0: sys.exit("Error making a snapshot.")
+	if ret != 0: exit_err("making a snapshot.")
 
 def make_snapshots(ssh1,dir1name, ssh2,dir2name, oldsnapname):
 	newsnapname = ".bsync-snap-"+datetime.datetime.now().strftime("%Y%m%d%H%M%S.%f")
@@ -275,7 +282,7 @@ def get_bsync_files(ssh, dirname):
 			out = subprocess.check_output(ssh.getcmdlist()+["[ -r "+quote(dirname)+" ] && cd "+quote(dirname)+" 2>/dev/null && ( ls -1 .bsync-* 2>/dev/null || true )" ], universal_newlines=True)
 			files = set( out.split("\n") )
 	except (FileNotFoundError, subprocess.CalledProcessError):
-		sys.exit("Error: could not open directory: "+getdirstr(ssh,dirname)+" (is it created?)")
+		exit_err("could not open directory: "+getdirstr(ssh,dirname)+" (is it created?)")
 
 	snaps = set()
 	ignorefile = None
@@ -359,7 +366,7 @@ def read_file_record(gen):
 		if i==None and p==None and t==None and d==None and s==None and perms==None:
 			return None
 		else:
-			sys.exit("Error: snap filelists not coherent.")
+			exit_err("snap filelists not coherent.")
 
 	d = d.split(".")[0]	# truncate date to seconds
 	if t=="d": d=s="0"	# ignore dates/size for dirs (set to zero)
@@ -401,7 +408,7 @@ def load_orig(ssh1,dir1name, ssh2,dir2name):
 	# iterate on gen1 to fill orig
 	# first fill with 1st snap, then with 2nd snap, because the order can be different (in find output)
 	record = read_file_record(gen1)
-	if record==None: sys.exit("Error reading files from dir1 filelist") #should be at least one record (dir root)
+	if record==None: exit_err("reading files from dir1 filelist") #should be at least one record (dir root)
 	while record != None:
 		inode,path,type,date,size,perms = record
 
@@ -412,7 +419,7 @@ def load_orig(ssh1,dir1name, ssh2,dir2name):
 
 	# iterate on gen2, fill inodes for dir2 and check for consistency
 	record = read_file_record(gen2)
-	if record==None: sys.exit("Error reading files from dir2 filelist")
+	if record==None: exit_err("reading files from dir2 filelist")
 	while record != None:
 		inode,path,type,date,size,perms = record
 
@@ -421,7 +428,7 @@ def load_orig(ssh1,dir1name, ssh2,dir2name):
 			if path in orig:
 				origfile = orig[path]
 				if origfile.type != type or origfile.date != date or origfile.size != size or origfile.perms != perms:
-					sys.exit("Error: difference in snaps for path: "+tostr(path)) 
+					exit_err("difference in snaps for path: "+tostr(path)) 
 
 				origfile.i2 = inode #set the second inode
 		
@@ -455,7 +462,7 @@ def load_dir(ssh, dirname, ignores):
 	fd.close()
 	proc.wait()
 	if proc.returncode != 0:
-		sys.exit("Find Error in "+getdirstr(ssh,dirname))
+		exit_err("Find Error in "+getdirstr(ssh,dirname))
 	
 	return dir
 
@@ -517,7 +524,7 @@ def ask_conflict(f1, f2, path, tokeep):
 		show_conflict(f1, f2, path)
 
 		if batch:
-			sys.exit("Error: Conflict found in batch mode. Exiting.")
+			exit_err("Conflict found in batch mode. Exiting.")
 
 		if resp!=None:
 			print("	1	Keep left version")
@@ -689,7 +696,7 @@ def apply_small_actions(ssh,dirname, mkdirs,moves,rm,rmdirs):
 		shproc.stdin.close()
 		shproc.wait() # wait shell process to exit
 		if shproc.returncode != 0:
-			sys.exit("Error in shell process.")
+			exit_err("in shell process.")
 
 ##### actions involving an rsync transfer
 def apply_rsync_actions(sshSrc,dirnameSrc, sshDst,dirnameDst, pathlist):
@@ -706,7 +713,7 @@ def apply_rsync_actions(sshSrc,dirnameSrc, sshDst,dirnameDst, pathlist):
 	rsyncproc.stdin.close()
 	rsyncproc.wait()
 	if rsyncproc.returncode != 0:
-		sys.exit("Error in rsync process.")
+		exit_err("in rsync process.")
 
 def check_moves(copy, rm):
 	# check if we can move instead of rm+copy
@@ -790,7 +797,7 @@ if ':' in dir2name:
 	sshuserhost, dir2name = dir2name.split(':', 1)
 	ssh = ssh2 = SshCon(sshuserhost, sshport, sshargs)
 if ssh1!=None and ssh2!=None:
-	sys.exit("Error: only one remote directory supported.")
+	exit_err("only one remote directory supported.")
 
 if ssh != None:
 	ssh_master_init(ssh)

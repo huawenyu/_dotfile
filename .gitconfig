@@ -41,11 +41,22 @@
 
 	# https://stackoverflow.com/questions/3321492/git-alias-with-positional-parameters
 	ls  = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cd) %C(bold yellow)(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=short
+
 	# https://jay.gooby.org/2021/07/13/positional-arguments-in-git-aliases
+	#  mantis="111810" git mantis dfb7a91cfd..HEAD
 	mantis = "!f() { \
-		git log $@ | awk 'BEGIN{text=\"\"} /^\\s*$/{next} /^commit/{one=0} /^Author: /{one=1; text=$0; next} /^Date: /{text = $2 \"  \" text; print text; next} /^    Problem Description:/{one=0} /^    Description:/{one=0} !/^    Purpose: /{ if (one==1) {print $0} } /^    Mantis: /{one=0} '; \
+		git log $@ | awk 'BEGIN{ if (\"mantis\" in ENVIRON) { vMantis=ENVIRON[\"mantis\"]; } else {vMantis=\"#\";}; } /^\\s*$/{next} /^commit/{one=0; commit=substr($2, 1, 10); next;} /^Author: /{one=1; author=$2\" \"$3; next} /^Date: /{date=$2; next} /[[:alpha:]]+-[0-9]+: /{summary=$0; next} /^    Mantis: /{mantis=$2; one=0; if (index($0, vMantis) > 0) {printf(\"%s %s %-15.15s %s  %s\\n\", date, commit, author, mantis, summary)} } '; \
 		}; f"
 
+	# Only list New feature commits
+	feature = "!f() { \
+		git log $@ | awk 'BEGIN{} /^\\s*$/{next} /^commit /{state=1; commit=substr($2, 1, 10); next;} state==1 && /^Author: /{author=$2\" \"$3; next} state==1 && /^Date: /{date=$2; next} state==1 && /[[:alpha:]]+-[0-9]+: /{summary=$0; next} state==1 && /^    Purpose: To merge a new feature or enhancement/{ state=2; next} /^    Mantis: /{mantis=$2; if (state==2) {printf(\"%s %s %-15.15s %s\\n\", date, commit, author, summary)}; state=0;  } '; \
+		}; f"
+
+	# Only list root-cause-eco
+	eco = "!f() { \
+		git log $@ | awk 'BEGIN{} /^\\s*$/{next} /^commit /{state=1; commit=substr($2, 1, 10); next;} state==1 && /^Author: /{author=$2\" \"$3; next} state==1 && /^Date: /{date=$2; next} state==1 && /[[:alpha:]]+-[0-9]+: /{summary=$0; next} state==1 && /^    Purpose: To fix a bug in this major release/{ state=2; next} state==2 && /^    Mantis: /{mantis=$2}  state==2 && /^    Root Cause ECO Number:/{eco=substr($4,8,6); if (state==2) {printf(\"%s %s %-15.15s %s  %s  %s\\n\", date, commit, author, eco, mantis, summary)}; state=0;}'; \
+		}; f"
 
 	# Git subtree if just use third-part repo, but no push request
 	#   git st-add <remote-repo> [<branch-name>]
