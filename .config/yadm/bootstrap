@@ -109,15 +109,20 @@ _Usage=$(cat <<-END
         basic
         editor
         dev
-        all
-      -f,--feature  Feature: "kvm,editor,python"
+        all         # all tools, exclude update/virt
+      -f,--feature  Feature: ",kvm,editor,python,update,info,"
+        update      # Linux/Ubuntu update
+        info        # ssh-welcome
+        kvm         # Virtual Machine Manager
+        editor      # neovim
+        python      # python
 
     Sample:
       bash -x script        # Run the script with debug mode enabled.
       bash -n script        # Check for syntax errors without execution.
 
       script -m all
-      script -m dev -f "python,editor"
+      script -m dev -f ",python,editor,"
 
 END
 )
@@ -247,7 +252,6 @@ do_args () {
             var_FeatureList+="ftVirt:"
         fi
     elif [[ "$var_Mode" == "all" ]]; then
-        var_FeatureList+="ftCommon:ftToolBasic:ftToolNet:ftToolTest:ftIDE:ftBuild:ftLibdev:ftLibdev2:ftPython:ftNix:ftNixTool:"
         if [[ "$var_IsPhysicalPC" == "true" ]]; then
             var_FeatureList+="ftVirt:"
         fi
@@ -260,16 +264,27 @@ do_args () {
 
     # Handle features
     {
-        if [[ "$var_Feature" =~ ",python," ]]; then
+        # mode=all don't auto add this feature, require explicit
+        if [[ "$var_Feature" =~ ",update," ]]; then
+            var_FeatureList+="ftUpdate:"
+        fi
+
+        if [[ "$var_Mode" == "all" || "$var_Feature" =~ ",info," ]]; then
+            var_FeatureList+="ftInfo:"
+        fi
+
+        if [[ "$var_Mode" == "all" || "$var_Feature" =~ ",python," ]]; then
             var_FeatureList+="ftPython:"
         fi
 
-        if [[ "$var_Feature" =~ ",kvm," ]]; then
-            var_FeatureList+="ftVirt:"
+        if [[ "$var_Mode" == "all" || "$var_Feature" =~ ",editor," ]]; then
+            var_FeatureList+="ftPython:"
+            var_FeatureList+="ftIDE:"
         fi
 
-        if [[ "$var_Feature" =~ ",editor," ]]; then
-            var_FeatureList+="ftIDE:"
+        # mode=all already added this feature
+        if [[ "$var_Feature" =~ ",kvm," ]]; then
+            var_FeatureList+="ftVirt:"
         fi
     }
 
@@ -354,84 +369,33 @@ do_task () {
         exit 1
         ;;
     esac
+
+    do_task_common
 }
 
 do_task_linux () {
     echo "Running Linux setup..."
     # yadm alt --os Linux
 
-    sudo apt-get update -qq && sudo apt-get upgrade -qq -y && sudo apt-get install -qq -y "${var_PackageName[@]}"
-    sudo apt clean autoclean
-    sudo apt autoremove -y
-
-    if [ ! -f /etc/update-motd.d/99-custom-welcome ] ; then
-      echo "Copy/Updating /etc/update-motd.d/99-custom-welcome"
-      sudo cp "$HOME/.config/yadm/update_motd_99_customer_welcom.sh" "/etc/update-motd.d/99-custom-welcome"
-      chmod +x /etc/update-motd.d/99-custom-welcome
+    if [[ "$var_FeatureList" =~ ":ftUpdate:" ]]; then
+        sudo apt-get update -qq && sudo apt-get upgrade -qq -y
+        sudo apt clean autoclean
+        sudo apt autoremove -y
     fi
 
-    if [[ "$var_FeatureList" =~ ":ftIDE:" ]]; then
-        sudo pip3 install -U pip
-        sudo pip3 install meson
-        sudo pip3 install pynvim
+    if command -v apt &> /dev/null; then
 
-        curl -fLo ~/.config/nvim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/autoload/plug.vim
-        curl -fLo ~/.config/nvim/init.vim          --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/init.vim
-    fi
+        command -v git >/dev/null ||  sudo apt-get install -qq -y "git curl"
+        command -v nix-env >/dev/null ||    sh <(curl -L https://nixos.org/nix/install) --daemon
+        command -v nix-env >/dev/null &&    nix-env -iA nixpkgs.yadm
 
-
-    if [[ "$var_FeatureList" =~ ":ftVirt:" ]]; then
-        sudo usermod -aG libvirt $USER
-        sudo usermod -aG kvm $USER
-    fi
-
-
-    if command -v nvim &> /dev/null; then
-        curl -fLo ~/.config/nvim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/autoload/plug.vim
-    fi
-
-
-    if command -v tmux &> /dev/null; then
-        if [ ! -d ~/.tmux/plugins/tpm ]; then
-            git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+        if command -v yadm &> /dev/null; then
+            [ -d "$HOME/.local/share/yadm/repo.git" ] && echo "yadm clone had done already!" || yadm clone https://github.com/huawenyu/_dotfile.git
         fi
+    else
+        echo "Linux not properly configured: Can't find bin 'apt'"
+        exit 1
     fi
-
-
-    if [[ "$var_FeatureList" =~ ":ftPython:" ]]; then
-        if [ ! -f /usr/bin/python ]; then
-            sudo ln -s /usr/bin/python3 /usr/bin/python
-        fi
-    fi
-
-    curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh
-
-    if [[ "$var_FeatureList" =~ ":ftZsh:" ]]; then
-        mkdir -p ~/.oh-my-zsh/custom/plugins
-        git clone https://github.com/huawenyu/zsh-local.git     ~/.oh-my-zsh/custom/plugins/zsh-local
-        git clone https://github.com/zsh-users/zsh-completions  ~/.oh-my-zsh/custom/plugins/zsh-completions
-        git clone https://github.com/jeffreytse/zsh-vi-mode     ~/.oh-my-zsh/custom/plugins/zsh-vi-mode
-
-        # Require interact, 'exit' for next step
-        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-    fi
-
-    if [[ "$var_FeatureList" =~ ":ftBash:" ]]; then
-        bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)"
-    fi
-
-    if [[ "$var_FeatureList" =~ ":ftNix:" ]]; then
-        # Require interact, 'exit' for next step
-        sh <(curl -L https://nixos.org/nix/install) --daemon
-
-        if [[ "$var_FeatureList" =~ ":ftNixTool:" ]]; then
-            # Require interact, 'exit' for next step
-            nix-env -iA nixpkgs.presenterm
-            nix-env -iA nixpkgs.clang-format
-            nix-env -iA nixpkgs.clang-tools
-        fi
-    fi
-
 }
 
 do_task_macos () {
@@ -448,13 +412,145 @@ do_task_macos () {
 
 do_task_wsl () {
     echo "Running Windows (WSL) setup..."
+
     #yadm alt --os Windows
+    if [[ "$var_FeatureList" =~ ":ftUpdate:" ]]; then
+        if command -v apt &> /dev/null; then
+            sudo apt-get update -qq && sudo apt-get upgrade -qq -y
+            sudo apt clean autoclean
+            sudo apt autoremove -y
+        fi
+    fi
+
     if command -v apt &> /dev/null; then
-      sudo apt update
-      sudo apt install -y git vim tmux
+        command -v git >/dev/null ||  sudo apt-get install -qq -y "git curl"
+        command -v nix-env >/dev/null ||    sh <(curl -L https://nixos.org/nix/install) --daemon
+        command -v nix-env >/dev/null &&    nix-env -iA nixpkgs.yadm
+
+        if command -v yadm &> /dev/null; then
+            [ -d "$HOME/.local/share/yadm/repo.git" ] && echo "yadm clone had done already!" || yadm clone https://github.com/huawenyu/_dotfile.git
+        fi
     else
-      echo "WSL not properly configured. Please ensure WSL is set up."
-      exit 1
+        echo "WSL not properly configured: Can't find bin 'apt'"
+        exit 1
+    fi
+}
+
+do_task_common () {
+    echo "Running common task ..."
+
+    # Firstly, try to install all require tools
+    if command -v apt &> /dev/null; then
+        sudo apt-get install -qq -y "${var_PackageName[@]}"
+        sudo apt clean autoclean
+        sudo apt autoremove -y
+    fi
+
+
+    if [[ "$var_FeatureList" =~ ":ftInfo:" ]]; then
+        echo "  task 'info' ..."
+
+        if [ ! -f /etc/update-motd.d/99-custom-welcome ] ; then
+            echo "Copy/Updating /etc/update-motd.d/99-custom-welcome"
+            sudo cp "$HOME/.config/yadm/update_motd_99_customer_welcom.sh" "/etc/update-motd.d/99-custom-welcome"
+            chmod +x /etc/update-motd.d/99-custom-welcome
+        else
+            echo "      existed, do nothing"
+        fi
+
+        echo "  task 'info' done!"
+    fi
+
+    if [[ "$var_FeatureList" =~ ":ftPython:" ]]; then
+        echo "  task 'python' ..."
+
+        command -v python3 >/dev/null || sudo apt-get install -y python3
+        if [ ! -f /usr/bin/python ]; then
+            command -v python3 >/dev/null && sudo ln -s /usr/bin/python3 /usr/bin/python
+        fi
+        command -v pip3 >/dev/null || sudo apt-get install -y python3-pip
+
+        echo "  task 'python' done!"
+    fi
+
+    if [[ "$var_FeatureList" =~ ":ftIDE:" ]]; then
+        echo "  task 'ide' ..."
+
+        command -v pip3 >/dev/null || sudo apt-get install -y python3-pip
+        pip3 show pip > /dev/null && echo "pip3 module 'pip' installed" || sudo pip3 install -U pip
+        pip3 show meson > /dev/null && echo "pip3 module 'meson' installed" || sudo pip3 install meson
+        pip3 show pynvim > /dev/null && echo "pip3 module 'pynvim' installed" || sudo pip3 install pynvim
+
+        [ ! -f ~/.config/nvim/autoload/plug.vim ] && curl -fLo ~/.config/nvim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/autoload/plug.vim
+        [ ! -f ~/.config/nvim/init.vim ] &&          curl -fLo ~/.config/nvim/init.vim          --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/init.vim
+
+        # Alter vi/vim
+        command -v nvim >/dev/null && (sudo update-alternatives --install /usr/bin/vi vi /usr/bin/nvim 60 --slave /usr/bin/vim vim /usr/bin/nvim && sudo update-alternatives --set vi /usr/bin/nvim) || echo "Neovim not installed, please install nvim first"
+
+        echo "  task 'ide' done!"
+    fi
+
+
+    if [[ "$var_FeatureList" =~ ":ftVirt:" ]]; then
+        echo "  task 'virt' ..."
+
+        sudo usermod -aG libvirt $USER
+        sudo usermod -aG kvm $USER
+
+        echo "  task 'virt' done!"
+    fi
+
+
+    if command -v nvim &> /dev/null; then
+        curl -fLo ~/.config/nvim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/autoload/plug.vim
+    fi
+
+
+    if command -v tmux &> /dev/null; then
+        if [ ! -d ~/.tmux/plugins/tpm ]; then
+            git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+        fi
+    fi
+
+
+    curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh
+
+    if [[ "$var_FeatureList" =~ ":ftZsh:" ]]; then
+        echo "  task 'zsh' ..."
+
+        mkdir -p ~/.oh-my-zsh/custom/plugins
+        git clone https://github.com/huawenyu/zsh-local.git     ~/.oh-my-zsh/custom/plugins/zsh-local
+        git clone https://github.com/zsh-users/zsh-completions  ~/.oh-my-zsh/custom/plugins/zsh-completions
+        git clone https://github.com/jeffreytse/zsh-vi-mode     ~/.oh-my-zsh/custom/plugins/zsh-vi-mode
+
+        # Require interact, 'exit' for next step
+        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+
+        echo "  task 'zsh' done!"
+    fi
+
+    if [[ "$var_FeatureList" =~ ":ftBash:" ]]; then
+        echo "  task 'bash' ..."
+
+        bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)"
+
+        echo "  task 'bash' done!"
+    fi
+
+    if [[ "$var_FeatureList" =~ ":ftNix:" ]]; then
+        echo "  task 'nix' ..."
+
+        # Require interact, 'exit' for next step
+        sh <(curl -L https://nixos.org/nix/install) --daemon
+
+        if [[ "$var_FeatureList" =~ ":ftNixTool:" ]]; then
+            # Require interact, 'exit' for next step
+            nix-env -iA nixpkgs.presenterm
+            nix-env -iA nixpkgs.clang-format
+            nix-env -iA nixpkgs.clang-tools
+        fi
+
+        echo "  task 'nix' done!"
     fi
 }
 
