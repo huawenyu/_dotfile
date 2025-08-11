@@ -760,7 +760,7 @@ endif
             Plug 'nvim-treesitter/nvim-treesitter',             Cond (has('nvim') && Mode(['admin']), { 'do': ':TSUpdate', 'for': ['c', 'cpp', 'rust', 'java', 'awk', 'bash', 'meson', 'python', 'tcl', 'expect'] })
             " Plug 'nvim-treesitter/nvim-treesitter-refactor',  Cond (has('nvim') && HasPlug('nvim-treesitter') && Mode(['editor',]))
             " Plug 'nvim-treesitter/playground',                Cond (has('nvim') && HasPlug('nvim-treesitter') && Mode(['editor',]))
-             Plug 'nvim-treesitter/nvim-treesitter-context',   Cond(has('nvim') && Mode(['coder',]))
+             Plug 'nvim-treesitter/nvim-treesitter-context',   Cond(has('nvim') && !IsWSL() && Mode(['coder',]))
             " Plug 'nelstrom/vimprint',                         Cond (has('nvim') && HasPlug('nvim-treesitter') && Mode(['editor',]))
 
             " :LspInfo
