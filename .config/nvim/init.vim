@@ -917,7 +917,7 @@ endif
 
     "}}}
 
-    Plug 'huawenyu/tldr.nvim',              Cond(has('nvim') && executable('tldr') && Mode(['editor',]))    | " :Tldr <list>
+    Plug 'huawenyu/tldr.nvim',              Cond(has('nvim') && !IsWSL() && executable('tldr') && Mode(['editor',]))    | " :Tldr <list>
     Plug 'yuratomo/w3m.vim',                Cond(has('nvim') && executable('w3m') && Mode(['admin',]) && Mode(['tool',]), {'on':['W3m', 'W3mTab'], 'config': 'LoadW3m'} ) | " :W3m
     Plug 's1n7ax/nvim-window-picker',       Cond(has('nvim') && Mode(['editor',]) && Mode(['tool',]))
 "}}}
