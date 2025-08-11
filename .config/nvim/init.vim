@@ -632,9 +632,9 @@ endif
         "Plug 'sourcegraph/sg.nvim', { 'do': 'nvim -l build/init.lua' }
         " Required for various utilities
         " Required if you want to use some of the search functionality
-        Plug 'nvim-telescope/telescope.nvim',               Cond(has('nvim') && Mode(['coder',]))        | "
+        Plug 'nvim-telescope/telescope.nvim',               Cond(has('nvim') && !IsWSL() && Mode(['coder',]))        | "
         Plug 'nvim-telescope/telescope-fzf-native.nvim',    Cond(has('nvim') && !IsWSL() && Mode(['coder',]), { 'do': 'make' })        | "
-        Plug 'nvim-telescope/telescope-hop.nvim',           Cond(has('nvim') && Mode(['coder',]))    | "
+        Plug 'nvim-telescope/telescope-hop.nvim',           Cond(has('nvim') && !IsWSL() && Mode(['coder',]))    | "
 
     " Copy {{{3
         Plug 'ojroques/vim-oscyank',        Cond(has('nvim') && Mode(['editor']))       | " Tmux-user following [doc](https://github.com/tmux/tmux/wiki/Clipboard#quick-summary)
