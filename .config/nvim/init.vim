@@ -633,7 +633,7 @@ endif
         " Required for various utilities
         " Required if you want to use some of the search functionality
         Plug 'nvim-telescope/telescope.nvim',               Cond(has('nvim') && Mode(['coder',]))        | "
-        Plug 'nvim-telescope/telescope-fzf-native.nvim',    Cond(has('nvim') && && !IsWSL() Mode(['coder',]), { 'do': 'make' })        | "
+        Plug 'nvim-telescope/telescope-fzf-native.nvim',    Cond(has('nvim') && !IsWSL() && Mode(['coder',]), { 'do': 'make' })        | "
         Plug 'nvim-telescope/telescope-hop.nvim',           Cond(has('nvim') && Mode(['coder',]))    | "
 
     " Copy {{{3
