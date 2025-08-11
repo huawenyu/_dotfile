@@ -489,7 +489,7 @@ do_task_common () {
         [ ! -f ~/.config/nvim/init.vim ] &&          curl -fLo ~/.config/nvim/init.vim          --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/init.vim
 
         # Alter vi/vim
-        command -v nvim >/dev/null && (sudo update-alternatives --install /usr/bin/vi vi /usr/bin/nvim 60 --slave /usr/bin/vim vim /usr/bin/nvim && sudo update-alternatives --set vi /usr/bin/nvim) || echo "Neovim not installed, please install nvim first"
+        command -v nvim >/dev/null && (sudo update-alternatives --install /usr/bin/vi vi /usr/bin/nvim 60 && sudo update-alternatives --install /usr/bin/vim vim /usr/bin/nvim 60 && sudo update-alternatives --set vi /usr/bin/nvim && sudo update-alternatives --set vim /usr/bin/nvim) || echo "Neovim not installed, please install nvim first"
 
         echo "  task 'ide' done!"
     fi
