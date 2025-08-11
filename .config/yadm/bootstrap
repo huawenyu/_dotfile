@@ -41,8 +41,7 @@ ftToolBasic=("unzip"
     "psmisc"
     "tmux"
     "fzf"
-    "gem"
-    "yadm")
+    "gem")
 
 ftToolTest=("parallel")
 
@@ -52,6 +51,7 @@ ftIDE=("neovim"
     "xxd"
     "bc"
     "patchutils"
+    "dos2unix"
     "clangd"
     "ripgrep"
     "sudo")

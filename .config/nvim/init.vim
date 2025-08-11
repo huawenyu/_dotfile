@@ -170,6 +170,14 @@ endif
         "endif
     endif
 
+    function! IsWSL()
+        if has('unix') && !has('mac')
+            let distro_name = $WSL_DISTRO_NAME
+            let interop = $WSL_INTEROP
+            return !empty(distro_name) || !empty(interop)
+        endif
+        return 0
+    endfunction
 
     " Plug related:
     function! Cond(cond, ...)
@@ -756,13 +764,13 @@ endif
             " Plug 'nelstrom/vimprint',                         Cond (has('nvim') && HasPlug('nvim-treesitter') && Mode(['editor',]))
 
             " :LspInfo
-            Plug 'neovim/nvim-lspconfig',           Cond(has('nvim') && Mode(['coder',]))
-            Plug 'williamboman/nvim-lsp-installer', Cond(has('nvim') && Mode(['coder',]))
+            Plug 'neovim/nvim-lspconfig',           Cond(has('nvim') && !IsWSL() && Mode(['coder',]))
+            Plug 'williamboman/nvim-lsp-installer', Cond(has('nvim') && !IsWSL() && Mode(['coder',]))
 
-            "Plug 'glepnir/lspsaga.nvim',       Cond(has('nvim') && Mode(['coder',]) && LINUX(), {'branch': 'main'})
-            Plug 'ojroques/nvim-lspfuzzy',      Cond(has('nvim') && Mode(['editor',]))  | " Sink lsp-result to fzf-float-windows, Select-All<c-aa> sink again to quickfix(<enter>)
-            "Plug 'gfanto/fzf-lsp.nvim',        Cond(has('nvim') && Mode(['editor',]))
-            "Plug 'VonHeikemen/lsp-zero.nvim',  Cond(has('nvim') && Mode(['editor',]))
+            "Plug 'glepnir/lspsaga.nvim',       Cond(has('nvim') && !IsWSL() && Mode(['coder',]) && LINUX(), {'branch': 'main'})
+            Plug 'ojroques/nvim-lspfuzzy',      Cond(has('nvim') && !IsWSL() && Mode(['editor',]))  | " Sink lsp-result to fzf-float-windows, Select-All<c-aa> sink again to quickfix(<enter>)
+            "Plug 'gfanto/fzf-lsp.nvim',        Cond(has('nvim') && !IsWSL() && Mode(['editor',]))
+            "Plug 'VonHeikemen/lsp-zero.nvim',  Cond(has('nvim') && !IsWSL() && Mode(['editor',]))
 
         " Backend using node.js and eat too much memory/CPU
         "Plug 'neoclide/coc.nvim',          Cond(has('nvim') && Mode(['coder',]) && LINUX(), {'branch': 'release'})
