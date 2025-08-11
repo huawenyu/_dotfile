@@ -541,7 +541,7 @@ endif
 
     " Markdown/Writing/Wiki {{{3
         " tool-render?
-        Plug 'vimwiki/vimwiki',             Cond(has('nvim') && Mode(['editor']) && Mode(['markdown']), {'for': 'markdown'})
+        "Plug 'vimwiki/vimwiki',             Cond(has('nvim') && Mode(['editor']) && Mode(['markdown']), {'for': 'markdown'})
         "Plug 'lervag/wiki.vim',             Cond(has('nvim') && IfNoPlug('vimwiki') && Mode(['editor']) && Mode(['markdown']), {'for': 'markdown'})  | " Seems not better than vimwiki
         "Plug 'godlygeek/tabular',           Cond(has('nvim') && Mode(['editor']) && Mode(['markdown']), {'on': 'Tabularize', 'for': 'markdown'}) | " EasyAlign is better.
         "Plug 'epwalsh/obsidian.nvim',        Cond(has('nvim') && IfNoPlug('vimwiki') && Mode(['editor']))
@@ -752,7 +752,7 @@ endif
             Plug 'nvim-treesitter/nvim-treesitter',             Cond (has('nvim') && Mode(['admin']), { 'do': ':TSUpdate', 'for': ['c', 'cpp', 'rust', 'java', 'awk', 'bash', 'meson', 'python', 'tcl', 'expect'] })
             " Plug 'nvim-treesitter/nvim-treesitter-refactor',  Cond (has('nvim') && HasPlug('nvim-treesitter') && Mode(['editor',]))
             " Plug 'nvim-treesitter/playground',                Cond (has('nvim') && HasPlug('nvim-treesitter') && Mode(['editor',]))
-            " Plug 'romgrk/nvim-treesitter-context',            Cond (has('nvim') && HasPlug('nvim-treesitter') && Mode(['editor',]))
+             Plug 'nvim-treesitter/nvim-treesitter-context',   Cond(has('nvim') && Mode(['coder',]))
             " Plug 'nelstrom/vimprint',                         Cond (has('nvim') && HasPlug('nvim-treesitter') && Mode(['editor',]))
 
             " :LspInfo
@@ -885,8 +885,7 @@ endif
     " Outline/Context {{{3
         Plug 'huawenyu/VOoM',               Cond(has('nvim') && Mode(['editor', 'log', ]), { 'on': ['VoomToggle', 'Voom'] })
         "Plug 'vim-voom/VOoM_extras',       Cond(has('nvim') && Mode(['editor']))  | " Seems no use at all, but slow/frozen when read large file (>100M)
-        Plug 'wellle/context.vim',          Cond(has('nvim') && Mode(['coder',]), {'on': 'ContextToggle', 'config': 'LoadContextVim'})    | " Show context every where
-        "Plug 'nvim-treesitter/nvim-treesitter-context', Cond(has('nvim') && Mode(['coder',]))
+        "Plug 'wellle/context.vim',          Cond(has('nvim') && Mode(['coder',]), {'on': 'ContextToggle', 'config': 'LoadContextVim'})    | " Show context every where
         "Plug "SmiteshP/nvim-navic",         Cond(has('nvim') && Mode(['editor']) && HasPlug('nvim-lspconfig'))
     "}}}
 

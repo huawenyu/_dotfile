@@ -1024,8 +1024,7 @@ proc do_log {} {
     send "diag debug enable\r"
     send "diag wad debug show\r"
     expect -re $prompt
-    send "diag test app wad 2200"
-
+    send "diag test app wad 2200\r"
 
     interact
     exit

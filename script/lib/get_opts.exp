@@ -92,6 +92,11 @@ proc parse_arguments { {name ""} } {
     getopt argv --gdb       runCtx(tool,GDB)         "Gef"
     getopt argv --remote    runCtx(tool,REMOTE)      ""
 
+    # action=log, filter the output
+    getopt argv --level     runCtx(tool,LEVEL)       "0"
+    getopt argv --cate      runCtx(tool,CATE)        "all"
+    getopt argv --filter    runCtx(tool,FILTER)      ""
+
 
     # Check arguments
     if { $runCtx(tool,DUT) eq "" } {

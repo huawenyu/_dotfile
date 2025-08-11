@@ -23,12 +23,14 @@ _Usage=$(cat <<-END
         'log'            Re-layout of the current window
         'cov'            Share tmux to -t <user>, or disable share if-no-<user>
         'nolog'          Update the tool 'tmex'
+      -f, --filter       The filename of tcl script of output filter, which contain the regex
 
     Sample:
       dutctl dut1 log
       dutctl dut1 console
-      dutctl -d dut1 -a log
       dutctl -d dut1 -a gdb
+      dutctl -d dut1 -a log
+      dutctl -d dut1 -a log -f "$var_ScriptDir/lib/filter.py"
 
 END
 )
@@ -42,6 +44,10 @@ parse_define() {
 
   param var_Dut        -d --dut      init:=""     -- "dut#: dut1,dut2, ..."
   param var_Action     -a --action   init:=""  pattern:"log | nolog | cov | gdb | console"     -- "Action: *log|nolog|cov|gdb|console"
+
+  param var_Level      -l --level    init:="0"       -- "The level of output"
+  param var_Cate       -c --cate     init:="all"     -- "The cate of output"
+  param var_Filter     -f --filter   init:=""        -- "The python script: filter.py used by rlwrap"
 
   disp  VERSION        --version
   disp  :usage         -h --help   -- "$_Usage"
@@ -103,6 +109,20 @@ do_args () {
     fi
 
 
+    if [[ -z "$var_Filter" ]]; then
+        : # noop
+    else
+        # Guess the rlwrap filter path, which is the python-base script, used to filter output
+        scriptFilter="$var_Filter"
+        var_Filter=""
+        for dir in  "$var_WorkDir"  "$HOME"  "$var_ScriptDir/lib"; do
+            if [ -f "$dir/$scriptFilter" ]; then
+                var_Filter="$dir/$scriptFilter"
+                break
+            fi
+        done
+    fi
+
     if [[ -n "$var_DRYRUN" ]]; then
         ( set -o posix ; set ) | grep -e '^var_'
         exit 1
@@ -131,7 +151,12 @@ do_task () {
     if [[ "$var_Action" == "gdb" ]]; then
         dutctl.exp --verbose "$var_VERBOSE" --dut "$var_Dut" --prompt "$var_Prompt" --action "gdb" --gdb "Gef" --process "worker"
     elif [[ "$var_Action" == "log" ]]; then
-        dutctl.exp --verbose "$var_VERBOSE" --dut "$var_Dut" --prompt "$var_Prompt" --action "log"
+        if [[ -z "$var_Filter" ]]; then
+            dutctl.exp --verbose "$var_VERBOSE" --dut "$var_Dut" --prompt "$var_Prompt" --action "log" --level "$var_Level" --cate "$var_Cate" --filter "$var_Filter"
+        else
+            rlwrap --always-readline -z "$var_Filter" \
+            dutctl.exp --verbose "$var_VERBOSE" --dut "$var_Dut" --prompt "$var_Prompt" --action "log" --level "$var_Level" --cate "$var_Cate" --filter "$var_Filter"
+        fi
     elif [[ "$var_Action" == "nolog" ]]; then
         dutctl.exp --verbose "$var_VERBOSE" --dut "$var_Dut" --prompt "$var_Prompt" --action "nolog"
     elif [[ "$var_Action" == "cov" ]]; then

@@ -278,75 +278,150 @@ do_git_worktree () {
             break 2
         done
 
-        # Check it's exist local branch {{{2}}}
-        if GIT_DIR="$git_dir" git branch -l | grep -q "$var_branchName"
-        then
-            git branch -l | grep "$var_branchName" | sed 's/^/	Candidate: /' > "$TEMPFILE"
-            # https://stackoverflow.com/questions/369758/how-to-trim-whitespace-from-a-bash-variable
-            # "+ br_1-0_my_sp1"   ==> br_1-0_my_sp1
-            _branchName=$( git branch -l | grep "$var_branchName" | tail -1 | xargs | tr -s '[:blank:]' ':')
-            var_branchName=${_branchName##*:}
 
-            echo "    Creating worktree against existed local branch '$var_branchName' ..."
-            cat "$TEMPFILE"
+        # Strict match:
+            ## Check it's exist local branch {{{2}}}
+            if GIT_DIR="$git_dir" git branch -l | grep -q "$var_branchName\$"
+            then
+                git branch -l | grep "$var_branchName" | sed 's/^/	Candidate: /' > "$TEMPFILE"
+                # https://stackoverflow.com/questions/369758/how-to-trim-whitespace-from-a-bash-variable
+                # "+ br_1-0_my_sp1"   ==> br_1-0_my_sp1
+                _branchName=$( git branch -l | grep "$var_branchName" | tail -1 | xargs | tr -s '[:blank:]' ':')
+                var_branchName=${_branchName##*:}
 
-            if [[ -d "${var_branchDir}/${var_branchName}" ]]; then
-                echo "    The dest dir '${var_branchDir}/${var_branchName}' already exist: Do nothing!"
+                echo "    Creating worktree against existed local branch '$var_branchName' ..."
+                cat "$TEMPFILE"
+
+                if [[ -d "${var_branchDir}/${var_branchName}" ]]; then
+                    echo "    The dest dir '${var_branchDir}/${var_branchName}' already exist: Do nothing!"
+                    break
+                fi
+
+                #doit git --work-tree="${var_branchDir}/${var_branchName}"   checkout   ${var_branchName}   > /dev/null
+                doit git worktree prune
+                doit git checkout -f  "${var_branchName}"   > /dev/null
+                doit git clone --local   "$(dirname $git_dir)"   "${var_branchDir}/${var_branchName}"
+                # Done and exit-loop
                 break
             fi
 
-            #doit git --work-tree="${var_branchDir}/${var_branchName}"   checkout   ${var_branchName}   > /dev/null
-            doit git worktree prune
-            doit git checkout -f  "${var_branchName}"   > /dev/null
-            doit git clone --local   "$(dirname $git_dir)"   "${var_branchDir}/${var_branchName}"
-            # Done and exit-loop
-            break
-        fi
+            ## Check it's valid tag {{{2}}}
+            if GIT_DIR="$git_dir" git tag -l | grep -q "$var_branchName\$"
+            then
+                git tag -l | grep "$var_branchName" | sed 's/^/	Candidate: /' > "$TEMPFILE"
+                var_branchName=$( git tag -l | grep "$var_branchName" | tail -1 | xargs )
+                echo "    Creating worktree against tag '$var_branchName' ..."
+                #commitSHA=$( git rev-list -n 1 tags/${var_branchName} )
+                cat "$TEMPFILE"
 
-        # Check it's valid tag {{{2}}}
-        if GIT_DIR="$git_dir" git tag -l | grep -q "$var_branchName"
-        then
-            git tag -l | grep "$var_branchName" | sed 's/^/	Candidate: /' > "$TEMPFILE"
-            var_branchName=$( git tag -l | grep "$var_branchName" | tail -1 | xargs )
-            echo "    Creating worktree against tag '$var_branchName' ..."
-            #commitSHA=$( git rev-list -n 1 tags/${var_branchName} )
-            cat "$TEMPFILE"
+                if [[ -d "${var_branchDir}/${var_branchName}" ]]; then
+                    echo "    The dest dir '${var_branchDir}/${var_branchName}' already exist: Do nothing!"
+                    break
+                fi
 
-            if [[ -d "${var_branchDir}/${var_branchName}" ]]; then
-                echo "    The dest dir '${var_branchDir}/${var_branchName}' already exist: Do nothing!"
+                doit  git  checkout -f  tags/${var_branchName}   -b   ${var_branchName}   > /dev/null
+                doit git clone --local   "$(dirname $git_dir)"   "${var_branchDir}/${var_branchName}"
+                #doit git --work-tree="${var_branchDir}/${var_branchName}"   checkout   tags/${var_branchName}   -b   ${var_branchName}   > /dev/null
+                #doit git worktree add -f --checkout  -B ${var_branchName}  "${var_branchDir}/${var_branchName}"  ${commitSHA}
+
+                # Done and exit-loop
                 break
             fi
 
-            doit  git  checkout -f  tags/${var_branchName}   -b   ${var_branchName}   > /dev/null
-            doit git clone --local   "$(dirname $git_dir)"   "${var_branchDir}/${var_branchName}"
-            #doit git --work-tree="${var_branchDir}/${var_branchName}"   checkout   tags/${var_branchName}   -b   ${var_branchName}   > /dev/null
-            #doit git worktree add -f --checkout  -B ${var_branchName}  "${var_branchDir}/${var_branchName}"  ${commitSHA}
 
-            # Done and exit-loop
-            break
-        fi
+            ## Check it's valid remote branch {{{2}}}
+            GIT_DIR="$git_dir" git branch -r > "$TEMPFILE"
+            if [ -s "$TEMPFILE"  ]; then
+                sed -e "s/\([ 	]\{1,\}->[ 	]\{1,\}\)\([^ 	]\{1,\}\)/\1$REMOTE_COLOR\2$RESET_COLOR/" \
+                    -e 's/^ */	/' "$TEMPFILE" > $TEMPFILE2
+            fi
 
+            if grep -q "$var_branchName\$" $TEMPFILE2; then
+                echo "    Creating worktree against remote branch"
 
-        # Check it's valid remote branch {{{2}}}
-        GIT_DIR="$git_dir" git branch -r > "$TEMPFILE"
-        if [ -s "$TEMPFILE"  ]; then
-            sed -e "s/\([ 	]\{1,\}->[ 	]\{1,\}\)\([^ 	]\{1,\}\)/\1$REMOTE_COLOR\2$RESET_COLOR/" \
-                -e 's/^ */	/' "$TEMPFILE" > $TEMPFILE2
-        fi
+                if [[ -d "${var_branchDir}/${var_branchName}" ]]; then
+                    echo "    The dest dir '${var_branchDir}/${var_branchName}' already exist: Do nothing!"
+                    break
+                fi
 
-        if grep -q "$var_branchName" $TEMPFILE2; then
-            echo "    Creating worktree against remote branch"
-
-            if [[ -d "${var_branchDir}/${var_branchName}" ]]; then
-                echo "    The dest dir '${var_branchDir}/${var_branchName}' already exist: Do nothing!"
+                # git worktree add -b br_7-0_http_transact_log_b0153 ~/work/bf-top3/br_7-0_http_transact_log_b0153 origin/br_7-0_http_transact_log_b0153
+                doit git worktree add -b   "$var_branchName"   "${var_branchDir}/${var_branchName}"   origin/${var_branchName}
+                # Done and exit-loop
                 break
             fi
 
-            # git worktree add -b br_7-0_http_transact_log_b0153 ~/work/bf-top3/br_7-0_http_transact_log_b0153 origin/br_7-0_http_transact_log_b0153
-            doit git worktree add -b   "$var_branchName"   "${var_branchDir}/${var_branchName}"   origin/${var_branchName}
-            # Done and exit-loop
-            break
-        fi
+
+        # Substring match:
+            ## Check it's exist local branch {{{2}}}
+            if GIT_DIR="$git_dir" git branch -l | grep -q "$var_branchName"
+            then
+                git branch -l | grep "$var_branchName" | sed 's/^/	Candidate: /' > "$TEMPFILE"
+                # https://stackoverflow.com/questions/369758/how-to-trim-whitespace-from-a-bash-variable
+                # "+ br_1-0_my_sp1"   ==> br_1-0_my_sp1
+                _branchName=$( git branch -l | grep "$var_branchName" | tail -1 | xargs | tr -s '[:blank:]' ':')
+                var_branchName=${_branchName##*:}
+
+                echo "    Creating worktree against existed local branch '$var_branchName' ..."
+                cat "$TEMPFILE"
+
+                if [[ -d "${var_branchDir}/${var_branchName}" ]]; then
+                    echo "    The dest dir '${var_branchDir}/${var_branchName}' already exist: Do nothing!"
+                    break
+                fi
+
+                #doit git --work-tree="${var_branchDir}/${var_branchName}"   checkout   ${var_branchName}   > /dev/null
+                doit git worktree prune
+                doit git checkout -f  "${var_branchName}"   > /dev/null
+                doit git clone --local   "$(dirname $git_dir)"   "${var_branchDir}/${var_branchName}"
+                # Done and exit-loop
+                break
+            fi
+
+            ## Check it's valid tag {{{2}}}
+            if GIT_DIR="$git_dir" git tag -l | grep -q "$var_branchName"
+            then
+                git tag -l | grep "$var_branchName" | sed 's/^/	Candidate: /' > "$TEMPFILE"
+                var_branchName=$( git tag -l | grep "$var_branchName" | tail -1 | xargs )
+                echo "    Creating worktree against tag '$var_branchName' ..."
+                #commitSHA=$( git rev-list -n 1 tags/${var_branchName} )
+                cat "$TEMPFILE"
+
+                if [[ -d "${var_branchDir}/${var_branchName}" ]]; then
+                    echo "    The dest dir '${var_branchDir}/${var_branchName}' already exist: Do nothing!"
+                    break
+                fi
+
+                doit  git  checkout -f  tags/${var_branchName}   -b   ${var_branchName}   > /dev/null
+                doit git clone --local   "$(dirname $git_dir)"   "${var_branchDir}/${var_branchName}"
+                #doit git --work-tree="${var_branchDir}/${var_branchName}"   checkout   tags/${var_branchName}   -b   ${var_branchName}   > /dev/null
+                #doit git worktree add -f --checkout  -B ${var_branchName}  "${var_branchDir}/${var_branchName}"  ${commitSHA}
+
+                # Done and exit-loop
+                break
+            fi
+
+
+            ## Check it's valid remote branch {{{2}}}
+            GIT_DIR="$git_dir" git branch -r > "$TEMPFILE"
+            if [ -s "$TEMPFILE"  ]; then
+                sed -e "s/\([ 	]\{1,\}->[ 	]\{1,\}\)\([^ 	]\{1,\}\)/\1$REMOTE_COLOR\2$RESET_COLOR/" \
+                    -e 's/^ */	/' "$TEMPFILE" > $TEMPFILE2
+            fi
+
+            if grep -q "$var_branchName" $TEMPFILE2; then
+                echo "    Creating worktree against remote branch"
+
+                if [[ -d "${var_branchDir}/${var_branchName}" ]]; then
+                    echo "    The dest dir '${var_branchDir}/${var_branchName}' already exist: Do nothing!"
+                    break
+                fi
+
+                # git worktree add -b br_7-0_http_transact_log_b0153 ~/work/bf-top3/br_7-0_http_transact_log_b0153 origin/br_7-0_http_transact_log_b0153
+                doit git worktree add -b   "$var_branchName"   "${var_branchDir}/${var_branchName}"   origin/${var_branchName}
+                # Done and exit-loop
+                break
+            fi
+
 
         # Check it's valid SHA1 {{{2}}}
         if GIT_DIR="$git_dir" git log --oneline | grep -q "$var_branchName "

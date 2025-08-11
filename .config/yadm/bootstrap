@@ -364,6 +364,12 @@ do_task_linux () {
     sudo apt clean autoclean
     sudo apt autoremove -y
 
+    if [ ! -f /etc/update-motd.d/99-custom-welcome ] ; then
+      echo "Copy/Updating /etc/update-motd.d/99-custom-welcome"
+      sudo cp "$HOME/.config/yadm/update_motd_99_customer_welcom.sh" "/etc/update-motd.d/99-custom-welcome"
+      chmod +x /etc/update-motd.d/99-custom-welcome
+    fi
+
     if [[ "$var_FeatureList" =~ ":ftIDE:" ]]; then
         sudo pip3 install -U pip
         sudo pip3 install meson
