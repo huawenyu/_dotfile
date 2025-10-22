@@ -42,11 +42,12 @@ yadm decrypt  # Decrypted and apply the encrypted file
 ### Status
 
 ```bash
-yadm status # Check Status
-yadm pull # Pull Changes
-yadm ls-files --others --exclude-standard  # List Untracked Files
-yadm diff # Diff Changes
-yadm ls-tree -r master --name-only # List All Managed Files
+yadm status                 ### Check Status
+yadm pull                   ### Pull Changes
+yadm list -a                ### list all tracked files
+yadm ls-files --others --exclude-standard  ### List Untracked Files
+yadm diff                   ### Diff Changes
+yadm ls-tree -r master --name-only ### List All Managed Files
 ```
 
 ### Add files
