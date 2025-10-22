@@ -1,7 +1,7 @@
 ---
-  title: Dotfiles manager by yadm
-  sub_title: ~/README.md
-  authors:
+  Name: Dotfiles manager by yadm
+  File: ~/README.md
+  Topic:
     - yadm
     - myssh -t work "tmux new -As default"  ### autossh
 ---
