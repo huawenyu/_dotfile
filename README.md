@@ -29,15 +29,15 @@ sudo apt install yadm
     sudo chmod a+x /usr/local/bin/yadm
 ```
 
-## Sync/pull dotfile for new-env
- -
+## [New env deploy] Sync/pull
+
 ```bash
 yadm clone https://github.com/huawenyu/_dotfile.git
 yadm checkout --force
 yadm decrypt  # Decrypted and apply the encrypted file
 ```
 
-## Update/push dotfile
+## ['main' env maitain] Update/push
 
 ### Status
 
@@ -50,7 +50,7 @@ yadm ls-tree -r master --name-only # List All Managed Files
 ```
 
 ### Add files
- -
+
 ```bash
 yadm add ~/.bashrc   ### git add
 yadm add ~/.vimrc    ### git add
@@ -72,7 +72,7 @@ yadm push --mirror origin
 ## Create a new dotfile
 
 1. Git `alias`
- -
+
 ```bash
 yadm init
 ```
@@ -98,7 +98,7 @@ tree ~/.local/share/yadm
 ```
 
 ## Config sensitive file pattern**
- -
+
 
 ```bash
 # default: gpg: no valid OpenPGP data found.
@@ -125,7 +125,7 @@ yadm decrypt  # Decrypted and apply the encrypted file
 
 
 ## Support multiple OS
- -
+
 ```bash
 $ ls
     ~/.bashrc##my-laptop        ### endwith <hostname>, <os>
