@@ -27,6 +27,7 @@ ftCommon=("software-properties-common"
     "sshpass"
     "tree"
     "gawk"
+    "autossh"
     "sudo")
 
 ftToolNet=("curl"
