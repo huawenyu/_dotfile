@@ -31,22 +31,17 @@ clean_files=( \
 
 
 _Usage=$(cat <<-END
-    Generating tags and cscope database...
+Generating tags and cscope database...
+
+      tagme -F -a clang
 
     Options:
       -a, --action
         pull     # Pull dev-git-dir 'compile_commands.json' from store-server
         push     # Push dev-git-dir 'compile_commands.json' to store-server
         link     # Link from .cache under docker-container
-        wiki
-        md
-        save
-        clean
-      -f, --file # One file enforce update it's tag
-
-    Sample:
-      tagme
-
+      -F, --force   # Force update specify type index
+      -f, --file    # One file enforce update it's tag
 END
 )
 
@@ -57,8 +52,8 @@ parse_define() {
   flag  var_VERBOSE    -v --verbose  counter:true init:=0    -- "e.g. -vvv is verbose level 3"
   flag  var_DRYRUN     -n --dryrun                           -- "Dryrun mode"
   flag  var_DEBUG      -d --debug                            -- "Debug mode and list all local variable"
-  flag  var_Force      -y --yes                              -- "Enforce update all tag"
-  param var_Action     -a --action   init:="all"     pattern:"all | pull | push | save | link | wiki | md | clean"     -- "Action: *all|pull|push|save|link|wiki|md|clean"
+  flag  var_Force      -F --force                            -- "Enforce update"
+  param var_Action     -a --action   init:="all"     pattern:"all|tag|cscope|clang|pull|push|save|link|wiki|md|clean"     -- "Action: *all|tag|cscope|clang|pull|push|save|link|wiki|md|clean"
   param var_TagFile    -t --tag      init:=""        -- "One file enforce update it's tag"
   param var_Scope      -s --scope    init:="all"     pattern:"all | wad"     -- "The files/dirs scope"
   param var_File       -f --file     init:=""                                -- "The file require tag"
@@ -173,22 +168,20 @@ do_task () {
             break
         fi
 
-        if [[  "$var_Action" != "all" \
-            && "$var_Action" != "pull" \
-            && "$var_Action" != "push" \
-            && "$var_Action" != "save" \
-            && "$var_Action" != "md" \
-            && "$var_Action" != "wiki" ]]; then
-            echo "Can't handle var_Action '$var_Action', Exit!"
-            break
+
+        if [[  "$var_Action" != "clang" \
+            && "$var_Action" != "push"  \
+            && "$var_Action" != "save"  \
+            && "$var_Action" != "link"  \
+            && "$var_Action" != "clean" \
+            && "$var_Action" != "pull" ]]; then
+            PrepareFileList
+            if [[ $? -ne 0 ]]; then
+                echo "PrepareFileList() fail! Exit!"
+                break
+            fi
         fi
 
-
-        PrepareFileList
-        if [[ $? -ne 0 ]]; then
-            echo "PrepareFileList() fail! Exit!"
-            break
-        fi
 
         if [[ $var_Action == "push" ]]; then
             SyncClangdJson
@@ -197,11 +190,20 @@ do_task () {
         fi
 
 
+        # bear-base json, speedup by upload/download
+        #pidClangd=0
+        #if [[  "$var_Action" == "all" \
+        #    || "$var_Action" == "pull" \
+        #    || "$var_Action" == "push" ]]; then
+        #    GenClangdJsonV1 &
+        #    pidClangd=$!
+        #fi
+
+        # compiledb-base json, generate json directly by dryrun-make, about 30s
         pidClangd=0
         if [[  "$var_Action" == "all" \
-            || "$var_Action" == "pull" \
-            || "$var_Action" == "push" ]]; then
-            GenClangdJson &
+            || "$var_Action" == "clang" ]]; then
+            GenClangdJsonV2 &
             pidClangd=$!
         fi
 
@@ -579,9 +581,13 @@ ClangdNormalPath () {
     fi
 }
 
-GenClangdJson () {
+# version 1: used if bear-base clangd-json
+#   - because bear-base require the build really happened, so this json file is heavy,
+#   - here try to reuse/share/download existed json file
+#   - cros: maybe not really respect latest code
+GenClangdJsonV1 () {
     if [[ -f "${var_dstDir}/${ClangdFile}" ]]; then
-        echo "Clangd '${ClangdFile}' existed, Skip! Enforce by '-f'."
+        echo "Clangd '${ClangdFile}' existed, Skip! Enforce by '-y'."
         return
     fi
 
@@ -590,6 +596,29 @@ GenClangdJson () {
     var_FmtIndent="    "
     ClangdNormalPath
     echo "${var_FmtIndent}clangd done! $(ls -lh $ClangdFile | cut -d ' ' -f 5- )"
+}
+
+# version 2: used by compiledb-base clangd-json
+# - Install:
+#   code: https://github.com/fcying/compiledb-go
+#   json generate: compiledb -S -n make -j$(grep -c ^processor /proc/cpuinfo) -C sysinit
+#   - don't like bear-base json, compiledb-base json using '-n' to dry run the build/make
+#   - and the dry-run build/make is really quick, like around 30s, so we're always create a new json file
+GenClangdJsonV2 () {
+    if [[ -f "${var_dstDir}/${ClangdFile}" ]]; then
+        echo "Clangd '${ClangdFile}' existed, Skip! Enforce by '-y'."
+        return
+    fi
+
+    echo "Handling '$ClangdFile' ..."
+
+    # ~/.oh-my-zsh/custom/plugins/zsh-local/zsh-local.plugin.zsh
+    #  alias compdb='compiledb -S -n make -j$(grep -c ^processor /proc/cpuinfo) -C sysinit'
+    if command -v compiledb >/dev/null 2>&1; then
+        compiledb -S -n make -j$(grep -c ^processor /proc/cpuinfo) -C sysinit
+    else
+        echo "compiledb does not exist, please install from https://github.com/fcying/compiledb-go"
+    fi
 }
 
 int () {
