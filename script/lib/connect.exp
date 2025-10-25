@@ -1053,6 +1053,8 @@ proc do_nolog {} {
 
 
 proc do_gdb {} {
+    global runCtx spawn_id
+
     set ret [Get_pid_by_process_type]
     dbg 3  "Get_pid_by_process_type=$ret"
     if { $ret != 0 } {

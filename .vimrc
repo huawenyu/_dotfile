@@ -1,0 +1,1 @@
+/home/hyu/.config/nvim/init.vim

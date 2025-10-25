@@ -3,9 +3,13 @@
 " QuickStart: vim <leader>    <Space>
 " - Install:
 "   - update nvim
-"          curl -LO https://github.com/neovim/neovim/releases/download/v0.10.4/nvim-linux-x86_64.appimage
-"          chmod u+x nvim-linux-x86_64.appimage
-"          sudo mv nvim-linux-x86_64.appimage /usr/bin/nvim
+"          If nix's neovim is not new enough, we can install from unstable-channel:
+"              nix-channel --add https://nixos.org/channels/nixpkgs-unstable unstable
+"              nix-channel --update
+"          Install:
+"              nix-env -iA nixpkgs.neovim
+"              sudo mv /usr/bin/nvim /usr/bin/nvim.old
+"              sudo ln -s $HOME/hyu/.nix-profile/bin/nvim /usr/bin/nvim
 "   - Linux
 "          curl -fLo ~/.config/nvim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/autoload/plug.vim
 "          curl -fLo ~/.config/nvim/init.vim          --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/init.vim
@@ -458,6 +462,7 @@ endif
     "}}}
 
     " gdb front-end {{{3
+        " Plug 'mfussenegger/nvim-dap',       Cond(has('nvim') && Mode(['coder']))      |  " Waiting try
         Plug 'huawenyu/neogdb2.vim',        Cond(has('nvim') && Mode(['coder']))      |  " Clone from fireflowerr/vwm.vim, vim windows management
         " Plug 'huawenyu/vwm.vim',            Cond(has('nvim') && Mode(['coder']))      |  " Clone from fireflowerr/vwm.vim, vim windows management
         " Plug 'huawenyu/termdebug.nvim',     Cond(has('nvim') && Mode(['coder']) && IfNoPlug('vimspector'))    | " Add config after copy /usr/share/nvim/runtime/pack/dist/opt/termdebug/plugin/termdebug.vim
