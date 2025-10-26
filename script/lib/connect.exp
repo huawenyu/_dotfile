@@ -543,7 +543,7 @@ proc Gdbserver_by_pid { } {
             dbg 3 "receive disconnect (eof)"
             return 2
         }
-        -re " # " {
+        -re "/ # " {
             dbg 3 "Wait shell prompt succ"
         }
     }
