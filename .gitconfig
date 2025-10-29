@@ -98,7 +98,7 @@
 
 	# https://jay.gooby.org/2021/07/13/positional-arguments-in-git-aliases
 	#  List commit related to specific bug: mantis="111810" git mantis dfb7a91cfd..HEAD
-	#  List all mantis from commits: git memantis dfb7a91cfd..HEAD
+	#  List all mantis from commits: git mantis dfb7a91cfd..HEAD
 	me-mantis = "!f() {                                             \
         git log $@ | awk '                                          \
             BEGIN {                                                 \
