@@ -11,8 +11,8 @@
 "              sudo mv /usr/bin/nvim /usr/bin/nvim.old
 "              sudo ln -s $HOME/hyu/.nix-profile/bin/nvim /usr/bin/nvim
 "   - Linux
-"          curl -fLo ~/.config/nvim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/autoload/plug.vim
-"          curl -fLo ~/.config/nvim/init.vim          --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/init.vim
+"          curl -fLo ~/.config/nvim/autoload/plug.vim --create-dirs https://github.com/huawenyu/_dotfile/raw/refs/heads/main/.config/nvim/autoload/plug.vim
+"          curl -fLo ~/.config/nvim/init.vim          --create-dirs https://github.com/huawenyu/_dotfile/raw/refs/heads/main/.config/nvim/init.vim
 "   - Windows (by WSL)
 "          curl -fLo /mnt/c/Users/<your-user-name>/AppData/Local/nvim/autoload/plug.vim --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/autoload/plug.vim
 "          curl -fLo /mnt/c/Users/<your-user-name>/AppData/Local/nvim/init.vim          --create-dirs https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/init.vim
