@@ -280,10 +280,7 @@ do_tidyup () {
                     continue
                 fi
 
-                echo "Softlink '${tagfile}' -> '.cache/$tagfile'"
-
-                mv $tagfile  ".cache/$tagfile"
-                ln -s  ".cache/$tagfile"  $tagfile
+                mv $tagfile  ".cache/$tagfile" && ln -s  ".cache/$tagfile"  $tagfile && echo "Softlink '${tagfile}' -> '.cache/$tagfile'"
             fi
 
             # if [[ -z ${var_origDir} ]]; then
