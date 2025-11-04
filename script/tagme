@@ -544,7 +544,7 @@ GenTag() {
 
 GenScope () {
     if [[ -f "${var_dstDir}/cscope.out" ]]; then
-        echo "Cscope 'cscope.out' existed, Skip! Enforce by '-f'."
+        echo "Cscope 'cscope.out' existed, Skip! Enforce by '-F'."
         return
     fi
 
