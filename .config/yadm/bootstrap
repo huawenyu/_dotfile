@@ -154,6 +154,7 @@ parse_args () {
 
     var_Mode="all"
     var_Feature=","
+    echo "args: 0'$0', 1'$1', 2'$2'"
 
     while true; do
         case "$1" in

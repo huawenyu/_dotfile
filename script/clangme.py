@@ -134,7 +134,11 @@ def run_clang_for_file(json_file, target_file, out_file, clang_path="clang"):
 
         subprocess.run(command, cwd=entry["directory"], check=True)
     else:
-        subprocess.run([f"{clang_path}", "-Wall", '-Wno-unused-command-line-argument', "-O0", "-g", "-std=c11", "-I.", "-I./include",
+        subprocess.run([f"{clang_path}", "-Wall", '-Wno-unused-command-line-argument', "-O0", "-g", "-std=c11",
+                        "-I.", "-I./include",
+                        "-I./migbase", "-I./migbase/include", "-I./migbase/include/wad",
+                        "-I./include/kernel/include",
+                        "-I./fgtutil",
                         '-lstdc++', '-lm', '-msse3',
                         '-o', f"{out_file}",
                         '-E', '-P', '-CC', '-dD',

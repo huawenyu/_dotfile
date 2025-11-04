@@ -340,10 +340,6 @@ endif
 " Please define our priviate wiki dirs in `~/.vimrc.before`
 let g:vim_wiki_dirs = get(g:, "vim_wiki_dirs", g:vim_confi_option.wiki_dirs)
 
-" Auto download the plug
-if filereadable("/.dockerenv")
-    let g:vim_confi_option.auto_install_vimplug = 0
-endif
 if g:vim_confi_option.auto_install_vimplug
     if LINUX()
         if empty(glob('~/.vim/autoload/plug.vim'))
@@ -577,7 +573,8 @@ endif
     " Statusline
     "Plug 'millermedeiros/vim-statline',    Cond(has('nvim') && Mode(['coder',]))	 | " Show current-function-name, simple, not annoy to distract our focus
     "Plug 'itchyny/lightline.vim',          Cond(has('nvim') && Mode(['coder',]))	 | "
-    Plug 'nvim-lualine/lualine.nvim',       Cond(has('nvim') && Mode(['coder',]))
+    Plug 'nvim-lualine/lualine.nvim',       Cond(has('nvim') && Mode(['coder',]))    | "  MN ▌ NOR# ▌ ~/.config
+                                                                                       " #session #attached-lient | buffer-number | filename
     Plug 'vimpostor/vim-tpipeline',         Cond(has('nvim') && Mode(['coder',]) && !empty($TMUX_PANE)) | " Show vim.statusline to the tmux.statusbar
 
     "Plug 'rcarriga/nvim-notify',           Cond(has('nvim') && Mode(['coder',]))  | " Substitute the vim's original print-type message
@@ -979,8 +976,8 @@ endif
 
 "}}}
 
-
-if g:vim_confi_option.auto_install_plugs
+" Auto download the plug
+if !filereadable("/.dockerenv") && g:vim_confi_option.auto_install_plugs
     autocmd VimEnter *
         \   if len(filter(values(g:plugs), '!isdirectory(v:val.dir)'))
         \ |     PlugInstall --sync | q
