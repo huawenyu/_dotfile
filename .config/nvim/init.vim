@@ -441,7 +441,8 @@ endif
 
 " Coder {{{2
     " Try/test {{{3
-        Plug 'andymass/vim-matchup',             Cond (has('nvim') && Mode(['editor',]))
+        " RM: Slow the cursor movement, profiling by: verbose autocmd CursorMoved
+        "Plug 'andymass/vim-matchup',             Cond (has('nvim') && Mode(['editor',]))
         Plug 'huawenyu/vim.demo',                Cond (has('nvim') && Mode(['test',]))
     "}}}
 
