@@ -574,8 +574,7 @@ endif
     " Statusline
     "Plug 'millermedeiros/vim-statline',    Cond(has('nvim') && Mode(['coder',]))	 | " Show current-function-name, simple, not annoy to distract our focus
     "Plug 'itchyny/lightline.vim',          Cond(has('nvim') && Mode(['coder',]))	 | "
-    Plug 'nvim-lualine/lualine.nvim',       Cond(has('nvim') && Mode(['coder',]))    | "  MN ▌ NOR# ▌ ~/.config
-                                                                                       " #session #attached-lient | buffer-number | filename
+    Plug 'nvim-lualine/lualine.nvim',       Cond(has('nvim') && Mode(['coder',]))    | " ## ▌ NOR# ▌ filename ...:  #tmux-session #attached-client | status & buffer-number | filename
     Plug 'vimpostor/vim-tpipeline',         Cond(has('nvim') && Mode(['coder',]) && !empty($TMUX_PANE)) | " Show vim.statusline to the tmux.statusbar
 
     "Plug 'rcarriga/nvim-notify',           Cond(has('nvim') && Mode(['coder',]))  | " Substitute the vim's original print-type message
