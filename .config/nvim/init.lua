@@ -542,14 +542,13 @@ local plugins = {
     lazy = false,
     dependencies = {
       "nvim-telescope/telescope.nvim",
-      "rbmarliere/telescope-cscope.nvim",  -- REQUIRED: The telescope extension
     },
     opts = {
       disable_maps = true,  -- Disable all defaults
-      disable_telescope = true,
+      disable_telescope = false,  -- MUST enable telescope support
       cscope = {
         exec = "cscope",
-        picker = "telescope",
+        picker = "telescope",  -- Use telescope picker
         skip_picker_for_single_result = true,
         project_rooter = {
           enable = true,
@@ -558,26 +557,12 @@ local plugins = {
       },
     },
     config = function(_, opts)
-      require("cscope_maps").setup(opts)
+      -- IMPORTANT: Setup cscope_maps first
+      local cscope_module = require("cscope_maps")
+      cscope_module.setup(opts)
 
-      -- Try different API access patterns
-      -- local cscope = require("cscope_maps.api")
-      local cscope = nil
-
-      -- Pattern 1: Direct module
-      if not cscope then
-        pcall(function() cscope = require("cscope_maps") end)
-      end
-
-      -- Pattern 2: From the setup return
-      if not cscope then
-        pcall(function() cscope = require("cscope_maps").api end)
-      end
-
-      -- Pattern 3: Global variable
-      if not cscope and vim.g.cscope_maps then
-        cscope = vim.g.cscope_maps
-      end
+      -- Get API reference (try different access patterns)
+      local cscope = cscope_module.api or cscope_module
 
       -- Find git root directory
       local function find_git_root()
@@ -655,11 +640,13 @@ local plugins = {
 
         -- Setup with first database
         opts.cscope.db_file = dbs[1]
-        require("cscope_maps").setup(opts)
+        cscope_module.setup(opts)
 
-        -- Add remaining databases
-        for i = 2, #dbs do
-          cscope.add_db(dbs[i])
+        -- Add remaining databases if API supports it
+        if cscope and cscope.add_db then
+          for i = 2, #dbs do
+            cscope.add_db(dbs[i])
+          end
         end
 
         vim.notify("Loaded " .. #dbs .. " cscope database(s)", vim.log.levels.INFO)
@@ -668,7 +655,6 @@ local plugins = {
 
       -- Initial load
       load_databases()
-      require("telescope").load_extension("cscope")
 
       -- Auto-reload on directory change
       vim.api.nvim_create_autocmd("DirChanged", {
@@ -680,50 +666,22 @@ local plugins = {
 
       local map_opts = { silent = true, noremap = true }
 
-      -- Your custom mappings (matching your original style)
-      -- File mappings
-      vim.keymap.set('n', '<leader>ff', function()
-        cscope.find({ querytype = "f" })
-      end, vim.tbl_extend("force", map_opts, { desc = "Find file" }))
+      -- Helper function to safely call cscope methods
+      local function cscope_find(params)
+        if not cscope or not cscope.find then
+          vim.notify("cscope API not available. Make sure cscope_maps is properly loaded.", vim.log.levels.ERROR)
+          return
+        end
 
-      -- Symbol/References
-      vim.keymap.set('n', '<leader>fs', function()
-        cscope.find({ querytype = "s" })
-      end, vim.tbl_extend("force", map_opts, { desc = "Find references" }))
+        -- If no query provided, use word under cursor
+        if not params.query then
+          params.query = vim.fn.expand("<cword>")
+        end
 
-      vim.keymap.set('n', '<leader>fS', function()
-        cscope.find({ querytype = "g" })
-      end, vim.tbl_extend("force", map_opts, { desc = "Find definition" }))
+        cscope.find(params)
+      end
 
-      -- Caller/Callee
-      vim.keymap.set('n', '<leader>fc', function()
-        cscope.find({ querytype = "c" })
-      end, vim.tbl_extend("force", map_opts, { desc = "Find callers" }))
-
-      vim.keymap.set('n', '<leader>fC', function()
-        cscope.find({ querytype = "d" })
-      end, vim.tbl_extend("force", map_opts, { desc = "Find callees" }))
-
-      -- Write value (assignments)
-      vim.keymap.set('n', '<leader>fw', function()
-        cscope.find({ querytype = "a" })
-      end, vim.tbl_extend("force", map_opts, { desc = "Find assignments" }))
-
-      vim.keymap.set('n', '<leader>fW', function()
-        cscope.find({ querytype = "a" })
-      end, vim.tbl_extend("force", map_opts, { desc = "Find assignments" }))
-
-      -- Text search
-      vim.keymap.set('n', '<leader>fe', function()
-        cscope.find({ querytype = "e" })
-      end, vim.tbl_extend("force", map_opts, { desc = "Egrep pattern" }))
-
-      -- Build database
-      vim.keymap.set('n', '<leader>fb', function()
-        cscope.build_db()
-      end, vim.tbl_extend("force", map_opts, { desc = "Build cscope database" }))
-
-      -- Visual mode support
+      -- Function to get visual selection
       local function get_visual_selection()
         local start_pos = vim.fn.getpos("'<")
         local end_pos = vim.fn.getpos("'>")
@@ -736,12 +694,78 @@ local plugins = {
         return table.concat(lines, "\n")
       end
 
+      -- Telescope-based mappings (these will use telescope picker)
+
+      -- Find symbols (references)
+      vim.keymap.set('n', '<leader>fs', function()
+        cscope_find({ querytype = "s" })
+      end, vim.tbl_extend("force", map_opts, { desc = "Find references (Telescope)" }))
+
+      -- Find global definition
+      vim.keymap.set('n', '<leader>fS', function()
+        cscope_find({ querytype = "g" })
+      end, vim.tbl_extend("force", map_opts, { desc = "Find definition (Telescope)" }))
+
+      -- Find functions called by this function
+      vim.keymap.set('n', '<leader>fc', function()
+        cscope_find({ querytype = "c" })
+      end, vim.tbl_extend("force", map_opts, { desc = "Find callers (Telescope)" }))
+
+      -- Find functions calling this function
+      vim.keymap.set('n', '<leader>fC', function()
+        cscope_find({ querytype = "d" })
+      end, vim.tbl_extend("force", map_opts, { desc = "Find callees (Telescope)" }))
+
+      -- Find text string
+      vim.keymap.set('n', '<leader>fe', function()
+        vim.ui.input({ prompt = "Egrep pattern: " }, function(input)
+          if input and input ~= "" then
+            cscope_find({ querytype = "e", query = input })
+          end
+        end)
+      end, vim.tbl_extend("force", map_opts, { desc = "Egrep pattern (Telescope)" }))
+
+      -- Find file
+      vim.keymap.set('n', '<leader>ff', function()
+        vim.ui.input({ prompt = "File name: " }, function(input)
+          if input and input ~= "" then
+            cscope_find({ querytype = "f", query = input })
+          end
+        end)
+      end, vim.tbl_extend("force", map_opts, { desc = "Find file (Telescope)" }))
+
+      -- Find assignments to symbol
+      vim.keymap.set('n', '<leader>fw', function()
+        cscope_find({ querytype = "a" })
+      end, vim.tbl_extend("force", map_opts, { desc = "Find assignments (Telescope)" }))
+
+      -- Build database
+      vim.keymap.set('n', '<leader>fb', function()
+        if cscope and cscope.build_db then
+          cscope.build_db()
+        else
+          vim.notify("build_db not available", vim.log.levels.ERROR)
+        end
+      end, vim.tbl_extend("force", map_opts, { desc = "Build cscope database" }))
+
+      -- Visual mode: find references for selected text
       vim.keymap.set('v', '<leader>fs', function()
         local selection = get_visual_selection()
         if selection ~= "" then
-          cscope.find({ querytype = "s", query = selection })
+          cscope_find({ querytype = "s", query = selection })
         end
-      end, vim.tbl_extend("force", map_opts, { desc = "Find references (visual)" }))
+      end, vim.tbl_extend("force", map_opts, { desc = "Find references (visual/Telescope)" }))
+
+      -- Optional: Add a keymap to manually reload cscope databases
+      vim.keymap.set('n', '<leader>fr', function()
+        load_databases()
+      end, vim.tbl_extend("force", map_opts, { desc = "Reload cscope databases" }))
+
+      -- Debug info
+      vim.keymap.set('n', '<leader>fd', function()
+        local dbs = find_cscope_databases()
+        vim.notify("Found " .. #dbs .. " cscope databases:\n" .. table.concat(dbs, "\n"), vim.log.levels.INFO)
+      end, vim.tbl_extend("force", map_opts, { desc = "Debug: Show found databases" }))
     end,
   },
   {
