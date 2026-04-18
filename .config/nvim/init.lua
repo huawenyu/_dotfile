@@ -1101,7 +1101,7 @@ local plugins = {
   },
   {
     "huawenyu/c-utils.vim",
-    enabled = cond({ "coder" }) and vim.fn.exists("*utils#Declaration") == 1,
+    enabled = cond({ "coder" }),
     config = function()
       local g = vim.g
       local home = os.getenv("HOME")
