@@ -172,6 +172,39 @@ local plugins = {
     enabled = cond({ "basic", "log", "editor" }),
     lazy = false,
     config = function()
+      -- ============================================================
+      -- vim-basic extracted configurations
+      -- ============================================================
+
+      -- Basic settings from plugin/config.vim
+      vim.opt.formatoptions:append("m")
+      vim.opt.formatoptions:append("B")
+      vim.opt.fileformats = "unix,dos,mac"
+      vim.opt.clipboard:prepend("unnamed,unnamedplus")
+
+      -- Terminal setup for neovim
+      vim.api.nvim_create_augroup("terminal_setup", { clear = true })
+      vim.api.nvim_create_autocmd("TermOpen", {
+        group = "terminal_setup",
+        callback = function()
+          vim.keymap.set("n", "<LeftRelease>", "<LeftRelease>i", { buffer = true })
+          vim.cmd("startinsert")
+        end,
+      })
+      vim.api.nvim_create_autocmd("TermOpen", {
+        group = "terminal_setup",
+        callback = function()
+          vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { buffer = true })
+        end,
+      })
+      vim.api.nvim_create_autocmd("FileType", {
+        group = "terminal_setup",
+        pattern = "fzf",
+        callback = function()
+          vim.cmd("tunmap <Esc><Esc>")
+        end,
+      })
+
       -- Yank from cursor to end of line (consistent with C and D)
       vim.keymap.set('n', 'Y', 'y$', { desc = "Yank to end of line" })
 
@@ -211,8 +244,18 @@ local plugins = {
         vim.cmd(':vim /\\<' .. vim.fn.getreg('"') .. '\\C/gj %')
       end, { desc = "Search visual selection with :vim" })
 
-      -- Alternative cleaner version for the last mapping:
-      -- vim.keymap.set('v', '//', 'y:vim /\\<' .. vim.fn.getreg('"') .. '\\C/gj %<CR>', { desc = "Search visual selection with :vim" })
+      -- File open with gf
+      vim.keymap.set("n", "gf", function()
+        vim.cmd("call utils#GotoFileWithLineNum(0)")
+      end, { desc = "Open file under cursor" })
+
+      vim.keymap.set("n", "<leader>gf", function()
+        vim.cmd("call <SID>GuessLink('n')")
+      end, { silent = true, desc = "(tool) Goto file" })
+
+      vim.keymap.set("x", "<leader>gf", function()
+        vim.cmd("call <SID>GuessLink('v')")
+      end, { silent = true, desc = "(tool) Goto file" })
     end,
   },
   {
@@ -220,6 +263,140 @@ local plugins = {
     enabled = cond({ "basic", "log", "editor" }),
     lazy = false,
     config = function()
+      -- ============================================================
+      -- vimConfig extracted configurations
+      -- ============================================================
+
+      -- vimConfig/conf_map.vim: Upper keyfixes
+      if vim.g.vim_confi_option.upper_keyfixes then
+        vim.api.nvim_create_user_command("E", function(opts)
+          vim.cmd("e" .. (opts.bang and "!" or "") .. " " .. (opts.args or ""))
+        end, { bang = true, nargs = "*" })
+        vim.api.nvim_create_user_command("W", function(opts)
+          vim.cmd("w" .. (opts.bang and "!" or "") .. " " .. (opts.args or ""))
+        end, { bang = true, nargs = "*" })
+        vim.api.nvim_create_user_command("Wq", function(opts)
+          vim.cmd("wq" .. (opts.bang and "!" or ""))
+        end, { bang = true, nargs = "?" })
+        vim.api.nvim_create_user_command("WQ", function(opts)
+          vim.cmd("wq" .. (opts.bang and "!" or ""))
+        end, { bang = true, nargs = "?" })
+        vim.api.nvim_create_user_command("Wa", function(opts)
+          vim.cmd("wa" .. (opts.bang and "!" or ""))
+        end, { bang = true })
+        vim.api.nvim_create_user_command("WA", function(opts)
+          vim.cmd("wa" .. (opts.bang and "!" or ""))
+        end, { bang = true })
+        vim.api.nvim_create_user_command("Q", function(opts)
+          vim.cmd("q" .. (opts.bang and "!" or ""))
+        end, { bang = true })
+        vim.api.nvim_create_user_command("QA", function(opts)
+          vim.cmd("qa" .. (opts.bang and "!" or ""))
+        end, { bang = true })
+        vim.api.nvim_create_user_command("Qa", function(opts)
+          vim.cmd("qa" .. (opts.bang and "!" or ""))
+        end, { bang = true })
+      end
+
+      -- vimConfig/conf_map.vim: Alt shortcuts
+      if vim.g.vim_confi_option.alt_shortcut then
+        vim.keymap.set("n", "<a-e>", "<leader>ve")
+        vim.keymap.set("n", "<a-w>", "<leader>vw")
+        vim.keymap.set("n", "<a-t>", "<leader>vt")
+        vim.keymap.set("n", "<a-b>", "<leader>vb")
+        vim.keymap.set("n", "<a-g>", "<leader>vg")
+        vim.keymap.set("n", "<a-q>", "<leader>vq")
+        vim.keymap.set("n", "<a-f>", ";fs")
+        vim.keymap.set("n", "<a-s>", "<leader>g1")
+        vim.keymap.set("n", "<a-/>", ":TodoLocList<cr>")
+        vim.keymap.set("n", "<a-:>", ":AsyncTask tag4one<cr>")
+        vim.keymap.set("n", "<a-'>", ":AsyncTask run<cr>")
+        vim.keymap.set("n", ";w", ":wall<cr>", { desc = "Save all buffers" })
+        vim.keymap.set("x", ";w", ":<c-U>wall<cr>")
+        -- vim-motion integration
+        if HasPlug("vim-motion") then
+          vim.keymap.set("n", "<a-,>", "<Plug>_JumpPrevIndent")
+          vim.keymap.set("n", "<a-.>", "<Plug>_JumpNextIndent")
+          vim.keymap.set("x", "<a-.>", "<Plug>_JumpPrevIndent")
+          vim.keymap.set("x", "<a-,>", "<Plug>_JumpNextIndent")
+          vim.keymap.set("o", "<a-,>", "<Plug>_JumpPrevIndent")
+          vim.keymap.set("o", "<a-.>", "<Plug>_JumpNextIndent")
+        end
+        vim.keymap.set("i", "<a-i>", '<c-r>"')
+      end
+
+      -- vimConfig/conf_map.vim: Basic mappings
+      if vim.g.vim_confi_option.enable_map_basic then
+        vim.keymap.set("n", "<C-c>", "<C-c>")
+        vim.keymap.set("n", "<leader>q", "qa", { desc = "Exit all" })
+        vim.keymap.set("x", "<leader>q", "qa")
+        vim.keymap.set("i", "<S-Tab>", "<C-v><Tab>")
+
+        -- gj/gk for visual navigation
+        vim.keymap.set({ "n", "x" }, "j", "gj")
+        vim.keymap.set({ "n", "x" }, "k", "gk")
+        vim.keymap.set("x", ">", ">gv")
+        vim.keymap.set("x", "<", "<gv")
+
+        -- Clear search highlight
+        vim.keymap.set("n", "<Return>", function()
+          vim.cmd("nohls")
+          vim.cmd("nohls")
+        end, { silent = true, desc = "Clear search highlight" })
+
+        -- Search count and quickfix sink
+        vim.keymap.set("n", ";#", ":<c-u><c-u>%s///gn<cr>", { desc = "Count search pattern" })
+        vim.keymap.set("n", ";^", ":<c-u>g//p<cr>", { desc = "Popup search pattern" })
+        vim.keymap.set("n", ";*", ":cexpr []<cr> | :<c-u>g//caddexpr expand('%') ..':' ..line('.') ..':0:' .. getline('.')<cr> | :copen<cr>", { desc = "Quickfix sink search" })
+        vim.keymap.set("n", "<F1>", ":%s///gc<cr>", { desc = "Continue replace all search" })
+        vim.keymap.set("n", ";.", ":%s//<C-R>\"/gc<cr>", { desc = "Continue replace all search" })
+        vim.keymap.set("n", "<leader>.", "@@", { desc = "Repeat macro" })
+      end
+
+      -- vimConfig/conf_map.vim: Useful mappings
+      if vim.g.vim_confi_option.enable_map_useful then
+        -- C/C++ file header toggle
+        vim.api.nvim_create_autocmd("FileType", {
+          pattern = { "c", "cpp" },
+          callback = function()
+            vim.keymap.set("n", "<leader>fa", function()
+              vim.cmd("call JumpToCorrespondingFile()")
+            end, { buffer = true, silent = true, desc = "Toggle source/header" })
+          end,
+        })
+
+        -- Window navigation with leader
+        vim.keymap.set("n", "<leader>h", "<c-w>h", { desc = "Window left" })
+        vim.keymap.set("n", "<leader>j", "<c-w>j", { desc = "Window down" })
+        vim.keymap.set("n", "<leader>k", "<c-w>k", { desc = "Window up" })
+        vim.keymap.set("n", "<leader>l", "<c-w>l", { desc = "Window right" })
+
+        -- Navigate quickfix
+        vim.keymap.set("n", "<c-n>", "cn", { desc = "Next quickfix" })
+        vim.keymap.set("n", "<c-p>", "cp", { desc = "Previous quickfix" })
+        vim.keymap.set("n", "<a-n>", ":lne<cr>", { desc = "Next locallist" })
+        vim.keymap.set("n", "<a-p>", ":lp<cr>", { desc = "Previous locallist" })
+
+        -- Terminal navigation
+        vim.keymap.set("t", "<c-h>", "<C-\\><C-n><C-w>h")
+        vim.keymap.set("t", "<c-j>", "<C-\\><C-n><C-w>j")
+        vim.keymap.set("t", "<c-k>", "<C-\\><C-n><C-w>k")
+        vim.keymap.set("t", "<c-l>", "<C-\\><C-n><C-w>l")
+
+        -- Paste and re-select
+        vim.keymap.set("n", "p", "p`]", { desc = "Paste and jump to end" })
+        vim.keymap.set("x", "p", function()
+          return "pgv\"" .. vim.v.register .. "y"
+        end, { expr = true, desc = "Paste over selection" })
+
+        -- Global replace
+        vim.keymap.set("n", "<leader>vR", "gD:%s/<C-R>///g<left><left>", { desc = "Replace all" })
+
+        -- vim-fugitive integration for quickfix
+        vim.keymap.set("n", "<leader>o", "<C-o>", { desc = "Jump to older position" })
+        vim.keymap.set("n", "<leader>i", "<C-i>", { desc = "Jump to newer position" })
+      end
+
       -- Tab navigation mappings
       vim.keymap.set('n', ';1', '1gt', { silent = true, desc = "Go to tab 1" })
       vim.keymap.set('n', ';2', '2gt', { silent = true, desc = "Go to tab 2" })
@@ -323,7 +500,27 @@ local plugins = {
   },
   { "davidhalter/jedi-vim", enabled = cond({ "coder", "python" }), ft = "python" },
   { "pangloss/vim-javascript", enabled = cond({ "coder", "javascript" }), ft = { "javascript", "typescript" } },
-  { "fatih/vim-go", enabled = cond({ "coder", "golang" }), ft = "go" },
+  {
+    "fatih/vim-go",
+    enabled = cond({ "coder", "golang" }),
+    ft = "go",
+    config = function()
+      -- vimConfig/conf_map.vim: vim-go mappings
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = "go",
+        callback = function()
+          vim.keymap.set("n", "<leader>gr", "<Plug>(go-run)", { buffer = true })
+          vim.keymap.set("n", "<leader>gb", "<Plug>(go-build)", { buffer = true })
+          vim.keymap.set("n", "<leader>gt", "<Plug>(go-test)", { buffer = true })
+          vim.keymap.set("n", "<leader>gc", "<Plug>(go-coverage)", { buffer = true })
+          vim.keymap.set("n", "<leader>gd", "<Plug>(go-doc)", { buffer = true })
+          vim.keymap.set("n", "<leader>gi", "<Plug>(go-info)", { buffer = true })
+          vim.keymap.set("n", "<leader>ge", "<Plug>(go-rename)", { buffer = true })
+          vim.keymap.set("n", "<leader>gg", "<Plug>(go-def-vertical)", { buffer = true })
+        end,
+      })
+    end,
+  },
   { "racer-rust/vim-racer", enabled = cond({ "coder", "rust" }), ft = "rust" },
   { "rust-lang/rust.vim", enabled = cond({ "coder", "rust" }), ft = "rust" },
   { "timonv/vim-cargo", enabled = cond({ "coder", "rust" }), ft = "rust" },
@@ -1489,8 +1686,45 @@ local plugins = {
       vim.keymap.set('n', '<c-\\>', '<cmd>ToggleTerm<cr>', { silent = true, desc = "Toggle Terminal" })
     end,
   },
-  { "huawenyu/asyncrun.vim", enabled = cond({ "admin" }) },
-  { "skywind3000/asynctasks.vim", enabled = cond({ "admin" }), dependencies = { "huawenyu/asyncrun.vim" } },
+  {
+    "huawenyu/asyncrun.vim",
+    enabled = cond({ "admin" }),
+    config = function()
+      -- Mappings
+      vim.keymap.set('n', '<leader>gc', ':AsyncStop! <bar> AsyncTask gitclean-dryrun<CR>', { desc = "(git)clean-dryrun" })
+      vim.keymap.set('n', '<leader>gx', ':AsyncStop! <bar> AsyncTask gitclean<CR>', { desc = "(git)clean" })
+      vim.keymap.set('n', '<leader>f]', ':AsyncRun! tagme<CR>', { desc = "(tool)Auto generate tags" })
+
+      -- Settings
+      vim.g.asyncrun_silent = 1
+      vim.g.asyncrun_open = 8
+      vim.g.asyncrun_rootmarks = { '.git', '.svn', '.root', '.project', '.hg' }
+      vim.g.asynctasks_term_reuse = 1
+      vim.g.asynctasks_term_focus = 1
+      vim.g.asynctasks_term_pos = 'bottom'
+
+      -- Link tasks file if needed
+      vim.fn.system('ln -sf ~/.vim_tasks.ini ~/.vim/tasks.ini')
+
+      -- Template
+      vim.g.asynctasks_template = {}
+      vim.g.asynctasks_template.cargo = {
+        "[project-init]",
+        "command=cargo update",
+        "cwd=<root>",
+        "",
+        "[project-build]",
+        "command=cargo build",
+        "cwd=<root>",
+        "errorformat=%. %#--> %f:%l:%c",
+        "",
+        "[project-run]",
+        "command=cargo run",
+        "cwd=<root>",
+        "output=terminal",
+      }
+    end,
+  },
   {
     "folke/edgy.nvim",
     enabled = cond({ "coder" }),
