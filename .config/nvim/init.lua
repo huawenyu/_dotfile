@@ -167,7 +167,54 @@ local plugins = {
   -- Basic / Core
   -- ============================================================
   { "tpope/vim-sensible", enabled = cond({ "basic", "log", "editor" }), lazy = false },
-  { "huawenyu/vim-basic", enabled = cond({ "basic", "log", "editor" }), lazy = false },
+  {
+    "huawenyu/vim-basic",
+    enabled = cond({ "basic", "log", "editor" }),
+    lazy = false,
+    config = function()
+      -- Yank from cursor to end of line (consistent with C and D)
+      vim.keymap.set('n', 'Y', 'y$', { desc = "Yank to end of line" })
+
+      -- Copy text to tmpfile
+      vim.keymap.set('v', '<leader>yy', function()
+        vim.cmd('call utils#GetSelected("v", "/tmp/vim.yank")')
+      end, { silent = true, desc = "Copy text to tmpfile" })
+
+      vim.keymap.set('n', '<leader>yy', function()
+        vim.cmd('call vimuxscript#Copy()')
+      end, { silent = true, desc = "Copy text to tmpfile" })
+
+      -- Paste text from tmpfile
+      vim.keymap.set('n', '<leader>yp', function()
+        vim.cmd('r! cat /tmp/vim.yank')
+      end, { silent = true, desc = "Paste text from tmpfile" })
+
+      -- Map `*`, `&` same to avoid ft=git conflict
+      vim.keymap.set('x', '*', function()
+        vim.cmd('call utils#VSetSearch("/")')
+        vim.cmd('/' .. vim.fn.getreg('/'))
+      end, { desc = "Search visual selection forward" })
+
+      vim.keymap.set('x', '&', function()
+        vim.cmd('call utils#VSetSearch("/")')
+        vim.cmd('/' .. vim.fn.getreg('/'))
+      end, { desc = "Search visual selection forward" })
+
+      vim.keymap.set('x', '#', function()
+        vim.cmd('call utils#VSetSearch("?")')
+        vim.cmd('?' .. vim.fn.getreg('/'))
+      end, { desc = "Search visual selection backward" })
+
+      -- vim search with visual selection
+      vim.keymap.set('v', '//', function()
+        vim.fn.execute('y')
+        vim.cmd(':vim /\\<' .. vim.fn.getreg('"') .. '\\C/gj %')
+      end, { desc = "Search visual selection with :vim" })
+
+      -- Alternative cleaner version for the last mapping:
+      -- vim.keymap.set('v', '//', 'y:vim /\\<' .. vim.fn.getreg('"') .. '\\C/gj %<CR>', { desc = "Search visual selection with :vim" })
+    end,
+  },
   {
     "huawenyu/vimConfig",
     enabled = cond({ "basic", "log", "editor" }),
@@ -368,14 +415,17 @@ local plugins = {
       local function find_first_existing_vault(paths)
         for _, path in ipairs(paths) do
           local expanded_path = vim.fn.expand(path)
-          if vim.fn.isdirectory(expanded_path) == 1 then return path end
+          if vim.fn.isdirectory(expanded_path) == 1 then
+            return expanded_path
+          end
         end
         return paths[1]
       end
 
       local vault_dir = find_first_existing_vault({ "~/Document/dotwiki", "~/dotwiki" })
-      if vim.fn.isdirectory(vault_dir) ~= 1 then
-        vim.notify("Obsidian directory not found: " .. vault_dir, vim.log.levels.WARN)
+      local ret = vim.fn.isdirectory(vault_dir)
+      if ret ~= 1 then
+        vim.notify("Obsidian dir not exist: " .. vault_dir .. " ret=" .. ret, vim.log.levels.WARN)
         return
       end
 
@@ -383,7 +433,7 @@ local plugins = {
         dir = vault_dir,
         notes_subdir = "notes",
         ui = { enable = false },
-        workspaces = { { name = "dotWiki", path = "~/dotwiki" } },
+        workspaces = { { name = "dotWiki", path = vault_dir } },
         daily_notes = { folder = "notes/dailies", date_format = "%Y-%m-%d", alias_format = "%B %-d, %Y" },
         completion = { nvim_cmp = false, blink = true, min_chars = 2 },
         legacy_commands = false,
@@ -428,7 +478,33 @@ local plugins = {
       vim.opt.laststatus = 0
     end,
   },
-  { "huawenyu/vim-mark", enabled = cond({ "editor" }) },
+  {
+    "huawenyu/vim-mark",
+    enabled = cond({ "editor" }),
+    keys = {
+      { "<leader>mm", function()
+        vim.cmd('silent! call mark#MarkCurrentWord(expand("<cword>"))')
+      end, mode = "n", silent = true, desc = "Colorize current word" },
+
+      { "<leader>mm", function()
+        vim.cmd('silent! call mark#GetVisualSelection()')
+      end, mode = "v", silent = true, desc = "Colorize visual selection" },
+
+      { "<leader>mx", function()
+        vim.cmd('silent! call mark#ClearAll()')
+      end, mode = "n", silent = true, desc = "Clear all colorized words" },
+    },
+    init = function()
+      vim.g.mw_no_mappings = 1
+    end,
+    config = function()
+      -- vim.g.mw_no_mappings = 1
+      vim.g.mwDefaultHighlightingPalette = 'extended'
+      vim.g.mwHistAdd = '/@'
+      vim.g.mwAutoSaveMarks = 0
+      vim.g.mwMaxMatchPriority = -10
+    end,
+  },
   { "huawenyu/vim-signature", enabled = cond({ "editor" }) },
   {
     "lukas-reineke/indent-blankline.nvim",
@@ -530,7 +606,24 @@ local plugins = {
   -- ============================================================
   -- Clipboard / Yank
   -- ============================================================
-  { "ojroques/vim-oscyank", enabled = cond({ "editor" }) },
+  {
+    "ojroques/vim-oscyank",
+    enabled = cond({ "editor" }),
+    lazy = false,
+    enabled = cond({ "editor" }),
+    keys = {
+      { "Y", "<cmd>OSCYank<cr>", mode = "v", desc = "Yank to OSC52" },
+      -- { "Y", "<cmd>call YankOSC52(getreg('+'))<cr>", mode = "v", desc = "Yank to OSC52" },
+    },
+    config = function()
+      vim.g.oscyank_max_length = 1
+      -- let g:oscyank_term = 'tmux'  " or 'screen', 'kitty', 'default'
+      vim.g.oscyank_term = 'tmux'
+      vim.g.mwHistAdd = '/@'
+      vim.g.mwAutoSaveMarks = 0
+      vim.g.mwMaxMatchPriority = -10
+    end,
+  },
 
   -- ============================================================
   -- Search / Jump / Motion
@@ -557,12 +650,9 @@ local plugins = {
       },
     },
     config = function(_, opts)
-      -- IMPORTANT: Setup cscope_maps first
+      -- Setup cscope_maps
       local cscope_module = require("cscope_maps")
       cscope_module.setup(opts)
-
-      -- Get API reference (try different access patterns)
-      local cscope = cscope_module.api or cscope_module
 
       -- Find git root directory
       local function find_git_root()
@@ -638,47 +728,17 @@ local plugins = {
           return {}
         end
 
-        -- Setup with first database
+        -- Re-setup with first database
         opts.cscope.db_file = dbs[1]
         cscope_module.setup(opts)
 
-        -- Add remaining databases if API supports it
-        if cscope and cscope.add_db then
-          for i = 2, #dbs do
-            cscope.add_db(dbs[i])
-          end
+        -- Add remaining databases using cscope command
+        for i = 2, #dbs do
+          vim.cmd("Cscope db add " .. dbs[i])
         end
 
         vim.notify("Loaded " .. #dbs .. " cscope database(s)", vim.log.levels.INFO)
         return dbs
-      end
-
-      -- Initial load
-      load_databases()
-
-      -- Auto-reload on directory change
-      vim.api.nvim_create_autocmd("DirChanged", {
-        pattern = "*",
-        callback = function()
-          load_databases()
-        end,
-      })
-
-      local map_opts = { silent = true, noremap = true }
-
-      -- Helper function to safely call cscope methods
-      local function cscope_find(params)
-        if not cscope or not cscope.find then
-          vim.notify("cscope API not available. Make sure cscope_maps is properly loaded.", vim.log.levels.ERROR)
-          return
-        end
-
-        -- If no query provided, use word under cursor
-        if not params.query then
-          params.query = vim.fn.expand("<cword>")
-        end
-
-        cscope.find(params)
       end
 
       -- Function to get visual selection
@@ -694,75 +754,149 @@ local plugins = {
         return table.concat(lines, "\n")
       end
 
-      -- Telescope-based mappings (these will use telescope picker)
+
+      local pickers = require("telescope.pickers")
+      local finders = require("telescope.finders")
+      local conf = require("telescope.config").values
+
+      local function select_from_filelist()
+        local current_dir = vim.fn.getcwd()
+        local git_root = find_git_root()
+        local stop_dir = git_root or vim.fn.expand("~")
+        local Flist = ""
+
+        local search_dir = current_dir
+        while search_dir and #search_dir > 1 do
+          -- 1. Check for files in the current search_dir
+          local patterns = { "cscope.files", ".cscope.files" }
+          for _, pattern in ipairs(patterns) do
+            local found = vim.fn.globpath(search_dir, pattern, false, true)
+            for _, flist in ipairs(found) do
+              if vim.fn.filereadable(flist) == 1 then
+                Flist = flist
+                goto found_file
+              end
+            end
+          end
+
+          -- 2. Exit IF we just checked the stop_dir
+          if search_dir == stop_dir then
+            break
+          end
+
+          -- 3. Move to parent
+          local parent = vim.fn.fnamemodify(search_dir, ":h")
+          if parent == search_dir then break end
+          search_dir = parent
+        end
+
+        ::found_file::
+        if Flist ~= "" then
+          -- Read the file and store lines in a table
+          local lines = vim.fn.readfile(Flist)
+          if #lines > 0 then
+            pickers.new({}, {
+              prompt_title = "Custom File List",
+              finder = finders.new_table {
+                results = lines
+              },
+              sorter = conf.generic_sorter({}),
+              previewer = conf.file_previewer({}), -- Enables file previewing
+            }):find()
+
+            return
+          end
+        end
+
+        -- If no file-list provide, list all files
+        -- vim.notify("Cscope files list '.cscope.files' not exists!\n", vim.log.levels.INFO)
+        require('telescope.builtin').find_files({
+          prompt_title = "Find(rg) File List",
+          find_command = {
+            "rg", "--files", "--hidden", "--glob", "!**/.git/*"
+          },
+        })
+      end
+
+
+      -- Initial load
+      load_databases()
+
+      -- Auto-reload on directory change
+      vim.api.nvim_create_autocmd("DirChanged", {
+        pattern = "*",
+        callback = function()
+          load_databases()
+        end,
+      })
+
+      local map_opts = { silent = true, noremap = true }
+
+      -- Direct command mappings (using plugin's built-in CscopeFind command)
 
       -- Find symbols (references)
-      vim.keymap.set('n', '<leader>fs', function()
-        cscope_find({ querytype = "s" })
-      end, vim.tbl_extend("force", map_opts, { desc = "Find references (Telescope)" }))
+      vim.keymap.set('n', '<leader>fs', ":Cscope find s <C-r><C-w><CR>",
+      vim.tbl_extend("force", map_opts, { desc = "Find references (Telescope)" }))
 
       -- Find global definition
-      vim.keymap.set('n', '<leader>fS', function()
-        cscope_find({ querytype = "g" })
-      end, vim.tbl_extend("force", map_opts, { desc = "Find definition (Telescope)" }))
+      vim.keymap.set('n', '<leader>fd', ":Cscope find g <C-r><C-w><CR>",
+      vim.tbl_extend("force", map_opts, { desc = "Find definition (Telescope)" }))
 
       -- Find functions called by this function
-      vim.keymap.set('n', '<leader>fc', function()
-        cscope_find({ querytype = "c" })
-      end, vim.tbl_extend("force", map_opts, { desc = "Find callers (Telescope)" }))
+      vim.keymap.set('n', '<leader>fc', ":Cscope find c <C-r><C-w><CR>",
+      vim.tbl_extend("force", map_opts, { desc = "Find callers (Telescope)" }))
 
       -- Find functions calling this function
-      vim.keymap.set('n', '<leader>fC', function()
-        cscope_find({ querytype = "d" })
-      end, vim.tbl_extend("force", map_opts, { desc = "Find callees (Telescope)" }))
+      vim.keymap.set('n', '<leader>fC', ":Cscope find d <C-r><C-w><CR>",
+      vim.tbl_extend("force", map_opts, { desc = "Find callees (Telescope)" }))
 
-      -- Find text string
+      -- Find assignments to symbol
+      vim.keymap.set('n', '<leader>fw', ":Cscope find a <C-r><C-w><CR>",
+      vim.tbl_extend("force", map_opts, { desc = "Find assignments (Telescope)" }))
+
+      -- Find text string (requires input)
       vim.keymap.set('n', '<leader>fe', function()
         vim.ui.input({ prompt = "Egrep pattern: " }, function(input)
           if input and input ~= "" then
-            cscope_find({ querytype = "e", query = input })
+            vim.cmd("Cscope find e " .. input)
           end
         end)
       end, vim.tbl_extend("force", map_opts, { desc = "Egrep pattern (Telescope)" }))
 
-      -- Find file
+      -- Find file (redirect to Telescope)
       vim.keymap.set('n', '<leader>ff', function()
-        vim.ui.input({ prompt = "File name: " }, function(input)
-          if input and input ~= "" then
-            cscope_find({ querytype = "f", query = input })
-          end
-        end)
+          select_from_filelist()
       end, vim.tbl_extend("force", map_opts, { desc = "Find file (Telescope)" }))
 
-      -- Find assignments to symbol
-      vim.keymap.set('n', '<leader>fw', function()
-        cscope_find({ querytype = "a" })
-      end, vim.tbl_extend("force", map_opts, { desc = "Find assignments (Telescope)" }))
+      -- Find file (redirect to Telescope)
+      vim.keymap.set('n', ';ff', function()
+        require('telescope.builtin').find_files({
+          prompt_title = "Find(rg) File List",
+          find_command = {
+            "rg", "--files", "--hidden", "--glob", "!**/.git/*"
+          },
+        })
+      end, vim.tbl_extend("force", map_opts, { desc = "Find file (Telescope)" }))
 
       -- Build database
-      vim.keymap.set('n', '<leader>fb', function()
-        if cscope and cscope.build_db then
-          cscope.build_db()
-        else
-          vim.notify("build_db not available", vim.log.levels.ERROR)
-        end
-      end, vim.tbl_extend("force", map_opts, { desc = "Build cscope database" }))
+      vim.keymap.set('n', '<leader>fb', ":Cscope db build<CR>",
+      vim.tbl_extend("force", map_opts, { desc = "Build cscope database" }))
 
       -- Visual mode: find references for selected text
       vim.keymap.set('v', '<leader>fs', function()
         local selection = get_visual_selection()
         if selection ~= "" then
-          cscope_find({ querytype = "s", query = selection })
+          vim.cmd("Cscope find s " .. selection)
         end
       end, vim.tbl_extend("force", map_opts, { desc = "Find references (visual/Telescope)" }))
 
-      -- Optional: Add a keymap to manually reload cscope databases
+      -- Reload cscope databases
       vim.keymap.set('n', '<leader>fr', function()
         load_databases()
       end, vim.tbl_extend("force", map_opts, { desc = "Reload cscope databases" }))
 
       -- Debug info
-      vim.keymap.set('n', '<leader>fd', function()
+      vim.keymap.set('n', '<leader>fz', function()
         local dbs = find_cscope_databases()
         vim.notify("Found " .. #dbs .. " cscope databases:\n" .. table.concat(dbs, "\n"), vim.log.levels.INFO)
       end, vim.tbl_extend("force", map_opts, { desc = "Debug: Show found databases" }))
@@ -969,8 +1103,62 @@ local plugins = {
   { "tpope/vim-abolish", enabled = cond({ "editor" }) },
   { "tpope/vim-repeat", enabled = cond({ "editor" }) },
   { "rhysd/clever-f.vim", enabled = cond({ "editor" }) },
-  { "huawenyu/vim-motion", enabled = cond({ "editor" }) },
-  { "junegunn/vim-easy-align", enabled = cond({ "editor" }), cmd = "EasyAlign" },
+  {
+    "huawenyu/vim-motion",
+    enabled = cond({ "editor" }),
+    dependencies = { "skywind3000/vim-preview" },
+    keys = {
+      { "<leader>;",  function() vim.cmd('call VimMotionTag()') end, mode = "n", silent = true, desc = "Jump Tag" },
+      { "<leader><leader>", function() vim.cmd('call VimMotionPreview()') end, mode = { "n", "v" }, desc = "Preview Tag" },
+    },
+  },
+  {
+    "junegunn/vim-easy-align",
+    event = "VeryLazy",
+    enabled = cond({ "editor" }),
+    cmd = "EasyAlign",
+    keys = {
+      { "<leader>ga", mode = "v" },
+      { "<leader>cc", mode = "v" },
+      { "<leader>cc", mode = "n" },
+    },
+    opts = {
+      ignore_comment = false,
+    },
+    config = function()
+      vim.g.easy_align_delimiters = {
+        [">"] = { pattern = ">>\\|=>\\|>" },
+        ["/"] = {
+          pattern = "//\\+\\|/\\*\\|\\*/",
+          delimiter_align = "l",
+          ignore_groups = { "!Comment" },
+        },
+        ["]"] = {
+          pattern = "[[\\]]",
+          left_margin = 0,
+          right_margin = 0,
+          stick_to_left = 0,
+        },
+        [")"] = {
+          pattern = "[()]",
+          left_margin = 0,
+          right_margin = 0,
+          stick_to_left = 0,
+        },
+        d = {
+          pattern = " \\(\\S\\+\\s*[;=]\\)\\@=",
+          left_margin = 0,
+          right_margin = 0,
+        },
+        m = {
+          pattern = "/\\\\$/",
+          stick_to_left = 0,
+          left_margin = 2,
+          right_margin = 0,
+        },
+      }
+    end,
+  },
 
   -- ============================================================
   -- Auto Completion
@@ -1022,9 +1210,14 @@ local plugins = {
       require('lspfuzzy').setup({})
 
       local opts = { noremap = true, silent = true }
-      vim.api.nvim_set_keymap('n', ';fd', '<cmd>lua vim.lsp.buf.definition()<CR>', vim.tbl_extend("force", opts, { desc = "Goto Definition" }))
+      -- Use Telescope for searching Definitions, References, and Diagnostics
+      vim.api.nvim_set_keymap('n', ';fd', '<cmd>Telescope lsp_definitions<CR>', vim.tbl_extend("force", opts, { desc = "Telescope: Goto Definition" }))
+      vim.api.nvim_set_keymap('n', ';fs', '<cmd>Telescope lsp_references<CR>', vim.tbl_extend("force", opts, { desc = "Telescope: References" }))
+      vim.api.nvim_set_keymap('n', ';fN', '<cmd>Telescope diagnostics<CR>', vim.tbl_extend("force", opts, { desc = "Telescope: Diagnostics" }))
+
+      -- Rename and Goto Next/Prev stay as standard LSP (no Telescope picker exists for these)
       vim.api.nvim_set_keymap('n', ';fr', '<cmd>lua vim.lsp.buf.rename()<CR>', vim.tbl_extend("force", opts, { desc = "Refactor rename" }))
-      vim.api.nvim_set_keymap('n', ';fs', '<cmd>lua vim.lsp.buf.references()<CR>', vim.tbl_extend("force", opts, { desc = "References" }))
+
       vim.api.nvim_set_keymap('n', ';fn', '<cmd>lua vim.lsp.diagnostic.goto_prev()<CR>', vim.tbl_extend("force", opts, { desc = "Diag prev" }))
       vim.api.nvim_set_keymap('n', ';fp', '<cmd>lua vim.lsp.diagnostic.goto_next()<CR>', vim.tbl_extend("force", opts, { desc = "Diag next" }))
 
@@ -1059,9 +1252,235 @@ local plugins = {
   -- ============================================================
   -- Tools
   -- ============================================================
+
   { "tpope/vim-eunuch", enabled = cond({ "admin" }) },
-  { "voldikss/vim-floaterm", enabled = cond({ "editor" }), cmd = { "FloatermKill", "FloatermNew", "FloatermShow", "FloatermUpdate" } },
+  {
+    "voldikss/vim-floaterm",
+    enabled = cond({ "editor" }),
+    event = "VeryLazy",
+    cmd = { "FloatermKill", "FloatermNew", "FloatermShow", "FloatermUpdate" },
+    opts = {
+      autoinsert = true,
+      shell = "/bin/bash",
+    },
+    config = function()
+      local compile_run_swap = 0
+
+      local function compile_run(mode)
+        local command = ":FloatermNew --name=repl --wintype=split --position=bottom --autoclose=0 height=0.4 --width=0.6 --title=Repl-" .. vim.bo.filetype
+
+        local fname_org = vim.fn.expand("%")
+        local fname, fname_bin, fpath_bin
+
+        if mode == "v" then
+          fname = vim.fn.expand("%")
+          fname_bin = vim.fn.expand("%:r")
+          fpath_bin = "./" .. vim.fn.expand("%:r")
+        else
+          fname = "/tmp/vim.out" .. compile_run_swap
+          fname_bin = "/tmp/vim.out" .. compile_run_swap
+          fpath_bin = "/tmp/vim.out" .. compile_run_swap
+        end
+
+        local ft = vim.bo.filetype
+        if ft == "c" then
+          command = command .. string.format("  gcc -pthread -lrt -g -O0 -finstrument-functions -fms-extensions -o %s %s && %s", fname_bin, fname_org, fpath_bin)
+        elseif ft == "cpp" then
+          command = command .. string.format("  g++ -pthread -lrt -g -O0 -finstrument-functions -fms-extensions -o %s %s && %s", fname_bin, fname_org, fpath_bin)
+        elseif ft == "rust" then
+          if mode == "v" then
+            local fname_bin_t = vim.fn.fnamemodify(fname_bin, ":t")
+            command = command .. string.format("  cargo test '%s::test::' -- --nocapture", fname_bin_t)
+          else
+            command = command .. string.format("  rust-script %s", fname_org)
+          end
+        elseif ft == "java" then
+          command = command .. string.format("  java %s", fname_org)
+        elseif ft == "javascript" then
+          command = command .. string.format("  node %s", fname_org)
+        elseif ft == "python" then
+          command = command .. string.format("  python %s", fname_org)
+        elseif ft == "tcl" then
+          command = command .. string.format("  expect %s", fname_org)
+        elseif ft == "awk" then
+          command = command .. string.format("  LC_ALL=C awk -f %s", fname_org)
+        elseif ft == "sh" then
+          command = command .. string.format("  LC_ALL=C bash %s", fname_org)
+        elseif ft == "markdown" then
+          vim.cmd(string.format("!rm -rf %s", fname_bin))
+          vim.cmd("AsyncStop!")
+          command = string.format("!pandoc -f markdown --standalone --to man %s -o %s", fname_org, fname_bin)
+          vim.cmd(command)
+          command = string.format("  Snman %s", fname_bin)
+        elseif ft == "nroff" then
+          command = string.format("  Snman %s", fname_org)
+        else
+          vim.notify("Not support filetype: " .. ft, vim.log.levels.WARN)
+          return
+        end
+
+        vim.cmd("echomsg 'Debug: " .. command .. "'")
+        vim.cmd("silent execute '" .. command .. "'")
+      end
+
+      local function is_git_repo()
+        local output = vim.fn.system("git rev-parse --is-inside-work-tree 2>/dev/null")
+        return vim.v.shell_error == 0 and vim.trim(output) == "true"
+      end
+
+      local function is_git_sha(word)
+        return word:match("^%x{40}$") ~= nil
+      end
+
+      local function get_man_word()
+        local col = vim.fn.col(".")
+        local line = vim.fn.getline(".")
+        local char = line:sub(col, col)
+
+        -- Loose mode: word includes alphanumeric, underscore, ., -
+        if char:match("%w") or char:match("[.-]") then
+          local saved_iskeyword = vim.bo.iskeyword
+          for _, key in ipairs({ 2, 1, 0 }) do
+            vim.bo.iskeyword = saved_iskeyword
+            if key == 2 then
+              vim.bo.iskeyword = saved_iskeyword .. ",.,-"
+            elseif key == 1 then
+              vim.bo.iskeyword = saved_iskeyword .. ",-"
+            end
+            local the_word = vim.fn.expand("<cword>")
+
+            -- Check git-SHA
+            if the_word:match("^%x{7,40}$") then
+              vim.bo.iskeyword = saved_iskeyword
+              return { "Git", the_word }
+            end
+
+            -- Check man
+            if vim.fn.system("man -w " .. the_word) then
+              vim.bo.iskeyword = saved_iskeyword
+              return { "Man", the_word }
+            end
+
+            -- Check tldr
+            if vim.fn.system("tldr --list | grep -e '^" .. the_word .. "$'") == 0 then
+              vim.bo.iskeyword = saved_iskeyword
+              return { "Tldr", the_word }
+            end
+
+            the_word = ""
+          end
+          vim.bo.iskeyword = saved_iskeyword
+        end
+
+        -- Strict mode: only alphanumeric and underscore
+        if char:match("%w") then
+          return { "none", vim.fn.expand("<cword>") }
+        end
+        return { "none", "" }
+      end
+
+      local function man_show(mode)
+        local cmd = ""
+        local subcmd = ""
+        local word = ""
+
+        if mode == "k" then
+          local words = get_man_word()
+          if not words[2] or words[2] == "" then
+            vim.cmd("Tldr")
+            return
+          else
+            word = words[2]
+            if words[1] == "Man" then
+              vim.cmd(string.format("Man %s", word))
+              return
+            elseif words[1] == "Git" then
+              vim.fn.system(string.format("git show --stat -p %s > /tmp/vim_a.diff", words[2]))
+              if vim.v.shell_error == 0 then
+                cmd = "PreviewFile /tmp/vim_a.diff"
+              end
+            end
+          end
+        end
+
+        if cmd == "" then
+          cmd = ":FloatermNew --name=Help --wintype=split --position=bottom --autoclose=1 --height=0.4 width=0.6 --title=Man-" .. vim.bo.filetype
+
+          if word == "" then
+            -- Use hw#misc#getWord equivalent
+            word = vim.fn.expand("<cword>")
+          end
+
+          subcmd = string.format("tldr %s -e", word)
+          cmd = cmd .. " " .. subcmd
+        end
+
+        vim.cmd("silent execute '" .. cmd .. "'")
+      end
+
+      local function toggle_terminal(mode)
+        local command = ":FloatermNew --name=Shell --wintype=split --position=bottom --autoclose=0 height=0.4 --width=0.6 --title=Shell bash"
+        vim.cmd("silent execute '" .. command .. "'")
+      end
+
+      -- Keymaps
+      vim.keymap.set("n", "<leader>ee", function()
+        vim.cmd("w")
+        compile_run("n")
+      end, { desc = "(*repl) Run me" })
+
+      vim.keymap.set("v", "<leader>ee", function()
+        vim.cmd("'<,'>w! /tmp/vim.out")
+        compile_run("v")
+      end, { desc = "(*repl) Run me" })
+
+      vim.keymap.set("v", ";ee", function()
+        vim.cmd("make " .. vim.fn.expand("%:t:r"))
+        vim.cmd("copen")
+        vim.cmd("wincmd p")
+      end, { desc = "(diag) Make buffer" })
+
+      vim.keymap.set("n", "K", function()
+        man_show("k")
+      end, { desc = "(Man) Show help" })
+
+      vim.keymap.set("n", "<leader>K", function()
+        man_show("n")
+      end, { desc = "(Man) Tldr" })
+
+      vim.keymap.set("v", "<leader>K", function()
+        man_show("v")
+      end, { desc = "(Man) Tldr" })
+
+      -- Terminal toggle (only if no vim-floaterm-repl or toggleterm)
+      vim.keymap.set({ "n", "v" }, "<C-\\>", function()
+        toggle_terminal("n")
+      end, { desc = "(Tool) Terminal" })
+
+      vim.keymap.set("i", "<C-\\>", function()
+        vim.cmd("silent execute ':FloatermNew --name=Shell --wintype=split --position=bottom --autoclose=0 height=0.4 --width=0.6 --title=Shell bash'")
+      end, { desc = "(Tool) Terminal" })
+
+      -- Custom Tldr command
+      vim.api.nvim_create_user_command("Tldr", function(opts)
+        vim.cmd(string.format("FloatermNew --name=Help --wintype=split --position=bottom --autoclose=1 height=0.4 --width=0.6 --title=Tldr tldr -e %s", opts.args))
+      end, { nargs = 1 })
+    end,
+  },
   { "huawenyu/vim-floaterm-repl", enabled = cond({ "editor" }), cmd = "FloatermRepl" },
+  {
+    "huawenyu/vim-floaterm-repl",
+    enabled = cond({ "editor" }),
+    cmd = "FloatermRepl",
+    ft = "markdown",
+    keys = {
+      { ";ee", "<cmd>FloatermRepl<cr>", ft = "markdown", desc = "(repl) Run me" },
+    },
+  },
+
+  { "kopischke/vim-fetch", enabled = cond({ "editor" }), lazy = false, },
+  { "nhooyr/neoman.vim", enabled = cond({ "editor" }), cmd = { "Nman", "Snman", }, },
+
   {
     "akinsho/toggleterm.nvim",
     enabled = cond({ "admin" }),
@@ -1072,7 +1491,6 @@ local plugins = {
   },
   { "huawenyu/asyncrun.vim", enabled = cond({ "admin" }) },
   { "skywind3000/asynctasks.vim", enabled = cond({ "admin" }), dependencies = { "huawenyu/asyncrun.vim" } },
-  { "skywind3000/vim-preview", enabled = cond({ "coder" }) },
   {
     "folke/edgy.nvim",
     enabled = cond({ "coder" }),
@@ -1214,22 +1632,64 @@ local plugins = {
   {
     "tpope/vim-fugitive",
     enabled = cond({ "editor", "git" }),
-    cmd = { "Gblame", "Git", "Gstatus", "Gvdiff", "GV" },
+    -- cmd is still useful for commands not covered by keys
+    cmd = { "Git", "Gstatus", "Gvdiff" },
+    keys = {
+      { "<leader>gl", "<cmd>GV<cr>", desc = "Git Log side by side" },
+      { "<leader>gd", "<cmd>Gvdiff<cr>", desc = "Git Diff review" },
+      { "<leader>gD", "<cmd>DiffReview git show<cr>", desc = "Git Diff review tabs" },
+      { "<leader>gb", "<cmd>Git blame<cr>", desc = "Git Blame" },
+      { "<leader>bb", "<cmd>Git blame<cr>", desc = "Git Blame" },
+      { "<leader>gs", "<cmd>Gstatus<cr>", desc = "Git Status" },
+    },
     config = function()
-      vim.keymap.set('n', '<leader>gl', '<c-U>GV<cr>', { silent = true, desc = "Git Log side by side" })
-      vim.keymap.set('n', '<leader>gd', '<c-U>Gvdiff<cr>', { silent = true, desc = "Git Diff review" })
-      vim.keymap.set('n', '<leader>gD', '<c-U>DiffReview git show<cr>', { silent = true, desc = "Git Diff review tabs" })
-      vim.keymap.set('n', '<leader>gb', '<c-U>Git blame<cr>', { silent = true, desc = "Git Blame" })
-      vim.keymap.set('n', '<leader>bb', '<c-U>Git blame<cr>', { silent = true, desc = "Git Blame" })
-      vim.keymap.set('n', '<leader>gs', '<c-U>Gstatus<cr>', { silent = true, desc = "Git Status" })
       vim.g.fugitive_legacy_commands = 0
       vim.g.fugitive_git_executable = 'git'
     end
   },
+  {
+    "junegunn/gv.vim",
+    enabled = cond({ "editor" }),
+    cmd = "GV",
+    dependencies = { "tpope/vim-fugitive" },
+    keys = {
+      { "<leader>gl", "<cmd>GV<cr>", desc = "Git Log side by side" },
+    },
+  },
+  {
+    "folke/noice.nvim",
+    enabled = cond({ "editor" }),
+    event = "VeryLazy",
+    dependencies = {
+      "MunifTanjim/nui.nvim",
+      -- Optional: "rcarriga/nvim-notify" (only if you want other notifications to look pretty)
+    },
+    opts = {
+      routes = {
+        {
+          filter = {
+            event = "msg_show",
+            any = {
+              { find = "Search hit BOTTOM" },
+              { find = "Search hit TOP" },
+            },
+          },
+          opts = { skip = true },
+        },
+      },
+      -- Basic presets to keep it from taking over your UI too much
+      presets = {
+        bottom_search = true, -- puts search at the bottom
+        command_palette = true, -- positions the cmdline and popupmenu together
+        long_message_to_split = true, -- long messages will be sent to a split
+      },
+    },
+  },
+  { "mhinz/vim-signify", enabled = false, },
   { "mattn/gist-vim", enabled = cond({ "editor", "extra" }), cmd = "Gist" },
   {
     "airblade/vim-gitgutter",
-    enabled = false, -- alter-to: gitsigns.nvim
+    enabled = false, -- better: gitsigns.nvim
     cmd = "GitGutterToggle",
     dependencies = { "tpope/vim-fugitive" },
     event = "BufReadPre",
@@ -1270,8 +1730,6 @@ local plugins = {
       local function is_yadm_repo()
         local handle = io.popen("yadm rev-parse --is-inside-work-tree 2>/dev/null")
         local result = handle:read("*a")
-        handle:close()
-        return result:gsub("%s+", "") == "true"
       end
       local function is_me_yadm_repo()
         local handle = io.popen("me-yadm rev-parse --is-inside-work-tree 2>/dev/null")
@@ -1299,8 +1757,6 @@ local plugins = {
       })
     end,
   },
-  { "junegunn/gv.vim", enabled = cond({ "editor" }), cmd = "GV", dependencies = { "tpope/vim-fugitive" } },
-  { "mhinz/vim-signify", enabled = false },
 
   -- ============================================================
   -- Other Utilities
