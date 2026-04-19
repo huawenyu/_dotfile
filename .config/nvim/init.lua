@@ -222,29 +222,6 @@ local plugins = {
         vim.cmd('r! cat /tmp/vim.yank')
       end, { silent = true, desc = "Paste text from tmpfile" })
 
-      -- Map `*`, `&` same to avoid ft=git conflict
-      local function visual_search(cmdtype)
-        local temp = vim.fn.getreg('s')
-        vim.cmd('normal! gv"sy')
-        local sel = vim.fn.escape(vim.fn.getreg('s'), cmdtype .. '\\')
-        sel = sel:gsub('\\n', '\\\\n')
-        vim.fn.setreg('s', temp)
-        vim.fn.setreg('/', '\\V\\<' .. sel .. '\\>')
-        vim.cmd('normal! ' .. cmdtype .. '//\\>')
-      end
-
-      vim.keymap.set('x', '*', function()
-        visual_search('/')
-      end, { desc = "Search visual selection forward" })
-
-      vim.keymap.set('x', '&', function()
-        visual_search('/')
-      end, { desc = "Search visual selection forward" })
-
-      vim.keymap.set('x', '#', function()
-        visual_search('?')
-      end, { desc = "Search visual selection backward" })
-
       -- vim search with visual selection
       vim.keymap.set('v', '//', function()
         vim.fn.execute('y')
@@ -1166,8 +1143,17 @@ local plugins = {
       vim.g.fzfCscopeFilter = vim.g.fzfCscopeFilter or "daemon/wad/"
     end,
   },
-  { "romainl/vim-cool", enabled = cond({ "editor" }) },
-  { "PeterRincker/vim-searchlight", enabled = cond({ "editor" }) },
+  -- vim-cool and vim-searchlight may conflict with improved-search, disable them
+  { "romainl/vim-cool", enabled = false },
+  { "PeterRincker/vim-searchlight", enabled = false },
+  {
+    "huawenyu/improved-search.nvim",
+    enabled = cond({ "editor" }),
+    config = function()
+      local search = require("improved-search")
+      vim.keymap.set("x", "*", search.forward, { desc = "Search forward" })
+    end,
+  },
   {
     "kwkarlwang/bufjump.nvim",
     enabled = cond({ "editor" }),
@@ -1577,8 +1563,7 @@ local plugins = {
         if mode == "k" then
           local words = get_man_word()
           if not words[2] or words[2] == "" then
-            vim.cmd("Tldr")
-            return
+            word = vim.fn.expand("<cword>")
           else
             word = words[2]
             if words[1] == "Man" then
