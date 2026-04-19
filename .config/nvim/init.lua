@@ -417,7 +417,7 @@ local plugins = {
       end
 
       -- vimConfig/conf_map.vim: Basic mappings
-      -- if vim.g.vim_confi_option.enable_map_basic then
+      if vim.g.vim_confi_option.enable_map_basic then
         vim.keymap.set("n", "<C-c>", "<C-c>")
         vim.keymap.set("n", "<leader>q", function() vim.cmd("qa") end, { silent = true, desc = "Exit all" })
         vim.keymap.set("x", "<leader>q", function() vim.cmd("qa") end, { silent = true })
@@ -440,7 +440,7 @@ local plugins = {
         vim.keymap.set("n", ";.", ":%s//<C-R>\"/gc<cr>", { desc = "Continue replace all search" })
         vim.keymap.set("n", "<leader>.", "@@", { desc = "Repeat macro" })
         vim.keymap.set("n", "<Esc>", ":nohlsearch<CR><Esc>", { silent = true })
-      -- end
+      end
 
       -- vimConfig/conf_map.vim: Useful mappings
       if vim.g.vim_confi_option.enable_map_useful then
