@@ -223,19 +223,26 @@ local plugins = {
       end, { silent = true, desc = "Paste text from tmpfile" })
 
       -- Map `*`, `&` same to avoid ft=git conflict
+      local function visual_search(cmdtype)
+        local temp = vim.fn.getreg('s')
+        vim.cmd('normal! gv"sy')
+        local sel = vim.fn.escape(vim.fn.getreg('s'), cmdtype .. '\\')
+        sel = sel:gsub('\\n', '\\\\n')
+        vim.fn.setreg('s', temp)
+        vim.fn.setreg('/', '\\V\\<' .. sel .. '\\>')
+        vim.cmd('normal! ' .. cmdtype .. '//\\>')
+      end
+
       vim.keymap.set('x', '*', function()
-        vim.cmd('call utils#VSetSearch("/")')
-        vim.cmd('/' .. vim.fn.getreg('/'))
+        visual_search('/')
       end, { desc = "Search visual selection forward" })
 
       vim.keymap.set('x', '&', function()
-        vim.cmd('call utils#VSetSearch("/")')
-        vim.cmd('/' .. vim.fn.getreg('/'))
+        visual_search('/')
       end, { desc = "Search visual selection forward" })
 
       vim.keymap.set('x', '#', function()
-        vim.cmd('call utils#VSetSearch("?")')
-        vim.cmd('?' .. vim.fn.getreg('/'))
+        visual_search('?')
       end, { desc = "Search visual selection backward" })
 
       -- vim search with visual selection
@@ -262,10 +269,95 @@ local plugins = {
     "huawenyu/vimConfig",
     enabled = cond({ "basic", "log", "editor" }),
     lazy = false,
+    dependencies = {
+      "huawenyu/vim-motion",
+    },
+    keys = {
+      -- conf_cmd.vim keymaps
+      { "<leader>vr", mode = { "n", "v" }, desc = "Replace" },
+      { "<leader>mk", desc = "Make wad" },
+      { "<leader>ma", desc = "Make all" },
+      { "<leader>mw", desc = "Dictionary" },
+      { "<leader>mf", desc = "Quickfix filter" },
+      { "<leader>mc", desc = "Quickfix add caller" },
+      { ";q", desc = "SmartClose" },
+    },
     config = function()
       -- ============================================================
       -- vimConfig extracted configurations
       -- ============================================================
+
+      -- Auto-save removed (caused slow :qa)
+
+      -- Commands
+      vim.api.nvim_create_user_command("R", function(opts)
+        vim.cmd("NeomakeRun! " .. opts.args)
+      end, { nargs = "+", bang = true, complete = "shellcmd" })
+      vim.api.nvim_create_user_command("Grep", function(opts)
+        vim.cmd("call utilgrep#_Grep('grep" .. (opts.bang and "!" or "") .. "'," .. opts.args .. ")")
+      end, { nargs = "*", bang = true, complete = "file" })
+      vim.api.nvim_create_user_command("GrepAdd", function(opts)
+        vim.cmd("call utilgrep#_Grep('grepadd" .. (opts.bang and "!" or "") .. "'," .. opts.args .. ")")
+      end, { nargs = "*", bang = true, complete = "file" })
+      vim.api.nvim_create_user_command("LGrep", function(opts)
+        vim.cmd("call utilgrep#_Grep('lgrep" .. (opts.bang and "!" or "") .. "'," .. opts.args .. ")")
+      end, { nargs = "*", bang = true, complete = "file" })
+      vim.api.nvim_create_user_command("LGrepAdd", function(opts)
+        vim.cmd("call utilgrep#_Grep('lgrepadd" .. (opts.bang and "!" or "") .. "'," .. opts.args .. ")")
+      end, { nargs = "*", bang = true, complete = "file" })
+      vim.api.nvim_create_user_command("SmartClose", function(opts)
+        local function is_auxiliary(buffer)
+          return not vim.bo[buffer].modifiable or not vim.bo[buffer].buflisted or vim.bo[buffer].buftype ~= ""
+        end
+        local current_buffer = vim.api.nvim_get_current_buf()
+        if opts.bang or is_auxiliary(current_buffer) then
+          vim.cmd("q")
+        else
+          local auxiliary_buffer = 0
+          for _, b in ipairs(vim.api.nvim_list_bufs()) do
+            if is_auxiliary(b) and b > auxiliary_buffer then
+              auxiliary_buffer = b
+            end
+          end
+          if auxiliary_buffer > 0 then
+            vim.cmd(string.format("noautocmd %d wincmd w", vim.fn.bufwinnr(auxiliary_buffer)))
+            vim.cmd("noautocmd q")
+            vim.cmd(string.format("noautocmd %d wincmd w", vim.fn.bufwinnr(current_buffer)))
+          else
+            vim.cmd("q")
+          end
+        end
+      end, { bang = true, nargs = 0 })
+
+      -- Functions
+      local function selected_replace(mode)
+        local save_cursor = vim.fn.getcurpos()
+        local sel_str = vim.fn["hw#misc#GetWord"](mode)
+        local nr = vim.fn.winnr()
+        if vim.fn.getwinvar(nr, '&syntax') == 'qf' then
+          vim.fn.setpos('.', save_cursor)
+          return "%s/\\<" .. sel_str .. "\\>/" .. sel_str .. "/gI"
+        else
+          vim.cmd("delmarks un")
+          vim.cmd("normal [[mu%mn")
+          vim.cmd("redraw")
+          return "'u,'ns/\\<" .. sel_str .. "\\>/" .. sel_str .. "/gI"
+        end
+      end
+
+      -- Keymaps from conf_cmd.vim
+      vim.keymap.set("n", "<leader>vr", function()
+        vim.cmd(selected_replace('n'))
+      end, { silent = true, desc = "Replace" })
+      vim.keymap.set("v", "<leader>vr", function()
+        vim.cmd(selected_replace('v'))
+      end, { silent = true, desc = "Replace" })
+      vim.keymap.set("n", "<leader>mk", ":AsyncStop! <bar> AsyncTask! wad<CR>", { silent = true, desc = "Make wad" })
+      vim.keymap.set("n", "<leader>ma", ":AsyncStop! <bar> AsyncTask! sysinit<CR>", { silent = true, desc = "Make all" })
+      vim.keymap.set("n", "<leader>mw", ":R! ~/tools/dict <C-R>=expand('<cword>')<cr>", { silent = true, desc = "Dictionary" })
+      vim.keymap.set("n", "<leader>mf", ":call utilquickfix#QuickFixFilter()<CR>", { silent = true, desc = "Quickfix filter" })
+      vim.keymap.set("n", "<leader>mc", ":call utilquickfix#QuickFixFunction()<CR>", { silent = true, desc = "Quickfix add caller" })
+      vim.keymap.set("n", ";q", ":SmartClose<CR>", { silent = true, desc = "SmartClose" })
 
       -- vimConfig/conf_map.vim: Upper keyfixes
       if vim.g.vim_confi_option.upper_keyfixes then
@@ -313,7 +405,6 @@ local plugins = {
         vim.keymap.set("n", "<a-'>", ":AsyncTask run<cr>")
         vim.keymap.set("n", ";w", ":wall<cr>", { desc = "Save all buffers" })
         vim.keymap.set("x", ";w", ":<c-U>wall<cr>")
-        -- vim-motion integration
         if HasPlug("vim-motion") then
           vim.keymap.set("n", "<a-,>", "<Plug>_JumpPrevIndent")
           vim.keymap.set("n", "<a-.>", "<Plug>_JumpNextIndent")
@@ -326,36 +417,33 @@ local plugins = {
       end
 
       -- vimConfig/conf_map.vim: Basic mappings
-      if vim.g.vim_confi_option.enable_map_basic then
+      -- if vim.g.vim_confi_option.enable_map_basic then
         vim.keymap.set("n", "<C-c>", "<C-c>")
-        vim.keymap.set("n", "<leader>q", "qa", { desc = "Exit all" })
-        vim.keymap.set("x", "<leader>q", "qa")
+        vim.keymap.set("n", "<leader>q", function() vim.cmd("qa") end, { silent = true, desc = "Exit all" })
+        vim.keymap.set("x", "<leader>q", function() vim.cmd("qa") end, { silent = true })
         vim.keymap.set("i", "<S-Tab>", "<C-v><Tab>")
 
-        -- gj/gk for visual navigation
         vim.keymap.set({ "n", "x" }, "j", "gj")
         vim.keymap.set({ "n", "x" }, "k", "gk")
         vim.keymap.set("x", ">", ">gv")
         vim.keymap.set("x", "<", "<gv")
 
-        -- Clear search highlight
         vim.keymap.set("n", "<Return>", function()
           vim.cmd("nohls")
           vim.cmd("nohls")
         end, { silent = true, desc = "Clear search highlight" })
 
-        -- Search count and quickfix sink
         vim.keymap.set("n", ";#", ":<c-u><c-u>%s///gn<cr>", { desc = "Count search pattern" })
         vim.keymap.set("n", ";^", ":<c-u>g//p<cr>", { desc = "Popup search pattern" })
         vim.keymap.set("n", ";*", ":cexpr []<cr> | :<c-u>g//caddexpr expand('%') ..':' ..line('.') ..':0:' .. getline('.')<cr> | :copen<cr>", { desc = "Quickfix sink search" })
         vim.keymap.set("n", "<F1>", ":%s///gc<cr>", { desc = "Continue replace all search" })
         vim.keymap.set("n", ";.", ":%s//<C-R>\"/gc<cr>", { desc = "Continue replace all search" })
         vim.keymap.set("n", "<leader>.", "@@", { desc = "Repeat macro" })
-      end
+        vim.keymap.set("n", "<Esc>", ":nohlsearch<CR><Esc>", { silent = true })
+      -- end
 
       -- vimConfig/conf_map.vim: Useful mappings
       if vim.g.vim_confi_option.enable_map_useful then
-        -- C/C++ file header toggle
         vim.api.nvim_create_autocmd("FileType", {
           pattern = { "c", "cpp" },
           callback = function()
@@ -365,39 +453,33 @@ local plugins = {
           end,
         })
 
-        -- Window navigation with leader
         vim.keymap.set("n", "<leader>h", "<c-w>h", { desc = "Window left" })
         vim.keymap.set("n", "<leader>j", "<c-w>j", { desc = "Window down" })
         vim.keymap.set("n", "<leader>k", "<c-w>k", { desc = "Window up" })
         vim.keymap.set("n", "<leader>l", "<c-w>l", { desc = "Window right" })
 
-        -- Navigate quickfix
         vim.keymap.set("n", "<c-n>", "cn", { desc = "Next quickfix" })
         vim.keymap.set("n", "<c-p>", "cp", { desc = "Previous quickfix" })
         vim.keymap.set("n", "<a-n>", ":lne<cr>", { desc = "Next locallist" })
         vim.keymap.set("n", "<a-p>", ":lp<cr>", { desc = "Previous locallist" })
 
-        -- Terminal navigation
         vim.keymap.set("t", "<c-h>", "<C-\\><C-n><C-w>h")
         vim.keymap.set("t", "<c-j>", "<C-\\><C-n><C-w>j")
         vim.keymap.set("t", "<c-k>", "<C-\\><C-n><C-w>k")
         vim.keymap.set("t", "<c-l>", "<C-\\><C-n><C-w>l")
 
-        -- Paste and re-select
         vim.keymap.set("n", "p", "p`]", { desc = "Paste and jump to end" })
         vim.keymap.set("x", "p", function()
           return "pgv\"" .. vim.v.register .. "y"
         end, { expr = true, desc = "Paste over selection" })
 
-        -- Global replace
         vim.keymap.set("n", "<leader>vR", "gD:%s/<C-R>///g<left><left>", { desc = "Replace all" })
 
-        -- vim-fugitive integration for quickfix
         vim.keymap.set("n", "<leader>o", "<C-o>", { desc = "Jump to older position" })
         vim.keymap.set("n", "<leader>i", "<C-i>", { desc = "Jump to newer position" })
       end
 
-      -- Tab navigation mappings
+      -- Tab navigation
       vim.keymap.set('n', ';1', '1gt', { silent = true, desc = "Go to tab 1" })
       vim.keymap.set('n', ';2', '2gt', { silent = true, desc = "Go to tab 2" })
       vim.keymap.set('n', ';3', '3gt', { silent = true, desc = "Go to tab 3" })
@@ -409,13 +491,11 @@ local plugins = {
       vim.keymap.set('n', ';9', '9gt', { silent = true, desc = "Go to tab 9" })
       vim.keymap.set('n', ';0', ':tabonly<CR>', { silent = true, desc = "Close other tabs" })
 
-      -- Tag word into new tab
       vim.keymap.set('n', ';tt', function()
         local selected = vim.fn["utils#GetSelected"]('n')
         vim.cmd('$tab split')
         vim.cmd('silent! tag ' .. selected)
       end, { silent = true, desc = "Tag word into new tab" })
-
       vim.keymap.set('v', ';tt', function()
         local selected = vim.fn["utils#GetSelected"]('v')
         vim.cmd('$tab split')
@@ -829,16 +909,31 @@ local plugins = {
   {
     "dhananjaylatkar/cscope_maps.nvim",
     enabled = cond({ "coder" }),
-    lazy = false,
+    lazy = true,
+    cmd = { "Cscope", "CscopeDbAdd" },
+    keys = {
+      { "<leader>fs", desc = "Find references" },
+      { "<leader>fd", desc = "Find definition" },
+      { "<leader>fc", desc = "Find callers" },
+      { "<leader>fC", desc = "Find callees" },
+      { "<leader>fw", desc = "Find assignments" },
+      { "<leader>fe", desc = "Egrep pattern" },
+      { "<leader>ff", desc = "Find file" },
+      { "<leader>fb", desc = "Build cscope db" },
+      { "<leader>fr", desc = "Reload cscope db" },
+      { "<leader>fz", desc = "Debug cscope" },
+      { ";<leader>ff", desc = "Find file (rg)" },
+      { "<leader>fs", mode = "v", desc = "Find references (visual)" },
+    },
     dependencies = {
       "nvim-telescope/telescope.nvim",
     },
     opts = {
-      disable_maps = true,  -- Disable all defaults
-      disable_telescope = false,  -- MUST enable telescope support
+      disable_maps = true,
+      disable_telescope = false,
       cscope = {
         exec = "cscope",
-        picker = "telescope",  -- Use telescope picker
+        picker = "telescope",
         skip_picker_for_single_result = true,
         project_rooter = {
           enable = true,
@@ -847,7 +942,6 @@ local plugins = {
       },
     },
     config = function(_, opts)
-      -- Setup cscope_maps
       local cscope_module = require("cscope_maps")
       cscope_module.setup(opts)
 
@@ -867,16 +961,13 @@ local plugins = {
         local git_root = find_git_root()
         local stop_dir = git_root or vim.fn.expand("~")
 
-        -- Search upward from current directory
         local search_dir = current_dir
         while search_dir and search_dir ~= stop_dir and #search_dir > 1 do
-          -- Check for cscope.out
           local cscope_file = search_dir .. "/cscope.out"
           if vim.fn.filereadable(cscope_file) == 1 then
             table.insert(dbs, cscope_file)
           end
 
-          -- Check for cscope with different names
           local patterns = { "cscope.*.out", "*.cscope.out", ".cscope/cscope.out", "tags/cscope.out" }
           for _, pattern in ipairs(patterns) do
             local found = vim.fn.globpath(search_dir, pattern, false, true)
@@ -887,15 +978,11 @@ local plugins = {
             end
           end
 
-          -- Move to parent
           local parent = vim.fn.fnamemodify(search_dir, ":h")
-          if parent == search_dir then
-            break
-          end
+          if parent == search_dir then break end
           search_dir = parent
         end
 
-        -- Also check git root
         if git_root and git_root ~= current_dir then
           local git_cscope = git_root .. "/cscope.out"
           if vim.fn.filereadable(git_cscope) == 1 then
@@ -903,7 +990,6 @@ local plugins = {
           end
         end
 
-        -- Remove duplicates
         local seen = {}
         local unique_dbs = {}
         for _, db in ipairs(dbs) do
@@ -912,33 +998,24 @@ local plugins = {
             table.insert(unique_dbs, db)
           end
         end
-
         return unique_dbs
       end
 
-      -- Load databases function
       local function load_databases()
         local dbs = find_cscope_databases()
-
         if #dbs == 0 then
           vim.notify("No cscope databases found", vim.log.levels.WARN)
           return {}
         end
-
-        -- Re-setup with first database
         opts.cscope.db_file = dbs[1]
         cscope_module.setup(opts)
-
-        -- Add remaining databases using cscope command
         for i = 2, #dbs do
           vim.cmd("Cscope db add " .. dbs[i])
         end
-
         vim.notify("Loaded " .. #dbs .. " cscope database(s)", vim.log.levels.INFO)
         return dbs
       end
 
-      -- Function to get visual selection
       local function get_visual_selection()
         local start_pos = vim.fn.getpos("'<")
         local end_pos = vim.fn.getpos("'>")
@@ -951,70 +1028,49 @@ local plugins = {
         return table.concat(lines, "\n")
       end
 
+      local map_opts = { silent = true, noremap = true }
 
-      local pickers = require("telescope.pickers")
-      local finders = require("telescope.finders")
-      local conf = require("telescope.config").values
+      vim.keymap.set('n', '<leader>fs', ":Cscope find s <C-r><C-w><CR>",
+        vim.tbl_extend("force", map_opts, { desc = "Find references (Telescope)" }))
+      vim.keymap.set('n', '<leader>fd', ":Cscope find g <C-r><C-w><CR>",
+        vim.tbl_extend("force", map_opts, { desc = "Find definition (Telescope)" }))
+      vim.keymap.set('n', '<leader>fc', ":Cscope find c <C-r><C-w><CR>",
+        vim.tbl_extend("force", map_opts, { desc = "Find callers (Telescope)" }))
+      vim.keymap.set('n', '<leader>fC', ":Cscope find d <C-r><C-w><CR>",
+        vim.tbl_extend("force", map_opts, { desc = "Find callees (Telescope)" }))
+      vim.keymap.set('n', '<leader>fw', ":Cscope find a <C-r><C-w><CR>",
+        vim.tbl_extend("force", map_opts, { desc = "Find assignments (Telescope)" }))
+      vim.keymap.set('n', '<leader>fe', function()
+        vim.ui.input({ prompt = "Egrep pattern: " }, function(input)
+          if input and input ~= "" then vim.cmd("Cscope find e " .. input) end
+        end)
+      end, vim.tbl_extend("force", map_opts, { desc = "Egrep pattern (Telescope)" }))
+      vim.keymap.set('n', '<leader>fb', ":Cscope db build<CR>",
+        vim.tbl_extend("force", map_opts, { desc = "Build cscope database" }))
+      vim.keymap.set('v', '<leader>fs', function()
+        local selection = get_visual_selection()
+        if selection ~= "" then vim.cmd("Cscope find s " .. selection) end
+      end, vim.tbl_extend("force", map_opts, { desc = "Find references (visual/Telescope)" }))
+      vim.keymap.set('n', '<leader>fr', function() load_databases() end,
+        vim.tbl_extend("force", map_opts, { desc = "Reload cscope databases" }))
+      vim.keymap.set('n', '<leader>fz', function()
+        local dbs = find_cscope_databases()
+        vim.notify("Found " .. #dbs .. " cscope databases:\n" .. table.concat(dbs, "\n"), vim.log.levels.INFO)
+      end, vim.tbl_extend("force", map_opts, { desc = "Debug: Show found databases" }))
 
-      local function select_from_filelist()
-        local current_dir = vim.fn.getcwd()
-        local git_root = find_git_root()
-        local stop_dir = git_root or vim.fn.expand("~")
-        local Flist = ""
-
-        local search_dir = current_dir
-        while search_dir and #search_dir > 1 do
-          -- 1. Check for files in the current search_dir
-          local patterns = { "cscope.files", ".cscope.files" }
-          for _, pattern in ipairs(patterns) do
-            local found = vim.fn.globpath(search_dir, pattern, false, true)
-            for _, flist in ipairs(found) do
-              if vim.fn.filereadable(flist) == 1 then
-                Flist = flist
-                goto found_file
-              end
-            end
-          end
-
-          -- 2. Exit IF we just checked the stop_dir
-          if search_dir == stop_dir then
-            break
-          end
-
-          -- 3. Move to parent
-          local parent = vim.fn.fnamemodify(search_dir, ":h")
-          if parent == search_dir then break end
-          search_dir = parent
-        end
-
-        ::found_file::
-        if Flist ~= "" then
-          -- Read the file and store lines in a table
-          local lines = vim.fn.readfile(Flist)
-          if #lines > 0 then
-            pickers.new({}, {
-              prompt_title = "Custom File List",
-              finder = finders.new_table {
-                results = lines
-              },
-              sorter = conf.generic_sorter({}),
-              previewer = conf.file_previewer({}), -- Enables file previewing
-            }):find()
-
-            return
-          end
-        end
-
-        -- If no file-list provide, list all files
-        -- vim.notify("Cscope files list '.cscope.files' not exists!\n", vim.log.levels.INFO)
+      -- Find file via telescope
+      vim.keymap.set('n', '<leader>ff', function()
         require('telescope.builtin').find_files({
           prompt_title = "Find(rg) File List",
-          find_command = {
-            "rg", "--files", "--hidden", "--glob", "!**/.git/*"
-          },
+          find_command = { "rg", "--files", "--hidden", "--glob", "!**/.git/*" },
         })
-      end
-
+      end, vim.tbl_extend("force", map_opts, { desc = "Find file (Telescope)" }))
+      vim.keymap.set('n', ';ff', function()
+        require('telescope.builtin').find_files({
+          prompt_title = "Find(rg) File List",
+          find_command = { "rg", "--files", "--hidden", "--glob", "!**/.git/*" },
+        })
+      end, vim.tbl_extend("force", map_opts, { desc = "Find file (Telescope)" }))
 
       -- Initial load
       load_databases()
@@ -1022,86 +1078,23 @@ local plugins = {
       -- Auto-reload on directory change
       vim.api.nvim_create_autocmd("DirChanged", {
         pattern = "*",
-        callback = function()
-          load_databases()
-        end,
+        callback = function() load_databases() end,
       })
-
-      local map_opts = { silent = true, noremap = true }
-
-      -- Direct command mappings (using plugin's built-in CscopeFind command)
-
-      -- Find symbols (references)
-      vim.keymap.set('n', '<leader>fs', ":Cscope find s <C-r><C-w><CR>",
-      vim.tbl_extend("force", map_opts, { desc = "Find references (Telescope)" }))
-
-      -- Find global definition
-      vim.keymap.set('n', '<leader>fd', ":Cscope find g <C-r><C-w><CR>",
-      vim.tbl_extend("force", map_opts, { desc = "Find definition (Telescope)" }))
-
-      -- Find functions called by this function
-      vim.keymap.set('n', '<leader>fc', ":Cscope find c <C-r><C-w><CR>",
-      vim.tbl_extend("force", map_opts, { desc = "Find callers (Telescope)" }))
-
-      -- Find functions calling this function
-      vim.keymap.set('n', '<leader>fC', ":Cscope find d <C-r><C-w><CR>",
-      vim.tbl_extend("force", map_opts, { desc = "Find callees (Telescope)" }))
-
-      -- Find assignments to symbol
-      vim.keymap.set('n', '<leader>fw', ":Cscope find a <C-r><C-w><CR>",
-      vim.tbl_extend("force", map_opts, { desc = "Find assignments (Telescope)" }))
-
-      -- Find text string (requires input)
-      vim.keymap.set('n', '<leader>fe', function()
-        vim.ui.input({ prompt = "Egrep pattern: " }, function(input)
-          if input and input ~= "" then
-            vim.cmd("Cscope find e " .. input)
-          end
-        end)
-      end, vim.tbl_extend("force", map_opts, { desc = "Egrep pattern (Telescope)" }))
-
-      -- Find file (redirect to Telescope)
-      vim.keymap.set('n', '<leader>ff', function()
-          select_from_filelist()
-      end, vim.tbl_extend("force", map_opts, { desc = "Find file (Telescope)" }))
-
-      -- Find file (redirect to Telescope)
-      vim.keymap.set('n', ';ff', function()
-        require('telescope.builtin').find_files({
-          prompt_title = "Find(rg) File List",
-          find_command = {
-            "rg", "--files", "--hidden", "--glob", "!**/.git/*"
-          },
-        })
-      end, vim.tbl_extend("force", map_opts, { desc = "Find file (Telescope)" }))
-
-      -- Build database
-      vim.keymap.set('n', '<leader>fb', ":Cscope db build<CR>",
-      vim.tbl_extend("force", map_opts, { desc = "Build cscope database" }))
-
-      -- Visual mode: find references for selected text
-      vim.keymap.set('v', '<leader>fs', function()
-        local selection = get_visual_selection()
-        if selection ~= "" then
-          vim.cmd("Cscope find s " .. selection)
-        end
-      end, vim.tbl_extend("force", map_opts, { desc = "Find references (visual/Telescope)" }))
-
-      -- Reload cscope databases
-      vim.keymap.set('n', '<leader>fr', function()
-        load_databases()
-      end, vim.tbl_extend("force", map_opts, { desc = "Reload cscope databases" }))
-
-      -- Debug info
-      vim.keymap.set('n', '<leader>fz', function()
-        local dbs = find_cscope_databases()
-        vim.notify("Found " .. #dbs .. " cscope databases:\n" .. table.concat(dbs, "\n"), vim.log.levels.INFO)
-      end, vim.tbl_extend("force", map_opts, { desc = "Debug: Show found databases" }))
     end,
   },
   {
     "huawenyu/c-utils.vim",
     enabled = cond({ "coder" }),
+    lazy = true,
+    keys = {
+      { "<leader><leader>", mode = { "n", "v" }, desc = "Preview Tag" },
+      { ";bb", desc = "Search rg all" },
+      { "<leader>bb", desc = "Search rg all" },
+      { "<leader>gg", mode = { "n", "v" }, desc = "Search to quickfix" },
+      { ";gg", mode = { "n", "v" }, desc = "Search to loclist" },
+      { "<leader>vv", mode = { "n", "v" }, desc = "Search all to quickfix" },
+      { ";vv", mode = { "n", "v" }, desc = "Search all to loclist" },
+    },
     config = function()
       local g = vim.g
       local home = os.getenv("HOME")
@@ -1112,23 +1105,23 @@ local plugins = {
       g.c_utils_map = g.c_utils_map or 1
       g.c_utils_prefer_dir = g.c_utils_prefer_dir or ""
 
+      local function get_prefer_dir() return (g.c_utils_prefer_dir ~= "") and g.c_utils_prefer_dir or "daemon/wad" end
+
       vim.keymap.set('n', '<leader><leader>', function() vim.fn["VimMotionPreview"]() end, { silent = true, desc = "Preview Tag" })
       vim.keymap.set('v', '<leader><leader>', function() vim.fn["VimMotionPreview"]() end, { silent = true, desc = "Preview Tag" })
 
       vim.keymap.set('n', ';bb', function() vim.cmd("Rg " .. vim.fn["utils#GetSelected"]('n')) end, { desc = "Search rg all" })
       vim.keymap.set('n', '<leader>bb', function() vim.cmd("Rg " .. vim.fn["utils#GetSelected"]('n')) end, { desc = "Search rg all" })
 
-      local function get_prefer_dir() return (g.c_utils_prefer_dir ~= "") and g.c_utils_prefer_dir or "daemon/wad" end
+      vim.keymap.set('n', '<leader>gg', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 0, get_prefer_dir(), 1)) end, { desc = "Search to quickfix" })
+      vim.keymap.set('n', ';gg', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 0, get_prefer_dir(), 0)) end, { desc = "Search to loclist" })
+      vim.keymap.set('v', '<leader>gg', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 1, get_prefer_dir(), 1)) end, { desc = "Search to quickfix" })
+      vim.keymap.set('v', ';gg', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 1, get_prefer_dir(), 0)) end, { desc = "Search to loclist" })
 
-      vim.keymap.set('n', '<leader>gg', function() vim.cmd([[<C-\>e utilgrep#Grep(0, 0, ']] .. get_prefer_dir() .. [[', 1)<cr>]]) end, { expr = true, desc = "Search to quickfix" })
-      vim.keymap.set('n', ';gg', function() vim.cmd([[<C-\>e utilgrep#Grep(0, 0, ']] .. get_prefer_dir() .. [[', 0)<cr>]]) end, { expr = true, desc = "Search to loclist" })
-      vim.keymap.set('v', '<leader>gg', function() vim.cmd([[<C-\>e utilgrep#Grep(0, 1, ']] .. get_prefer_dir() .. [[', 1)<cr>]]) end, { expr = true, desc = "Search to quickfix" })
-      vim.keymap.set('v', ';gg', function() vim.cmd([[<C-\>e utilgrep#Grep(0, 1, ']] .. get_prefer_dir() .. [[', 0)<cr>]]) end, { expr = true, desc = "Search to loclist" })
-
-      vim.keymap.set('n', '<leader>vv', function() vim.cmd([[<C-\>e utilgrep#Grep(0, 0, '', 1)<cr>]]) end, { expr = true, desc = "Search all to quickfix" })
-      vim.keymap.set('n', ';vv', function() vim.cmd([[<C-\>e utilgrep#Grep(0, 0, '', 0)<cr>]]) end, { expr = true, desc = "Search all to loclist" })
-      vim.keymap.set('v', '<leader>vv', function() vim.cmd([[<C-\>e utilgrep#Grep(0, 1, '', 1)<cr>]]) end, { expr = true, desc = "Search all to quickfix" })
-      vim.keymap.set('v', ';vv', function() vim.cmd([[<C-\>e utilgrep#Grep(0, 1, '', 0)<cr>]]) end, { expr = true, desc = "Search all to loclist" })
+      vim.keymap.set('n', '<leader>vv', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 0, "", 1)) end, { desc = "Search all to quickfix" })
+      vim.keymap.set('n', ';vv', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 0, "", 0)) end, { desc = "Search all to loclist" })
+      vim.keymap.set('v', '<leader>vv', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 1, "", 1)) end, { desc = "Search all to quickfix" })
+      vim.keymap.set('v', ';vv', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 1, "", 0)) end, { desc = "Search all to loclist" })
     end,
   },
   {
@@ -1675,7 +1668,22 @@ local plugins = {
     },
   },
 
-  { "kopischke/vim-fetch", enabled = cond({ "editor" }), lazy = false, },
+  { -- Open file:line
+    "wsdjeg/vim-fetch",
+    enabled = cond({ "editor" }),
+    lazy = false,
+    config = function()
+      -- Initialize the table if it doesn't exist to avoid overwriting defaults
+      vim.g.fetch_patterns = vim.g.fetch_patterns or {}
+
+      -- Append the new pattern to the existing list
+      table.insert(vim.g.fetch_patterns, {
+        pattern = "%f line %l",
+        column = 0
+      })
+    end,
+  },
+
   { "nhooyr/neoman.vim", enabled = cond({ "editor" }), cmd = { "Nman", "Snman", }, },
 
   {
@@ -1890,9 +1898,9 @@ local plugins = {
       { "<leader>gl", "<cmd>GV<cr>", desc = "Git Log side by side" },
     },
   },
-  {
+  { -- will hide some importance output message, don't use it
     "folke/noice.nvim",
-    enabled = cond({ "editor" }),
+    enabled = false and cond({ "editor" }),
     event = "VeryLazy",
     dependencies = {
       "MunifTanjim/nui.nvim",
@@ -1900,6 +1908,7 @@ local plugins = {
     },
     opts = {
       routes = {
+        -- 1. Silence specific search messages
         {
           filter = {
             event = "msg_show",
@@ -1909,6 +1918,35 @@ local plugins = {
             },
           },
           opts = { skip = true },
+        },
+        -- 2. Route tall or verbose messages to a split
+        {
+          filter = {
+            event = "msg_show",
+            any = {
+              { find = "Last set from" }, -- Catch verbose output
+              { min_height = 5 },        -- Catch any tall message
+            },
+          },
+          view = "split",
+        },
+        -- 3. Route errors to split
+        {
+          filter = {
+            event = { "msg_show", "emsg", "notification" },
+            kind = "error",
+          },
+          view = "split",
+        },
+        -- 4. Route E### errors to split
+        {
+          filter = {
+            event = "notification",
+            any = {
+              { find = "E%d+" },
+            },
+          },
+          view = "split",
         },
       },
       -- Basic presets to keep it from taking over your UI too much
@@ -2041,6 +2079,9 @@ require("lazy").setup({
 
 -- Set colorscheme AFTER lazy setup
 vim.cmd.colorscheme("jellybeans")
+
+-- Search highlight: background color instead of underline
+vim.api.nvim_set_hl(0, 'Search', { bg = '#f0a0c0', fg = '#302028', ctermbg = 217, ctermfg = 16, cterm = nil, gui = nil })
 
 
 local function load_vimscript_config()
