@@ -590,10 +590,14 @@ local plugins = {
     cmd = "Telescope",
     keys = {
       -- { "<leader>ff", "<cmd>Telescope find_files<cr>", desc = "Find files" },
-      { "<leader>fg", "<cmd>Telescope live_grep<cr>", desc = "Live grep" },
-      { "<leader>fb", "<cmd>Telescope buffers<cr>", desc = "Buffers" },
-      { "<leader>fh", "<cmd>Telescope help_tags<cr>", desc = "Help tags" },
-      { "<leader>fo", "<cmd>Telescope oldfiles<cr>", desc = "Old files" },
+      { "<leader>vr", "<cmd>Telescope resume<cr>", desc = "Resume" },
+      { "<leader>vp", "<cmd>Telescope pickers<cr>", desc = "Picker" },
+      { "<leader>vg", "<cmd>Telescope live_grep<cr>", desc = "Live grep" },
+      { "<leader>vb", "<cmd>Telescope buffers<cr>", desc = "Buffers" },
+      { "<leader>vs", "<cmd>Telescope search_history<cr>", desc = "Search" },
+      { "<leader>vc", "<cmd>Telescope command_history<cr>", desc = "Command" },
+      { "<leader>vz", "<cmd>Telescope oldfiles<cr>", desc = "Old files" },
+      { "<leader>vq", "<cmd>Telescope quickfix<cr>", desc = "Quick fix" },
     },
     dependencies = {
       "nvim-lua/plenary.nvim",
@@ -1125,18 +1129,42 @@ local plugins = {
       vim.keymap.set('n', '<leader><leader>', function() vim.fn["VimMotionPreview"]() end, { silent = true, desc = "Preview Tag" })
       vim.keymap.set('v', '<leader><leader>', function() vim.fn["VimMotionPreview"]() end, { silent = true, desc = "Preview Tag" })
 
-      vim.keymap.set('n', ';bb', function() vim.cmd("Rg " .. vim.fn["utils#GetSelected"]('n')) end, { desc = "Search rg all" })
-      vim.keymap.set('n', '<leader>bb', function() vim.cmd("Rg " .. vim.fn["utils#GetSelected"]('n')) end, { desc = "Search rg all" })
+      local function prepare_grep(is_visual, dir, to_qf)
+        vim.cmd("let g:grepper = {}")
 
-      vim.keymap.set('n', '<leader>gg', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 0, get_prefer_dir(), 1)) end, { desc = "Search to quickfix" })
-      vim.keymap.set('n', ';gg', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 0, get_prefer_dir(), 0)) end, { desc = "Search to loclist" })
-      vim.keymap.set('v', '<leader>gg', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 1, get_prefer_dir(), 1)) end, { desc = "Search to quickfix" })
-      vim.keymap.set('v', ';gg', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 1, get_prefer_dir(), 0)) end, { desc = "Search to loclist" })
+        -- 1. Sync the visual marks to the current selection
+        if is_visual == 1 then
+          -- This "kicks" Neovim to update the '< and '> marks
+          vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>gv<Esc>", true, false, true), "nx", false)
+        end
 
-      vim.keymap.set('n', '<leader>vv', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 0, "", 1)) end, { desc = "Search all to quickfix" })
-      vim.keymap.set('n', ';vv', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 0, "", 0)) end, { desc = "Search all to loclist" })
-      vim.keymap.set('v', '<leader>vv', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 1, "", 1)) end, { desc = "Search all to quickfix" })
-      vim.keymap.set('v', ';vv', function() vim.cmd("let g:grepper = {}") vim.cmd(vim.fn["utilgrep#Grep"](0, 1, "", 0)) end, { desc = "Search all to loclist" })
+        local target_dir = ""
+        if dir == "prefer" then
+          -- Check if it's a global vim function or a script function
+          target_dir = get_prefer_dir()
+        end
+
+        -- 2. Get the command string
+        local cmd = vim.fn["utilgrep#Grep"](0, is_visual, target_dir, to_qf)
+
+        -- 3. Feed to command line without Enter
+        local prefix = is_visual == 1 and ":<C-u>" or ":"
+        local keys = vim.api.nvim_replace_termcodes(prefix .. cmd, true, false, true)
+        vim.api.nvim_feedkeys(keys, "n", false)
+      end
+
+
+      -- Grep in Preferred Directory
+      vim.keymap.set('n', '<leader>gg', function() prepare_grep(0, "prefer", 1) end, { desc = "Search to QF (edit)" })
+      vim.keymap.set('n', ';gg',        function() prepare_grep(0, "prefer", 0) end, { desc = "Search to Loc (edit)" })
+      vim.keymap.set('v', '<leader>gg', function() prepare_grep(1, "prefer", 1) end, { desc = "Search selection to QF (edit)" })
+      vim.keymap.set('v', ';gg',        function() prepare_grep(1, "prefer", 0) end, { desc = "Search selection to Loc (edit)" })
+
+      -- Grep All (Empty Directory)
+      vim.keymap.set('n', '<leader>vv', function() prepare_grep(0, "", 1) end, { desc = "Search all to QF (edit)" })
+      vim.keymap.set('n', ';vv',        function() prepare_grep(0, "", 0) end, { desc = "Search all to Loc (edit)" })
+      vim.keymap.set('v', '<leader>vv', function() prepare_grep(1, "", 1) end, { desc = "Search all selection to QF (edit)" })
+      vim.keymap.set('v', ';vv',        function() prepare_grep(1, "", 0) end, { desc = "Search all selection to Loc (edit)" })
     end,
   },
   {
@@ -1187,9 +1215,26 @@ local plugins = {
   {
     "huawenyu/improved-search.nvim",
     enabled = cond({ "editor" }),
+    lazy = false,
     config = function()
       local search = require("improved-search")
-      vim.keymap.set("x", "*", search.forward, { desc = "Search forward" })
+
+      -- We don't necessarily need the 'search' variable if we use Neovim's internal yank
+      vim.keymap.set("x", "*", function()
+        -- 1. Grab visual selection
+        vim.cmd('noau normal! "vy')
+        local text = vim.fn.getreg('v')
+
+        if type(text) ~= "string" or text == "" then return end
+
+        -- 2. Escape for literal search
+        local escaped = vim.fn.escape(text, '/\\^$*.~[]')
+
+        -- 3. Use 'feedkeys' with 't' flag (simulate real typing)
+        -- <C-u> clears the range ('<,'>) that appears when pressing '/' in visual mode
+        local keys = vim.api.nvim_replace_termcodes("<Esc>/<C-u>" .. escaped, true, false, true)
+        vim.fn.feedkeys(keys, "n")
+      end, { desc = "Search selection - edit before enter" })
     end,
   },
   {
