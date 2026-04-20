@@ -435,10 +435,10 @@ local plugins = {
         vim.keymap.set("n", "<leader>k", "<c-w>k", { desc = "Window up" })
         vim.keymap.set("n", "<leader>l", "<c-w>l", { desc = "Window right" })
 
-        vim.keymap.set("n", "<c-n>", "cn", { desc = "Next quickfix" })
-        vim.keymap.set("n", "<c-p>", "cp", { desc = "Previous quickfix" })
-        vim.keymap.set("n", "<a-n>", ":lne<cr>", { desc = "Next locallist" })
-        vim.keymap.set("n", "<a-p>", ":lp<cr>", { desc = "Previous locallist" })
+        vim.keymap.set("n", "<c-n>", "<cmd>silent! cnext<cr>", { desc = "Next quickfix" })
+        vim.keymap.set("n", "<c-p>", "<cmd>silent! cprev<cr>", { desc = "Previous quickfix" })
+        vim.keymap.set("n", "<a-n>", "<cmd>silent! lne<cr>", { desc = "Next locallist" })
+        vim.keymap.set("n", "<a-p>", "<cmd>silent! lp<cr>", { desc = "Previous locallist" })
 
         vim.keymap.set("t", "<c-h>", "<C-\\><C-n><C-w>h")
         vim.keymap.set("t", "<c-j>", "<C-\\><C-n><C-w>j")
@@ -470,12 +470,12 @@ local plugins = {
 
       vim.keymap.set('n', ';tt', function()
         local selected = vim.fn["utils#GetSelected"]('n')
-        vim.cmd('$tab split')
+        vim.cmd('tabnew')
         vim.cmd('silent! tag ' .. selected)
       end, { silent = true, desc = "Tag word into new tab" })
       vim.keymap.set('v', ';tt', function()
         local selected = vim.fn["utils#GetSelected"]('v')
-        vim.cmd('$tab split')
+        vim.cmd('tabnew')
         vim.cmd('silent! tag ' .. selected)
       end, { silent = true, desc = "Tag word into new tab" })
     end,
@@ -705,23 +705,38 @@ local plugins = {
     enabled = cond({ "coder" }),
     lazy = false,
     dependencies = { "nvim-tree/nvim-web-devicons" },
-    opts = {
-      options = {
-        icons_enabled = true,
-        theme = 'auto',
-        component_separators = { left = '⋮', right = '⋮' },
-        section_separators = { left = '▌', right = '▐' },
-        disabled_filetypes = { 'tpipeline', statusline = {}, winbar = {} },
-        always_divide_middle = true,
-        always_show_tabline = false,
-        globalstatus = true,
-      },
-      inactive_sections = {
-        lualine_a = {}, lualine_b = {}, lualine_c = { 'filename' },
-        lualine_x = { 'location' }, lualine_y = {}, lualine_z = {}
-      },
-      extensions = { 'fugitive' }
-    },
+    config = function()
+      -- 1. Define your custom line counter function
+      local function line_info()
+        local current = vim.fn.line('.')
+        local column = vim.fn.col('.')
+        local total = vim.fn.line('$')
+        -- Format: "Line:Col / Total"
+        return string.format("%d:%d/%d", current, column, total)
+      end
+
+      -- 2. Setup lualine with the function in lualine_z
+      require('lualine').setup({
+        options = {
+          icons_enabled = true,
+          theme = 'auto',
+          component_separators = { left = '⋮', right = '⋮' },
+          section_separators = { left = '▌', right = '▐' },
+          disabled_filetypes = { 'tpipeline', statusline = {}, winbar = {} },
+          always_divide_middle = true,
+          always_show_tabline = false,
+          globalstatus = true,
+        },
+        sections = {
+          lualine_z = { line_info }
+        },
+        inactive_sections = {
+          lualine_a = {}, lualine_b = {}, lualine_c = { 'filename' },
+          lualine_x = { 'location' }, lualine_y = {}, lualine_z = {}
+        },
+        extensions = { 'fugitive' }
+      })
+    end,
   },
   {
     "vimpostor/vim-tpipeline",
@@ -789,15 +804,38 @@ local plugins = {
     end,
   },
   { "chrisbra/NrrwRgn", enabled = cond({ "editor" }), cmd = { "NR", "NRV" } },
+  -- { "huawenyu/vim-tabber", enabled = cond({ "editor" }), lazy = false, }, -- UI: pretty tab
   {
     "huawenyu/vim-tabber",
-    enabled = cond({ "editor" }),
-    config = function()
+    lazy = false,
+    init = function()
+      -- Use dots, not colons; use semicolons or newlines, not commas
       vim.g.tabber_filename_style = 'filename'
       vim.g.tabber_divider_style = 'unicode'
     end,
+    config = function()
+      -- A "stronger" function to force the Red color
+      local function force_red_tabs()
+        -- Change bg to '#FF0000' for Red, or '#FFFF00' for Yellow
+        vim.cmd('highlight! TabLineSel guifg=#FFFFFF guibg=#FF0000 gui=bold')
+        -- Force standard inactive tabs to be dark
+        vim.cmd('highlight! TabLine guifg=#BCBCBC guibg=#202020 gui=NONE')
+      end
+
+      -- 1. Run it now
+      force_red_tabs()
+
+      -- 2. Run it again slightly later to beat plugin internal overrides
+      vim.schedule(force_red_tabs)
+
+      -- 3. Run it every time you switch themes
+      vim.api.nvim_create_autocmd("ColorScheme", {
+        callback = force_red_tabs,
+      })
+    end,
   },
 
+  -- { "romgrk/barbar.nvim", enabled = cond({ "editor" }), lazy = false, config = true, }, -- UI: pretty tab
   -- ============================================================
   -- Syntax
   -- ============================================================
