@@ -808,14 +808,16 @@ local plugins = {
     end,
   },
   { "chrisbra/NrrwRgn", enabled = cond({ "editor" }), cmd = { "NR", "NRV" } },
-  -- { "huawenyu/vim-tabber", enabled = cond({ "editor" }), lazy = false, }, -- UI: pretty tab
-  {
-    "huawenyu/vim-tabber",
+  { -- UI: pretty tab
+    "fweep/vim-tabber",
     lazy = false,
     init = function()
       -- Use dots, not colons; use semicolons or newlines, not commas
       vim.g.tabber_filename_style = 'filename'
       vim.g.tabber_divider_style = 'unicode'
+      -- vim.g.tabber_divider_char = '┃'
+      -- vim.g.tabber_selected_marker = '▶' -- Example additional marker
+      -- vim.g.tabber_selected_marker = '👉'
     end,
     config = function()
       -- A "stronger" function to force the Red color
@@ -896,8 +898,6 @@ local plugins = {
       vim.keymap.set('n', ';vh', '<c-U>FZFHistory<cr>', { silent = true, desc = "History" })
     end,
   },
-  { "nvim-telescope/telescope-fzf-native.nvim", enabled = not is_wsl() and cond({ "coder" }), build = "make" },
-  { "nvim-telescope/telescope-hop.nvim", enabled = not is_wsl() and cond({ "coder" }) },
 
   -- ============================================================
   -- Clipboard / Yank
@@ -924,7 +924,7 @@ local plugins = {
   -- ============================================================
   -- Search / Jump / Motion
   -- ============================================================
-  { "mhinz/vim-grepper", enabled = cond({ "editor" }), cmd = { "Grepper", "GrepperAg", "GrepperGit", "GrepperGrep", "GrepperRg" } },
+  { "huawenyu/vim-grepper", enabled = cond({ "editor" }), cmd = { "Grepper", "GrepperAg", "GrepperGit", "GrepperGrep", "GrepperRg" } },
   {
     "dhananjaylatkar/cscope_maps.nvim",
     enabled = cond({ "coder" }),
