@@ -1392,17 +1392,15 @@ local plugins = {
   {
     "junegunn/vim-easy-align",
     enabled = cond({ "editor" }),
-    event = "VeryLazy",
     cmd = "EasyAlign",
     keys = {
-      { "<leader>ga", mode = "v" },
-      { "<leader>cc", mode = "v" },
-      { "<leader>cc", mode = "n" },
+      { "<leader>ga", "<Plug>(EasyAlign)", mode = "x", desc = "Easy Align (Visual)" },
+      { "<leader>cc", "<Plug>(EasyAlign)", mode = "x", desc = "Easy Align (Visual)" },
+      { "<leader>cc", "<Plug>(EasyAlign)", mode = "n", desc = "Easy Align (Normal)" },
     },
-    opts = {
-      ignore_comment = false,
-    },
-    config = function()
+    init = function()
+      -- Set global variables before the plugin loads
+      vim.g.easy_align_ignore_comment = 0
       vim.g.easy_align_delimiters = {
         [">"] = { pattern = ">>\\|=>\\|>" },
         ["/"] = {
@@ -1482,7 +1480,6 @@ local plugins = {
     opts = {
       enable = true, -- Enable this plugin (Can be enabled/disabled later via commands)
       max_lines = 0, -- How many lines the window should span. Values <= 0 mean no limit.
-      -- ... other config
     },
   },
   {
