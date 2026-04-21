@@ -248,6 +248,7 @@ local plugins = {
     lazy = false,
     dependencies = {
       "huawenyu/vim-motion",
+      "huawenyu/vim-basic",
     },
     keys = {
       -- conf_cmd.vim keymaps
@@ -405,10 +406,17 @@ local plugins = {
         vim.keymap.set("x", ">", ">gv")
         vim.keymap.set("x", "<", "<gv")
 
-        vim.keymap.set("n", "<Return>", function()
-          vim.cmd("nohls")
-          vim.cmd("nohls")
-        end, { silent = true, desc = "Clear search highlight" })
+        vim.keymap.set('n', '<Return>', function()
+          -- Only clear highlights if we are NOT in a quickfix window
+          if vim.bo.buftype ~= 'quickfix' then
+            vim.cmd("nohls")
+            vim.cmd("nohls")
+          end
+
+          -- Always return the actual Enter key behavior
+          return '<CR>'
+        end, { expr = true, silent = true, desc = "Clear search highlight" })
+
 
         vim.keymap.set("n", ";#", ":<c-u><c-u>%s///gn<cr>", { desc = "Count search pattern" })
         vim.keymap.set("n", ";^", ":<c-u>g//p<cr>", { desc = "Popup search pattern" })
@@ -468,15 +476,15 @@ local plugins = {
       vim.keymap.set('n', ';9', '9gt', { silent = true, desc = "Go to tab 9" })
       vim.keymap.set('n', ';0', ':tabonly<CR>', { silent = true, desc = "Close other tabs" })
 
-      vim.keymap.set('n', ';tt', function()
-        local selected = vim.fn["utils#GetSelected"]('n')
-        vim.cmd('tabnew')
-        vim.cmd('silent! tag ' .. selected)
-      end, { silent = true, desc = "Tag word into new tab" })
-      vim.keymap.set('v', ';tt', function()
-        local selected = vim.fn["utils#GetSelected"]('v')
-        vim.cmd('tabnew')
-        vim.cmd('silent! tag ' .. selected)
+      vim.keymap.set({'n', 'v'}, ';tt', function()
+        local bufnr = vim.api.nvim_get_current_buf()
+        local vtag = vim.fn["utils#GetSelected"]('') -- lets auto mode
+
+        if vtag == "" then
+          vim.cmd('silent! tab sb ' .. bufnr)
+        else
+          vim.cmd('silent! tab tag ' .. vtag)
+        end
       end, { silent = true, desc = "Tag word into new tab" })
     end,
   },
@@ -1298,7 +1306,17 @@ local plugins = {
       end
     end,
   },
-  { "huawenyu/quickfix-reflector.vim", enabled = cond({ "editor" }) },
+
+  -- { "huawenyu/quickfix-reflector.vim", enabled = cond({ "editor" }) }, -- Disable it for it confuse neovim and create multiple-quickfix window
+  {
+    'stevearc/quicker.nvim',
+    enabled = cond({ "editor" }),
+    ft = "qf",
+    ---@module "quicker"
+    ---@type quicker.SetupOptions
+    opts = {},
+  },
+
   {
     "folke/todo-comments.nvim",
     enabled = cond({ "editor" }),
@@ -1373,8 +1391,8 @@ local plugins = {
   },
   {
     "junegunn/vim-easy-align",
-    event = "VeryLazy",
     enabled = cond({ "editor" }),
+    event = "VeryLazy",
     cmd = "EasyAlign",
     keys = {
       { "<leader>ga", mode = "v" },
@@ -1454,8 +1472,19 @@ local plugins = {
       vim.api.nvim_set_keymap("c", "<Tab>", "<Cmd>call wilder#main#start()<CR>", { noremap = true, silent = true })
     end,
   },
+
   { "nvim-treesitter/nvim-treesitter", enabled = cond({ "editor" }), build = ":TSUpdate", lazy = false },
-  { "nvim-treesitter/nvim-treesitter-context", enabled = not is_wsl() and cond({ "coder" }) },
+  {
+    "nvim-treesitter/nvim-treesitter-context",
+    enabled = cond({ "coder" }),
+    event = "BufReadPost", -- Loads when you start reading a file
+    dependencies = { "nvim-treesitter/nvim-treesitter" },
+    opts = {
+      enable = true, -- Enable this plugin (Can be enabled/disabled later via commands)
+      max_lines = 0, -- How many lines the window should span. Values <= 0 mean no limit.
+      -- ... other config
+    },
+  },
   {
     "neovim/nvim-lspconfig",
     enabled = cond({ "coder" }),
