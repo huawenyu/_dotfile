@@ -171,11 +171,95 @@ local plugins = {
     "huawenyu/vim-basic",
     enabled = cond({ "basic", "log", "editor" }),
     lazy = false,
-    config = function()
-      -- ============================================================
-      -- vim-basic extracted configurations
-      -- ============================================================
+    keys = {
+      -- <leader>c "Cleanup" Toolbox
+      {
+        "<leader>ct",
+        function()
+          -- Check if we are in Visual or Select mode
+          local mode = vim.api.nvim_get_mode().mode
+          local is_visual = mode:match("[vV\22]") -- \22 is Ctrl-V (Visual Block)
 
+          if is_visual then
+            -- Exit visual mode to update the '< and '> marks
+            vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", true)
+
+            -- Use a scheduled call or just run on the marks
+            vim.schedule(function()
+              vim.cmd([[silent! '<,'>s/\s\+$//e]])
+              print("Selection: Trailing whitespace cleared")
+            end)
+          else
+            -- Normal mode: operate on the whole file
+            local save_cursor = vim.fn.getpos(".")
+            vim.cmd([[silent! %s/\s\+$//e]])
+            vim.fn.setpos(".", save_cursor)
+            print("File: Trailing whitespace cleared")
+          end
+        end,
+        mode = { "n", "x" },
+        desc = "Clear trailing whitespace",
+      },
+
+      -- 1. FIX INDENTATION: Uses '=' operator on whole file (n) or selection (x)
+      {
+        "<leader>ci",
+        function()
+          local mode = vim.api.nvim_get_mode().mode
+          if mode:match("[vV\22]") then
+            -- Exit visual mode to apply operator to selection
+            vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", true)
+            vim.schedule(function()
+              vim.cmd("normal! gv=")
+            end)
+          else
+            local save_cursor = vim.fn.getpos(".")
+            vim.cmd("normal! gg=G")
+            vim.fn.setpos(".", save_cursor)
+          end
+        end,
+        mode = { "n", "x" },
+        desc = "Fix indentation",
+      },
+
+      -- 2. REMOVE ^M: Cleans Windows line endings from file (n) or selection (x)
+      {
+        "<leader>cm",
+        function()
+          local mode = vim.api.nvim_get_mode().mode
+          if mode:match("[vV\22]") then
+            vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", true)
+            vim.schedule(function()
+              vim.cmd([[silent! '<,'>s/\r//g]])
+            end)
+          else
+            vim.cmd([[silent! %s/\r//g]])
+          end
+        end,
+        mode = { "n", "x" },
+        desc = "Remove ^M (Windows line endings)",
+      },
+
+      -- 3. COLLAPSE BLANK LINES: Shrinks 3+ blank lines into 2 (one gap)
+      {
+        "<leader>cn",
+        function()
+          local mode = vim.api.nvim_get_mode().mode
+          local range = mode:match("[vV\22]") and "'<,'>" or "%"
+          if mode:match("[vV\22]") then
+            vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", true)
+            vim.schedule(function()
+              vim.cmd(string.format([[silent! %ss/\n\{3,}/\r\r/e]], range))
+            end)
+          else
+            vim.cmd([[silent! %s/\n\{3,}/\r\r/e]])
+          end
+        end,
+        mode = { "n", "x" },
+        desc = "Collapse blank lines",
+      },
+    },
+    config = function()
       -- Basic settings from plugin/config.vim
       vim.opt.formatoptions:append("m")
       vim.opt.formatoptions:append("B")
@@ -1394,9 +1478,7 @@ local plugins = {
     enabled = cond({ "editor" }),
     cmd = "EasyAlign",
     keys = {
-      { "<leader>ga", "<Plug>(EasyAlign)", mode = "x", desc = "Easy Align (Visual)" },
-      { "<leader>cc", "<Plug>(EasyAlign)", mode = "x", desc = "Easy Align (Visual)" },
-      { "<leader>cc", "<Plug>(EasyAlign)", mode = "n", desc = "Easy Align (Normal)" },
+      { "<leader>ga", "<Plug>(EasyAlign)", mode = { "n", "x" }, desc = "Easy Align" },
     },
     init = function()
       -- Set global variables before the plugin loads
@@ -2216,6 +2298,25 @@ if cond({ "coder" }) then
     pattern = { "tagbar", "nerdtree", "voomtree", "qf" },
     callback = function() vim.opt_local.signcolumn = "no" end,
   })
+
+  vim.api.nvim_create_autocmd("FileType", {
+    pattern = { "qf" },
+    callback = function(ev)
+      -- 1. Mappings ONLY for Quickfix
+      if ev.match == "qf" then
+        vim.keymap.set("n", "<C-o>", "<cmd>colder<CR>", { buffer = true })
+        vim.keymap.set("n", "<C-i>", "<cmd>cnewer<CR>", { buffer = true })
+
+        -- Force n/N to standard search for QF only
+        vim.keymap.set("n", "n", "n", { buffer = true })
+        vim.keymap.set("n", "N", "N", { buffer = true })
+      end
+
+      -- 3. Mappings for ALL types in the pattern list
+      vim.keymap.set("n", "q", "<cmd>close<CR>", { buffer = true })
+    end,
+  })
+
 
   vim.api.nvim_create_autocmd("VimEnter", {
     callback = function()
