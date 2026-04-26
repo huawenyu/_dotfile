@@ -260,7 +260,7 @@ local plugins = {
       },
     },
     config = function()
-      -- Basic settings from plugin/config.vim
+      vim.opt.modeline = true
       vim.opt.formatoptions:append("m")
       vim.opt.formatoptions:append("B")
       vim.opt.fileformats = "unix,dos,mac"
@@ -560,9 +560,26 @@ local plugins = {
       vim.keymap.set('n', ';9', '9gt', { silent = true, desc = "Go to tab 9" })
       vim.keymap.set('n', ';0', ':tabonly<CR>', { silent = true, desc = "Close other tabs" })
 
+      local function has_tags()
+        local tags_option = vim.opt.tags:get()
+        for _, path in ipairs(tags_option) do
+          -- Expand path (handles ./tags)
+          local expanded_path = vim.fn.expand(path)
+          if vim.fn.filereadable(expanded_path) == 1 then
+            return true
+          end
+        end
+
+        return false
+      end
+
       vim.keymap.set({'n', 'v'}, ';tt', function()
         local bufnr = vim.api.nvim_get_current_buf()
-        local vtag = vim.fn["utils#GetSelected"]('') -- lets auto mode
+
+        local vtag = ""
+        if has_tags() then
+          local vtag = vim.fn["utils#GetSelected"]('') -- lets auto mode
+        end
 
         if vtag == "" then
           vim.cmd('silent! tab sb ' .. bufnr)
@@ -690,6 +707,16 @@ local plugins = {
       { "<leader>vc", "<cmd>Telescope command_history<cr>", desc = "Command" },
       { "<leader>vz", "<cmd>Telescope oldfiles<cr>", desc = "Old files" },
       { "<leader>vq", "<cmd>Telescope quickfix<cr>", desc = "Quick fix" },
+      {
+        "<leader>fq",
+        function()
+          require("telescope.builtin").find_files({
+            default_text = vim.fn.expand("<cword>"),
+          })
+        end,
+        desc = "Find Files (Word Under Cursor)",
+      },
+
     },
     dependencies = {
       "nvim-lua/plenary.nvim",
@@ -748,11 +775,80 @@ local plugins = {
   },
 
   -- Markdown
-  { "preservim/vim-markdown", enabled = cond({ "editor", "markdown" }), ft = "markdown" },
+  {
+    "preservim/vim-markdown",
+    lazy = false,
+    enabled = cond({ "editor", "markdown" }),
+    dependencies = { 'godlygeek/tabular' }, -- Required by vim-markdown
+    ft = { "markdown", "wiki" },
+    dependencies = { 
+      'godlygeek/tabular',
+    },
+    init = function()
+      -- Global colors for headers (Traditional look but colorful)
+      -- This defines the text color for # H1, ## H2, etc.
+      vim.api.nvim_set_hl(0, 'RenderMarkdownH1', { fg = '#ff5555', bold = true }) -- Red
+      vim.api.nvim_set_hl(0, 'RenderMarkdownH2', { fg = '#50fa7b', bold = true }) -- Green
+      vim.api.nvim_set_hl(0, 'RenderMarkdownH3', { fg = '#f1fa8c', bold = true }) -- Yellow
+      vim.api.nvim_set_hl(0, 'RenderMarkdownH4', { fg = '#bd93f9', bold = true }) -- Purple
+
+      -- Disable the old plugin's "ugly" folding and conceal
+      vim.g.vim_markdown_folding_disabled = 1
+      vim.g.vim_markdown_conceal = 0
+      vim.g.vim_markdown_toc_autofit = 1
+      vim.g.vim_markdown_strikethrough = 1
+      vim.g.vim_markdown_frontmatter = 1
+      vim.g.vim_markdown_json_frontmatter = 1
+      -- Lists & Indentation
+      vim.g.vim_markdown_new_list_item_indent = 2
+
+      -- Fenced Languages (C, Shell, Java, etc.)
+      vim.g.vim_markdown_fenced_languages = {
+        'c', 'sh', 'java', 'cs', 'cpp', 'vim',
+        'dosini', 'rust'
+      }
+      -- Apply to the general markdown variable as well
+      vim.g.markdown_fenced_languages = vim.g.vim_markdown_fenced_languages
+    end,
+    config = function()
+    end
+  },
+  -- { "OXY2DEV/markview.nvim", lazy = false, enabled = cond({ "editor", "markdown" }), ft = "markdown" },
+  {
+    'MeanderingProgrammer/render-markdown.nvim',
+    enabled = false and cond({ "editor", "markdown" }),
+    dependencies = {
+      'nvim-treesitter/nvim-treesitter',
+      'nvim-tree/nvim-web-devicons' -- or 'mini.icons'
+    },
+    ---@module 'render-markdown'
+    ---@type render.md.UserConfig
+    opts = {
+      file_types = { "markdown", "vimwiki" },
+      heading = { position = 'inline' },
+      code = {
+        style = 'normal',
+        border = 'thick',
+      },
+      -- Better checkboxes
+      checkbox = {
+        enabled = true,
+        unchecked = { icon = '   ' },
+        checked = { icon = ' ' },
+      },
+    },
+    ft = { "markdown", "vimwiki" }, -- Lazy load on these filetypes
+    config = function(_, opts)
+      require('render-markdown').setup(opts)
+      -- Required for the icons/styling to "render" properly
+      vim.opt.conceallevel = 2
+    end,
+  },
   {
     "epwalsh/obsidian.nvim",
     version = "*",
-    lazy = true,
+    lazy = false,
+    enabled = cond({ "editor", "markdown" }),
     event = "VeryLazy",
     ft = "markdown",
     dependencies = { "nvim-lua/plenary.nvim", "ibhagwan/fzf-lua", "nvim-telescope/telescope.nvim" },
@@ -793,6 +889,18 @@ local plugins = {
   },
   { "ellisonleao/glow.nvim", enabled = cond({ "editor", "markdown" }), cmd = "Glow", ft = "markdown" },
 
+  {
+    "ethanholz/nvim-lastplace",
+    lazy = false,
+    enabled = cond({ "editor", "markdown" }),
+    config = function()
+      require("nvim-lastplace").setup({
+        lastplace_ignore_buftype = { "quickfix", "nofile", "help" },
+        lastplace_ignore_filetype = { "gitcommit", "gitrebase", "svn", "hgcommit" },
+        lastplace_open_folds = true,
+      })
+    end,
+  },
   -- ============================================================
   -- Facade / UI
   -- ============================================================
@@ -938,11 +1046,56 @@ local plugins = {
   -- Syntax
   -- ============================================================
   { "justinmk/vim-syntax-extra", enabled = cond({ "coder" }), ft = "vim" },
-  { "huawenyu/vim-log-syntax", enabled = cond({ "editor", "log" }), ft = "log" },
+  -- { "huawenyu/vim-log-syntax", enabled = cond({ "editor", "log" }), ft = "log" },
+  { "fei6409/log-highlight.nvim", enabled = cond({ "editor", "log" }), ft = "log" },
   { "huawenyu/vim-autotest-syntax", enabled = cond({ "editor", "log" }), ft = "case" },
   { "nickhutchinson/vim-cmake-syntax", enabled = cond({ "editor" }), ft = "cmake" },
   { "xuhdev/syntax-dosini.vim", enabled = cond({ "editor" }), ft = "dosini" },
   { "tmux-plugins/vim-tmux", enabled = cond({ "editor" }), ft = "tmux" },
+
+  {
+    "chentoast/marks.nvim",
+    enabled = cond({ "editor" }),
+    lazy = false,
+    config = function()
+      require'marks'.setup {
+        -- whether to map keybinds or not. default true
+        default_mappings = true,
+        -- which builtin marks to show. default {}
+        builtin_marks = { ".", "<", ">", "^" },
+        -- whether movements cycle back to the beginning/end of buffer. default true
+        cyclic = true,
+        -- whether the shada file is updated after modifying uppercase marks. default false
+        force_write_shada = false,
+        -- how often (in ms) to redraw signs/recompute mark positions. 
+        -- higher values will have better performance but may cause visual lag, 
+        -- while lower values may cause performance penalties. default 150.
+        refresh_interval = 250,
+        -- sign priorities for each type of mark - builtin marks, uppercase marks, lowercase
+        -- marks, and bookmarks.
+        -- can be either a table with all/none of the keys, or a single number, in which case
+        -- the priority applies to all marks.
+        -- default 10.
+        sign_priority = { lower=10, upper=15, builtin=8, bookmark=20 },
+        -- disables mark tracking for specific filetypes. default {}
+        excluded_filetypes = {},
+        -- disables mark tracking for specific buftypes. default {}
+        excluded_buftypes = {},
+        -- marks.nvim allows you to configure up to 10 bookmark groups, each with its own
+        -- sign/virttext. Bookmarks can be used to group together positions and quickly move
+        -- across multiple buffers. default sign is '!@#$%^&*()' (from 0 to 9), and
+        -- default virt_text is "".
+        bookmark_0 = {
+          sign = "⚑",
+          virt_text = "hello world",
+          -- explicitly prompt for a virtual line annotation when setting a bookmark from this group.
+          -- defaults to false.
+          annotate = false,
+        },
+        mappings = {}
+      }
+    end
+  },
 
   -- ============================================================
   -- Fuzzy Finder & Search
@@ -1461,9 +1614,9 @@ local plugins = {
     },
     config = function() require("hop").setup({ keys = "asdfghjklqwertyuiopzxcvbnm" }) end,
   },
-  { "tpope/vim-abolish", enabled = cond({ "editor" }) },
-  { "tpope/vim-repeat", enabled = cond({ "editor" }) },
-  { "rhysd/clever-f.vim", enabled = cond({ "editor" }) },
+  { "tpope/vim-abolish", enabled = cond({ "editor" }), lazy = false,  },
+  { "tpope/vim-repeat", enabled = cond({ "editor" }), lazy = false, },
+  { "rhysd/clever-f.vim", enabled = cond({ "editor" }), lazy = false,  },
   {
     "huawenyu/vim-motion",
     enabled = cond({ "editor" }),
