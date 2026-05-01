@@ -266,6 +266,89 @@ local plugins = {
       vim.opt.fileformats = "unix,dos,mac"
       vim.opt.clipboard:prepend("unnamed,unnamedplus")
 
+
+      local function guess_link()
+        -- Greedy helper: tries to find a valid file path in a string
+        local function find_path_greedy(input)
+          if not input or input == "" then return nil, nil end
+          local parts = vim.split(input, "/")
+
+          for i = #parts, 1, -1 do
+            local candidate = table.concat(parts, "/", 1, i)
+
+            -- Check Style: file:line
+            local path_part, line_part = candidate:match("([^:]+):(%d+)$")
+            if path_part then
+              local abs_path = vim.fn.fnamemodify(path_part, ":p")
+              if vim.fn.filereadable(abs_path) == 1 then
+                return abs_path, line_part
+              end
+            end
+
+            -- Check Style: plain file
+            local abs_path = vim.fn.fnamemodify(candidate, ":p")
+            if vim.fn.filereadable(abs_path) == 1 then
+              return abs_path, nil
+            end
+          end
+          return nil, nil
+        end
+
+        local line_text = vim.api.nvim_get_current_line()
+
+        -- 1. URL Check (Priority)
+        local url = line_text:match("https?://[%w%-_%.%?%.:/%+=&]+")
+        if url then
+          local opener = vim.fn.has("mac") == 1 and "open" or "xdg-open"
+          vim.fn.jobstart({ opener, url }, { detach = true })
+          return
+        end
+
+        -- 2. Comprehensive File Search on Current Line
+        local valid_file, line_num = nil, nil
+
+        -- First try the exact string under cursor (most specific)
+        local cfile = vim.fn.expand("<cfile>")
+        valid_file, line_num = find_path_greedy(cfile)
+
+        -- If cursor fails, scan the whole line for path-like strings
+        if not valid_file then
+          -- This pattern looks for strings containing '/' or typical file extensions
+          for word in line_text:gmatch("[%g]+") do 
+            valid_file, line_num = find_path_greedy(word)
+            if valid_file then break end
+          end
+        end
+
+        if valid_file then
+          local bn = vim.fn.bufnr(valid_file)
+          local jump = line_num and ("|" .. line_num) or ""
+
+          if bn ~= -1 then
+            vim.fn['utils#PreviewTheCmd']("buffer " .. bn .. jump .. "|normal mO")
+          else
+            vim.fn['utils#PreviewTheCmd']("edit " .. vim.fn.fnameescape(valid_file) .. jump .. "|normal mO")
+          end
+          return
+        end
+
+        -- 3. Fallback: Search (Markdown/Vim)
+        local ft = vim.bo.filetype
+        if ft == "markdown" or ft == "vim" then
+          local words = vim.fn.expand("<cword>")
+          if words ~= "" then
+            local search_url = "https://google.com" .. vim.fn.urlencode(words)
+            if vim.fn.exists(":FloatermNew") == 2 then
+              vim.cmd("FloatermNew w3m " .. vim.fn.fnameescape(search_url))
+            else
+              local opener = vim.fn.has("mac") == 1 and "open" or "xdg-open"
+              vim.fn.jobstart({ opener, search_url }, { detach = true })
+            end
+          end
+        end
+      end
+
+
       -- Terminal setup for neovim
       vim.api.nvim_create_augroup("terminal_setup", { clear = true })
       vim.api.nvim_create_autocmd("TermOpen", {
@@ -318,11 +401,11 @@ local plugins = {
       end, { desc = "Open file under cursor" })
 
       vim.keymap.set("n", "<leader>gf", function()
-        vim.cmd("call <SID>GuessLink('n')")
+        guess_link('n')
       end, { silent = true, desc = "(tool) Goto file" })
 
       vim.keymap.set("x", "<leader>gf", function()
-        vim.cmd("call <SID>GuessLink('v')")
+        guess_link('v')
       end, { silent = true, desc = "(tool) Goto file" })
     end,
   },
@@ -621,7 +704,8 @@ local plugins = {
     end,
   },
   { "Chiel92/vim-autoformat", enabled = cond({ "coder" }) },
-  { "vim-scripts/iptables", enabled = cond({ "coder" }) },
+  { "vim-scripts/iptables", enabled = cond({ "coder" }), lazy = false, },
+  { "vim-scripts/genutils", enabled = cond({ "coder" }), lazy = false, },
   { "tenfyzhong/CompleteParameter.vim", enabled = cond({ "coder", "extra" }) },
   { "FooSoft/vim-argwrap", enabled = cond({ "coder", "extra" }) },
   { "ericcurtin/CurtineIncSw.vim", enabled = cond({ "coder" }) },
