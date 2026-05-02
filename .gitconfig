@@ -333,19 +333,56 @@
 			return 1;                                                                                     \
 		fi;                                                                                               \
 		echo \"[2/3] Generating patch from $START_SHA to $END_SHA...\" >&2;                               \
-		git format-patch --stdout \"$START_SHA^..$END_SHA\" > export.patch;                               \
+		git format-patch --stdout \"$START_SHA..$END_SHA\" > export.patch;                                \
 		echo \"[3/3] Success! Created export.patch\";                                                     \
 	}; f"
 
-	import = "!f() {                                                                                      \
-		if [ -z \"$1\" ] || [ ! -f \"$1\" ]; then                                                         \
-			echo \"Usage: git import <path-to-patch-file>\";                                              \
-			return 1;                                                                                     \
-		fi;                                                                                               \
-		echo \"Applying patches from $1...\" >&2;                                                         \
-		git am --show-current-patch --committer-date-is-author-date \"$1\";                               \
-		echo \"Import complete.\";                                                                        \
+	import = "!f() { \
+		GIT_DIR=$(git rev-parse --git-dir 2>/dev/null); \
+		if [ -d \"$GIT_DIR/rebase-apply\" ] || [ -d \"$GIT_DIR/rebase-merge\" ]; then \
+			echo \"[!] Previous operation detected.\"; \
+			printf \"Abort and clean up everything to start fresh? (y/n): \"; \
+			read -r answer; \
+			if [ \"$answer\" = \"y\" ]; then \
+				git am --abort >/dev/null 2>&1; \
+				git rebase --abort >/dev/null 2>&1; \
+				[ -d \"$GIT_DIR/rebase-apply\" ] && rm -rf \"$GIT_DIR/rebase-apply\"; \
+				[ -d \"$GIT_DIR/rebase-merge\" ] && rm -rf \"$GIT_DIR/rebase-merge\"; \
+				echo \"[+] Clean up complete.\"; \
+			else \
+				echo \"[!] Aborting import.\"; \
+				return 1; \
+			fi; \
+		fi; \
+		if [ -z \"$1\" ] || [ ! -f \"$1\" ]; then \
+			echo \"Usage: git import <patch-file>\"; \
+			return 1; \
+		fi; \
+		echo \"[1/2] Applying patches from $1...\"; \
+		if git am --show-current-patch --committer-date-is-author-date --3way \"$1\"; then \
+			echo \"[2/2] Import complete.\"; \
+		else \
+			echo \"[!] Import paused due to conflicts.\"; \
+			echo \"[!] Resolve then run 'git am --continue' or 'git am --abort'.\"; \
+		fi; \
 	}; f"
+
+
+    import-clean = "!f() { \
+        echo \"[!] Force-cleaning internal Git state...\" >&2; \
+        rm -rf .git/rebase-apply .git/rebase-merge .git/sequencer; \
+        rm -f .git/REBASE_HEAD .git/ORIG_HEAD .git/CHERRY_PICK_HEAD .git/MERGE_HEAD .git/index.lock; \
+        git update-index --refresh; \
+        git read-tree HEAD; \
+        \
+        echo \"[+] Post-Cleanup Status:\"; \
+        if [ ! -d \"$(git rev-parse --git-dir)/rebase-apply\" ]; then \
+            echo \"  - AM/Apply Session: INACTIVE (Cleaned)\"; \
+        else \
+            echo \"  - AM/Apply Session: STILL ACTIVE (Check permissions)\"; \
+        fi; \
+        echo \"  - Working Tree: $(git status --branch --short)\"; \
+    }; f"
 
 
 [credential]
