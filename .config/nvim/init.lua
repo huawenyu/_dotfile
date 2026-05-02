@@ -1,3 +1,5 @@
+-- vim: set ft=lua autoindent cindent expandtab   tabstop=2 shiftwidth=2 softtabstop=2:
+
 -- ~/.config/nvim/init.lua
 -- Performance-optimized Neovim configuration with lazy.nvim
 
@@ -1721,36 +1723,55 @@ local plugins = {
       -- Set global variables before the plugin loads
       vim.g.easy_align_ignore_comment = 0
       vim.g.easy_align_delimiters = {
+        --  Usage: ga + i + > (Aligns >>, =>, or >)
         [">"] = { pattern = ">>\\|=>\\|>" },
-        ["/"] = {
-          pattern = "//\\+\\|/\\*\\|\\*/",
-          delimiter_align = "l",
-          ignore_groups = { "!Comment" },
+
+        -- Usage: ga + i + / (Aligns C-style //, /*, and */)
+        -- Note: 'ignore_groups' ensures it works even if you're inside a comment block.
+        ["/"] = { 
+          pattern = "//\\+\\|/\\*\\|\\*/", 
+          delimiter_align = "l", 
+          ignore_groups = { "!Comment" }, 
         },
-        ["]"] = {
-          pattern = "[[\\]]",
-          left_margin = 0,
-          right_margin = 0,
-          stick_to_left = 0,
+
+        -- Usage: ga + i + ] or ) (Tightens alignment for brackets/parens)
+        ["]"] = { pattern = "[[\\]]", left_margin = 0, right_margin = 0, stick_to_left = 0, },
+        [")"] = { pattern = "[()]", left_margin = 0, right_margin = 0, stick_to_left = 0, },
+
+        -- NEW: Shell line continuation
+        -- Usage: ga + \
+        -- Action: Aligns the trailing backslash used in multi-line shell commands.
+        ['\\'] = {
+          pattern = '\\\\$',    -- Matches \ only at the end of the line
+          left_margin = 1,      -- Keeps one space before the \
+          stick_to_left = 0     -- Allows it to push to the right (useful for right-side alignment)
         },
-        [")"] = {
-          pattern = "[()]",
-          left_margin = 0,
-          right_margin = 0,
-          stick_to_left = 0,
+
+        -- NEW: C/C++ Variable & Struct Member alignment
+        -- Usage: ga + v
+        -- Action: Aligns variable names, keeping types on the left. 
+        -- Works for: "int    var;" and "float  *ptr;"
+        ['v'] = {
+          pattern = [[\s\+\zs\*\?\w\+\s*\(;\|=\|(\)\@=]],
+          left_margin = 1,
+          right_margin = 0
         },
-        d = {
-          pattern = " \\(\\S\\+\\s*[;=]\\)\\@=",
-          left_margin = 0,
-          right_margin = 0,
+
+        -- NEW: C Preprocessor
+        -- Usage: ga + #
+        -- Action: Aligns the values in #define statements.
+        ['#'] = {
+          pattern = [[#\s*define\s\+\zs\w\+]],
+          left_margin = 1
         },
-        m = {
-          pattern = "/\\\\$/",
-          stick_to_left = 0,
-          left_margin = 2,
-          right_margin = 0,
-        },
+
+        -- Usage: ga + d (Custom logic for semicolon/equals)
+        d = { pattern = " \\(\\S\\+\\s*[;=]\\)\\@=", left_margin = 0, right_margin = 0, },
+
+        -- Usage: ga + m (Custom pattern for specific regex matching)
+        m = { pattern = "/\\\\$/", stick_to_left = 0, left_margin = 2, right_margin = 0, },
       }
+
     end,
   },
 

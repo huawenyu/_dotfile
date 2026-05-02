@@ -290,24 +290,63 @@
 
 	# Git subtree if just use third-part repo, but no push request
 	#   git st-add <remote-repo> [<branch-name>]
-	st-add = "!f() { \
-		DEFAULT_BRANCH=master; \
-		DEFAULT_DIR=$(basename $1 | cut -d. -f1); \
+	st-add = "!f() {                                                             \
+		DEFAULT_BRANCH=master;                                                   \
+		DEFAULT_DIR=$(basename $1 | cut -d. -f1);                                \
 		git subtree add --prefix $DEFAULT_DIR $1 ${2:-$DEFAULT_BRANCH} --squash; \
 		}; f"
-	st-pull = "!f() { \
-		DEFAULT_BRANCH=master; \
-		DEFAULT_DIR=$(basename $1 | cut -d. -f1); \
+	st-pull = "!f() {                                                             \
+		DEFAULT_BRANCH=master;                                                    \
+		DEFAULT_DIR=$(basename $1 | cut -d. -f1);                                 \
 		git subtree pull --prefix $DEFAULT_DIR $1 ${2:-$DEFAULT_BRANCH} --squash; \
 		}; f"
-	st-push = "!f() { \
-		DEFAULT_BRANCH=master; \
-		DEFAULT_DIR=$(basename $1 | cut -d. -f1); \
+	st-push = "!f() {                                                    \
+		DEFAULT_BRANCH=master;                                           \
+		DEFAULT_DIR=$(basename $1 | cut -d. -f1);                        \
 		git subtree push --prefix $DEFAULT_DIR $1 ${2:-$DEFAULT_BRANCH}; \
 		}; f"
 	vimdiff = "!f() { vim -p $(git diff --name-only) +\"tabdo Gvdiff $@\" +tabfirst; }; f"
 
 	stat2 = status --untracked-files=all .
+
+	export = "!f() {                                                                                      \
+		[ -z \"$1\" ] && { echo \"Usage: git export <start-sha/summary> [end-sha/summary]\"; return 1; }; \
+		resolve_ref() {                                                                                   \
+			echo \"[1/3] Resolving reference: $1...\" >&2;                                                \
+			if git rev-parse --verify \"$1\" >/dev/null 2>&1; then                                        \
+				git rev-parse \"$1\";                                                                     \
+			else                                                                                          \
+				git log -1 --format=%H --grep=\"$1\";                                                     \
+			fi;                                                                                           \
+		};                                                                                                \
+		if echo \"$1\" | grep -q \"\\.\\.\"; then                                                         \
+			START_STR=$(echo \"$1\" | cut -d. -f1);                                                       \
+			END_STR=$(echo \"$1\" | cut -d. -f4);                                                         \
+		else                                                                                              \
+			START_STR=\"$1\";                                                                             \
+			END_STR=\"${2:-HEAD}\";                                                                       \
+		fi;                                                                                               \
+		START_SHA=$(resolve_ref \"$START_STR\");                                                          \
+		END_SHA=$(resolve_ref \"$END_STR\");                                                              \
+		if [ -z \"$START_SHA\" ] || [ -z \"$END_SHA\" ]; then                                             \
+			echo \"Error: Could not resolve START ($START_STR) or END ($END_STR)\";                       \
+			return 1;                                                                                     \
+		fi;                                                                                               \
+		echo \"[2/3] Generating patch from $START_SHA to $END_SHA...\" >&2;                               \
+		git format-patch --stdout \"$START_SHA^..$END_SHA\" > export.patch;                               \
+		echo \"[3/3] Success! Created export.patch\";                                                     \
+	}; f"
+
+	import = "!f() {                                                                                      \
+		if [ -z \"$1\" ] || [ ! -f \"$1\" ]; then                                                         \
+			echo \"Usage: git import <path-to-patch-file>\";                                              \
+			return 1;                                                                                     \
+		fi;                                                                                               \
+		echo \"Applying patches from $1...\" >&2;                                                         \
+		git am --show-current-patch --committer-date-is-author-date \"$1\";                               \
+		echo \"Import complete.\";                                                                        \
+	}; f"
+
 
 [credential]
 	helper = store
