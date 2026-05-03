@@ -373,6 +373,8 @@
 		echo \"------\"; \
 		echo \"Restore the backup: git stash list\"; \
 		echo \"                    git stash pop stash\"; \
+		echo \"Resolve the branch ahead:\"; \
+		echo \"                    git update-ref refs/remotes/origin/$(git branch --show-current HEAD)\"; \
 	}; f"
 
 
