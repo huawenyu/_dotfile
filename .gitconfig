@@ -358,13 +358,21 @@
 			echo \"Usage: git import <patch-file>\"; \
 			return 1; \
 		fi; \
+		\
+		echo \"[0/2] Stashing untracked file \"; \
+		git stash push -u -m \"Pre-am-backup-$(date +%Y%m%d-%H%M)\"; \
+		git --no-pager stash show --include-untracked --name-only \"${1:-stash@{0}}\"; \
+		\
 		echo \"[1/2] Applying patches from $1...\"; \
-		if git am --show-current-patch --committer-date-is-author-date --3way \"$1\"; then \
+		if GIT_LFS_SKIP_SMUDGE=1 git am --committer-date-is-author-date --3way \"$1\"; then \
 			echo \"[2/2] Import complete.\"; \
 		else \
 			echo \"[!] Import paused due to conflicts.\"; \
 			echo \"[!] Resolve then run 'git am --continue' or 'git am --abort'.\"; \
 		fi; \
+		echo \"------\"; \
+		echo \"Restore the backup: git stash list\"; \
+		echo \"                    git stash pop stash\"; \
 	}; f"
 
 
@@ -383,6 +391,38 @@
         fi; \
         echo \"  - Working Tree: $(git status --branch --short)\"; \
     }; f"
+
+	am-status = "!f() { \
+		GIT_DIR=$(git rev-parse --git-dir); \
+		if [ -d \"$GIT_DIR/rebase-apply\" ]; then \
+			NEXT=$(cat \"$GIT_DIR/rebase-apply/next\"); \
+			LAST=$(cat \"$GIT_DIR/rebase-apply/last\"); \
+			echo \"[!] AM Session Active: Patch $NEXT of $LAST\"; \
+			echo \"------------------------------------------\"; \
+			echo \"Current patch subject:\"; \
+			sed -n '/^Subject: /p' \"$GIT_DIR/rebase-apply/$(printf %04d $NEXT)\" | head -n 1; \
+			echo \"------------------------------------------\"; \
+			echo \"Unmerged files (Conflicts):\"; \
+			git diff --name-only --diff-filter=U; \
+		else \
+			echo \"[+] No active AM/Apply session.\"; \
+			git status --short --branch; \
+		fi; \
+	}; f"
+
+    last-stash = "!f() { \
+        target=\"${1:-stash@{0}}\"; \
+        echo \"--- Files in $target ---\"; \
+        git --no-pager stash show --include-untracked --name-only \"$target\"; \
+        echo -n \"\nDo you want to pop this stash? (y/n): \"; \
+        read confirm; \
+        if [ \"$confirm\" = \"y\" ] || [ \"$confirm\" = \"Y\" ]; then \
+            git stash pop \"$target\"; \
+        else \
+            echo \"Stash preserved.\"; \
+        fi; \
+    }; f"
+
 
 
 [credential]
@@ -410,3 +450,7 @@
 	required = true
 [safe]
 	directory = /ssd/proj/linux
+[merge]
+	tool = nvim
+[mergetool "nvim"]
+	cmd = nvim -f -c \"Gdiffsplit!\" \"$MERGED\"
