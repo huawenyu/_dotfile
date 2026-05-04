@@ -1692,7 +1692,7 @@ local plugins = {
   },
   { "mg979/vim-visual-multi", enabled = cond({ "editor" }) },
   {
-    "phaazon/hop.nvim",
+    "huawenyu/hop.nvim",
     enabled = cond({ "editor" }),
     keys = {
       { ";s", "<cmd>HopChar1CurrentLine<cr>", desc = "Hop to char (current line)" },
@@ -2292,13 +2292,62 @@ local plugins = {
       vim.keymap.set('n', '<leader>vF', '<c-U>Neotree reveal<cr>', { silent = true, desc = "Explore Focus (Reveal)" })
     end
   },
+
   {
     "huawenyu/VOoM",
-    enabled = cond({ "editor", "log" }),
+    enabled = false and cond({ "editor", "log" }),
     cmd = { "VoomToggle", "Voom" },
     keys = {
       { "<leader>vo", "<cmd>VoomToggle<cr>", mode = "n", silent = true, desc = "Toggle Voom outline" },
       { "<leader>v0", "<cmd>VoomToggle fmr<cr>", mode = "n", silent = true, desc = "Toggle Voom outline (fmr)" },
+    },
+  },
+
+  {
+    "stevearc/aerial.nvim",
+    enabled = cond({ "editor", "log" }),
+    dependencies = {
+      "nvim-treesitter/nvim-treesitter",
+      "nvim-tree/nvim-web-devicons"
+    },
+    -- Only load when calling these commands
+    cmd = { "AerialToggle", "AerialOpen", "AerialNavToggle" },
+    -- Or load when pressing these keys
+    keys = {
+      { "<leader>vo", "<cmd>AerialToggle!<cr>", desc = "Aerial: Toggle" },
+    },
+    opts = {
+      -- Configuration options
+      backends = { "lsp", "treesitter", "markdown", "man" },
+      layout = {
+        -- This forces the sidebar to the left
+        default_direction = "left",
+        -- Optional: adjust width for the left side
+        max_width = { 40, 0.2 },
+        min_width = 20,
+      },
+      highlight_on_hover = true,
+      show_guides = true,
+      filter_kind = false, -- Show all symbols
+      -- Automatically attach to buffers
+      attach_mode = "global",
+
+      post_parse_symbol = function(bufnr, item, ctx)
+        -- Only apply this logic in markdown files
+        if vim.bo[bufnr].filetype ~= "markdown" then
+          return true
+        end
+
+        -- Get the line text to check for leading whitespace
+        local line = vim.api.nvim_buf_get_lines(bufnr, item.lnum - 1, item.lnum, false)[1] or ""
+
+        -- Matches any space or tab (%s+) followed by #
+        if line:match("^%s+#") then
+          return false
+        end
+
+        return true
+      end,
     },
   },
 
