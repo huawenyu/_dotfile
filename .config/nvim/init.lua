@@ -815,7 +815,6 @@ local plugins = {
       telescope.setup({
         defaults = {
           layout_config = { scroll_speed = 2 },
-        defaults = {
           mappings = {
             i = {
               ["<C-n>"] = actions.move_selection_next,
@@ -847,8 +846,6 @@ local plugins = {
       })
 
 
-      require("telescope").setup({
-      })
       -- telescope.load_extension("fzf")
       -- telescope.load_extension("hop")
 
