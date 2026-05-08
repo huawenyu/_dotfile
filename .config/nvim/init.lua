@@ -810,19 +810,26 @@ local plugins = {
       "nvim-telescope/telescope-hop.nvim",
     },
     config = function()
+      local actions = require("telescope.actions")
       local telescope = require("telescope")
       telescope.setup({
         defaults = {
           layout_config = { scroll_speed = 2 },
+        defaults = {
           mappings = {
             i = {
-              ["<a-p>"] = require("telescope.actions").preview_scrolling_up,
-              ["<a-n>"] = require("telescope.actions").preview_scrolling_down,
+              ["<C-n>"] = actions.move_selection_next,
+              ["<C-p>"] = actions.move_selection_previous,
+              ["<a-p>"] = actions.preview_scrolling_up,
+              ["<a-n>"] = actions.preview_scrolling_down,
               [";;"] = function(prompt_bufnr) require("telescope").extensions.hop.hop(prompt_bufnr) end,
             },
             n = {
-              ["<a-p>"] = require("telescope.actions").preview_scrolling_up,
-              ["<a-n>"] = require("telescope.actions").preview_scrolling_down,
+              ["<C-n>"] = actions.move_selection_next,
+              ["<C-p>"] = actions.move_selection_previous,
+              ["<a-p>"] = actions.preview_scrolling_up,
+              ["<a-n>"] = actions.preview_scrolling_down,
+              [";;"] = function(prompt_bufnr) require("telescope").extensions.hop.hop(prompt_bufnr) end,
             },
           },
         },
@@ -837,6 +844,10 @@ local plugins = {
             reset_selection = true,
           },
         },
+      })
+
+
+      require("telescope").setup({
       })
       -- telescope.load_extension("fzf")
       -- telescope.load_extension("hop")
