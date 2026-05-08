@@ -815,6 +815,9 @@ local plugins = {
       telescope.setup({
         defaults = {
           layout_config = { scroll_speed = 2 },
+
+          -- Prevent selection from wrapping around when reaching the top or bottom
+          cycle_layout_list = false,
           mappings = {
             i = {
               ["<C-n>"] = actions.move_selection_next,
