@@ -267,6 +267,9 @@ local plugins = {
       vim.opt.formatoptions:append("B")
       vim.opt.fileformats = "unix,dos,mac"
 
+      -- ============================================================
+      -- Clipboard / Yank
+      -- ============================================================
       -- Force Neovim to hook into the system clipboard
       vim.opt.clipboard:prepend("unnamed,unnamedplus")
 
@@ -282,6 +285,7 @@ local plugins = {
           ["*"] = require("vim.ui.clipboard.osc52").paste("*"),
         },
       }
+
 
       local function guess_link()
         -- Greedy helper: tries to find a valid file path in a string
@@ -1258,28 +1262,6 @@ local plugins = {
       vim.keymap.set('n', ';vt', '<c-U>BTags<cr>', { silent = true, desc = "BTags" })
       vim.keymap.set('n', ';vw', '<c-U>FZFWindows<cr>', { silent = true, desc = "Windows" })
       vim.keymap.set('n', ';vh', '<c-U>FZFHistory<cr>', { silent = true, desc = "History" })
-    end,
-  },
-
-  -- ============================================================
-  -- Clipboard / Yank
-  -- ============================================================
-  {
-    "ojroques/vim-oscyank",
-    enabled = false and cond({ "editor" }),
-    lazy = false,
-    enabled = cond({ "editor" }),
-    keys = {
-      { "Y", "<cmd>OSCYank<cr>", mode = "v", desc = "Yank to OSC52" },
-      -- { "Y", "<cmd>call YankOSC52(getreg('+'))<cr>", mode = "v", desc = "Yank to OSC52" },
-    },
-    config = function()
-      vim.g.oscyank_max_length = 1
-      -- let g:oscyank_term = 'tmux'  " or 'screen', 'kitty', 'default'
-      vim.g.oscyank_term = 'tmux'
-      vim.g.mwHistAdd = '/@'
-      vim.g.mwAutoSaveMarks = 0
-      vim.g.mwMaxMatchPriority = -10
     end,
   },
 
@@ -2596,6 +2578,14 @@ vim.cmd.colorscheme("jellybeans")
 
 -- Search highlight: background color instead of underline
 vim.api.nvim_set_hl(0, 'Search', { bg = '#f0a0c0', fg = '#302028', ctermbg = 217, ctermfg = 16, cterm = nil, gui = nil })
+
+-- Select High-Contrast Reverse Mode
+vim.api.nvim_set_hl(0, 'Visual', { reverse = true })
+vim.api.nvim_create_autocmd('ColorScheme', {
+  callback = function()
+    vim.api.nvim_set_hl(0, 'Visual', { reverse = true })
+  end,
+})
 
 
 local function load_vimscript_config()
