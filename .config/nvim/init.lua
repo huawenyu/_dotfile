@@ -266,8 +266,22 @@ local plugins = {
       vim.opt.formatoptions:append("m")
       vim.opt.formatoptions:append("B")
       vim.opt.fileformats = "unix,dos,mac"
+
+      -- Force Neovim to hook into the system clipboard
       vim.opt.clipboard:prepend("unnamed,unnamedplus")
 
+      -- Configure the built-in OSC 52 provider globally
+      vim.g.clipboard = {
+        name = "OSC 52",
+        copy = {
+          ["+"] = require("vim.ui.clipboard.osc52").copy("+"),
+          ["*"] = require("vim.ui.clipboard.osc52").copy("*"),
+        },
+        paste = {
+          ["+"] = require("vim.ui.clipboard.osc52").paste("+"),
+          ["*"] = require("vim.ui.clipboard.osc52").paste("*"),
+        },
+      }
 
       local function guess_link()
         -- Greedy helper: tries to find a valid file path in a string
@@ -493,9 +507,9 @@ local plugins = {
       end
 
       -- Keymaps from conf_cmd.vim
-      vim.keymap.set("n", "<leader>vr", function()
-        vim.cmd(selected_replace('n'))
-      end, { silent = true, desc = "Replace" })
+      -- vim.keymap.set("n", "<leader>vr", function()
+      --  vim.cmd(selected_replace('n'))
+      -- end, { silent = true, desc = "Replace" })
       vim.keymap.set("v", "<leader>vr", function()
         vim.cmd(selected_replace('v'))
       end, { silent = true, desc = "Replace" })
@@ -783,27 +797,6 @@ local plugins = {
     version = "*",
     enabled = not is_wsl() and cond({ "coder" }),
     cmd = "Telescope",
-    keys = {
-      -- { "<leader>ff", "<cmd>Telescope find_files<cr>", desc = "Find files" },
-      { "<leader>vr", "<cmd>Telescope resume<cr>", desc = "Resume" },
-      { "<leader>vp", "<cmd>Telescope pickers<cr>", desc = "Picker" },
-      { "<leader>vg", "<cmd>Telescope live_grep<cr>", desc = "Live grep" },
-      { "<leader>vb", "<cmd>Telescope buffers<cr>", desc = "Buffers" },
-      { "<leader>vs", "<cmd>Telescope search_history<cr>", desc = "Search" },
-      { "<leader>vc", "<cmd>Telescope command_history<cr>", desc = "Command" },
-      { "<leader>vz", "<cmd>Telescope oldfiles<cr>", desc = "Old files" },
-      { "<leader>vq", "<cmd>Telescope quickfix<cr>", desc = "Quick fix" },
-      {
-        "<leader>fq",
-        function()
-          require("telescope.builtin").find_files({
-            default_text = vim.fn.expand("<cword>"),
-          })
-        end,
-        desc = "Find Files (Word Under Cursor)",
-      },
-
-    },
     dependencies = {
       "nvim-lua/plenary.nvim",
       { "nvim-telescope/telescope-fzf-native.nvim", build = "make", cond = function() return vim.fn.executable("make") == 1 end },
@@ -818,6 +811,15 @@ local plugins = {
 
           -- Prevent selection from wrapping around when reaching the top or bottom
           cycle_layout_list = false,
+
+          -- FORCE THE BUFFER TO KILL TIMEOUT DELAYS IMMEDIATELY
+          attach_mappings = function(prompt_bufnr, map)
+            -- Force delete any conflicting global insert maps inside the Telescope prompt
+            pcall(vim.api.nvim_buf_del_keymap, prompt_bufnr, "i", "<C-p>")
+            pcall(vim.api.nvim_buf_del_keymap, prompt_bufnr, "i", "<C-n>")
+            return true
+          end,
+
           mappings = {
             i = {
               ["<C-n>"] = actions.move_selection_next,
@@ -868,6 +870,24 @@ local plugins = {
       vim.keymap.set('n', ';v/', '<cmd>Telescope search_history<cr>', { silent = true, desc = "History /" })
       vim.keymap.set('n', ';v:', '<cmd>Telescope commands<cr>', { silent = true, desc = "Commands" })
       vim.keymap.set('n', ';v;', '<cmd>Telescope command_history<cr>', { silent = true, desc = "Command History" })
+
+      vim.keymap.set('n', '<leader>vr', '<cmd>Telescope resume<cr>', { silent = true, desc = "Resume" })
+      vim.keymap.set('n', '<leader>vp', '<cmd>Telescope pickers<cr>', { silent = true, desc = "Picker" })
+      vim.keymap.set('n', '<leader>vp', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "Live grep" })
+      vim.keymap.set('n', '<leader>vg', '<cmd>Telescope buffers<cr>', { silent = true, desc = "Buffers" })
+      vim.keymap.set('n', '<leader>vb', '<cmd>Telescope search_history<cr>', { silent = true, desc = "Search" })
+      vim.keymap.set('n', '<leader>vc', '<cmd>Telescope command_history<cr>', { silent = true, desc = "Command" })
+      vim.keymap.set('n', '<leader>vz', '<cmd>Telescope oldfiles<cr>', { silent = true, desc = "Old files" })
+      vim.keymap.set('n', '<leader>vq', '<cmd>Telescope quickfix<cr>', { silent = true, desc = "Quick fix" })
+      vim.keymap.set('n', '<leader>fq',
+        function()
+          require("telescope.builtin").find_files({
+            default_text = vim.fn.expand("<cword>"),
+          })
+        end,
+        { silent = true, desc = "Find Files (Word Under Cursor)" }
+      )
+
     end,
   },
 
@@ -1246,7 +1266,7 @@ local plugins = {
   -- ============================================================
   {
     "ojroques/vim-oscyank",
-    enabled = cond({ "editor" }),
+    enabled = false and cond({ "editor" }),
     lazy = false,
     enabled = cond({ "editor" }),
     keys = {
