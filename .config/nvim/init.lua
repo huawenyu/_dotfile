@@ -799,13 +799,49 @@ local plugins = {
   {
     "nvim-telescope/telescope.nvim",
     version = "*",
-    enabled = not is_wsl() and cond({ "coder" }),
+    enabled = cond({ "coder" }),
     cmd = "Telescope",
     dependencies = {
       "nvim-lua/plenary.nvim",
       { "nvim-telescope/telescope-fzf-native.nvim", build = "make", cond = function() return vim.fn.executable("make") == 1 end },
       "nvim-telescope/telescope-hop.nvim",
     },
+    init = function()
+      vim.keymap.set('n', ';vF', '<cmd>Telescope find_files<cr>', { silent = true, desc = "All files" })
+      vim.keymap.set('n', ';vy', '<cmd>Telescope yank_history<cr>', { silent = true, desc = "Yanks" })
+      vim.keymap.set('n', ';va', '<cmd>Telescope autocommands<cr>', { silent = true, desc = "Auto commands" })
+      vim.keymap.set('n', ';vb', '<cmd>Telescope buffers<cr>', { silent = true, desc = "Buffers" })
+      vim.keymap.set('n', ';vC', '<cmd>Telescope git_commits<cr>', { silent = true, desc = "Git commits" })
+      vim.keymap.set('n', ';vm', '<cmd>Telescope marks<cr>', { silent = true, desc = "Marks" })
+      vim.keymap.set('n', ';vM', '<cmd>Telescope keymaps<cr>', { silent = true, desc = "Key maps" })
+      vim.keymap.set('n', ';vj', '<cmd>Telescope jumplist<cr>', { silent = true, desc = "Jumps" })
+      vim.keymap.set('n', '<leader>fl', '<cmd>Telescope current_buffer_fuzzy_find<cr>', { silent = true, desc = "Lines" })
+      vim.keymap.set('n', '<leader>fL', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "Live grep" })
+      vim.keymap.set('n', ';vd', '<cmd>Telescope diagnostics<cr>', { silent = true, desc = "Diagnostics" })
+      vim.keymap.set('n', ';vq', '<cmd>Telescope quickfix<cr>', { silent = true, desc = "Quickfix" })
+      vim.keymap.set('n', ';vQ', '<cmd>Telescope quickfixhistory<cr>', { silent = true, desc = "Quickfix History" })
+      vim.keymap.set('n', ';v/', '<cmd>Telescope search_history<cr>', { silent = true, desc = "History /" })
+      vim.keymap.set('n', ';v:', '<cmd>Telescope commands<cr>', { silent = true, desc = "Commands" })
+      vim.keymap.set('n', ';v;', '<cmd>Telescope command_history<cr>', { silent = true, desc = "Command History" })
+
+      vim.keymap.set('n', '<leader>vr', '<cmd>Telescope resume<cr>', { silent = true, desc = "Resume" })
+      vim.keymap.set('n', '<leader>vp', '<cmd>Telescope pickers<cr>', { silent = true, desc = "Picker" })
+      vim.keymap.set('n', '<leader>vp', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "Live grep" })
+      vim.keymap.set('n', '<leader>vg', '<cmd>Telescope buffers<cr>', { silent = true, desc = "Buffers" })
+      vim.keymap.set('n', '<leader>vb', '<cmd>Telescope search_history<cr>', { silent = true, desc = "Search" })
+      vim.keymap.set('n', '<leader>vc', '<cmd>Telescope command_history<cr>', { silent = true, desc = "Command" })
+      vim.keymap.set('n', '<leader>vz', '<cmd>Telescope oldfiles<cr>', { silent = true, desc = "Old files" })
+      vim.keymap.set('n', '<leader>vq', '<cmd>Telescope quickfix<cr>', { silent = true, desc = "Quick fix" })
+      vim.keymap.set('n', '<leader>fq',
+        function()
+          require("telescope.builtin").find_files({
+            default_text = vim.fn.expand("<cword>"),
+          })
+        end,
+        { silent = true, desc = "Find Files (Word Under Cursor)" }
+      )
+    end,
+
     config = function()
       local actions = require("telescope.actions")
       local telescope = require("telescope")
@@ -858,42 +894,8 @@ local plugins = {
 
       -- telescope.load_extension("fzf")
       -- telescope.load_extension("hop")
-
-      vim.keymap.set('n', ';vF', '<cmd>Telescope find_files<cr>', { silent = true, desc = "All files" })
-      vim.keymap.set('n', ';vy', '<cmd>Telescope yank_history<cr>', { silent = true, desc = "Yanks" })
-      vim.keymap.set('n', ';va', '<cmd>Telescope autocommands<cr>', { silent = true, desc = "Auto commands" })
-      vim.keymap.set('n', ';vb', '<cmd>Telescope buffers<cr>', { silent = true, desc = "Buffers" })
-      vim.keymap.set('n', ';vC', '<cmd>Telescope git_commits<cr>', { silent = true, desc = "Git commits" })
-      vim.keymap.set('n', ';vm', '<cmd>Telescope marks<cr>', { silent = true, desc = "Marks" })
-      vim.keymap.set('n', ';vM', '<cmd>Telescope keymaps<cr>', { silent = true, desc = "Key maps" })
-      vim.keymap.set('n', ';vj', '<cmd>Telescope jumplist<cr>', { silent = true, desc = "Jumps" })
-      vim.keymap.set('n', '<leader>fl', '<cmd>Telescope current_buffer_fuzzy_find<cr>', { silent = true, desc = "Lines" })
-      vim.keymap.set('n', '<leader>fL', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "Live grep" })
-      vim.keymap.set('n', ';vd', '<cmd>Telescope diagnostics<cr>', { silent = true, desc = "Diagnostics" })
-      vim.keymap.set('n', ';vq', '<cmd>Telescope quickfix<cr>', { silent = true, desc = "Quickfix" })
-      vim.keymap.set('n', ';vQ', '<cmd>Telescope quickfixhistory<cr>', { silent = true, desc = "Quickfix History" })
-      vim.keymap.set('n', ';v/', '<cmd>Telescope search_history<cr>', { silent = true, desc = "History /" })
-      vim.keymap.set('n', ';v:', '<cmd>Telescope commands<cr>', { silent = true, desc = "Commands" })
-      vim.keymap.set('n', ';v;', '<cmd>Telescope command_history<cr>', { silent = true, desc = "Command History" })
-
-      vim.keymap.set('n', '<leader>vr', '<cmd>Telescope resume<cr>', { silent = true, desc = "Resume" })
-      vim.keymap.set('n', '<leader>vp', '<cmd>Telescope pickers<cr>', { silent = true, desc = "Picker" })
-      vim.keymap.set('n', '<leader>vp', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "Live grep" })
-      vim.keymap.set('n', '<leader>vg', '<cmd>Telescope buffers<cr>', { silent = true, desc = "Buffers" })
-      vim.keymap.set('n', '<leader>vb', '<cmd>Telescope search_history<cr>', { silent = true, desc = "Search" })
-      vim.keymap.set('n', '<leader>vc', '<cmd>Telescope command_history<cr>', { silent = true, desc = "Command" })
-      vim.keymap.set('n', '<leader>vz', '<cmd>Telescope oldfiles<cr>', { silent = true, desc = "Old files" })
-      vim.keymap.set('n', '<leader>vq', '<cmd>Telescope quickfix<cr>', { silent = true, desc = "Quick fix" })
-      vim.keymap.set('n', '<leader>fq',
-        function()
-          require("telescope.builtin").find_files({
-            default_text = vim.fn.expand("<cword>"),
-          })
-        end,
-        { silent = true, desc = "Find Files (Word Under Cursor)" }
-      )
-
     end,
+
   },
 
   -- Markdown
