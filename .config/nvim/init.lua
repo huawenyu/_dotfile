@@ -815,6 +815,7 @@ local plugins = {
 
           -- Prevent selection from wrapping around when reaching the top or bottom
           cycle_layout_list = false,
+          scroll_strategy = "limit",
 
           -- FORCE THE BUFFER TO KILL TIMEOUT DELAYS IMMEDIATELY
           attach_mappings = function(prompt_bufnr, map)
