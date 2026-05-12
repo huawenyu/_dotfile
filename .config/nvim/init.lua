@@ -824,11 +824,10 @@ local plugins = {
       vim.keymap.set('n', ';v:', '<cmd>Telescope commands<cr>', { silent = true, desc = "Commands" })
       vim.keymap.set('n', ';v;', '<cmd>Telescope command_history<cr>', { silent = true, desc = "Command History" })
 
-      vim.keymap.set('n', '<leader>vr', '<cmd>Telescope resume<cr>', { silent = true, desc = "Resume" })
-      vim.keymap.set('n', '<leader>vp', '<cmd>Telescope pickers<cr>', { silent = true, desc = "Picker" })
+      vim.keymap.set('n', '<leader>v;', '<cmd>Telescope resume<cr>', { silent = true, desc = "Resume" })
+      vim.keymap.set('n', '<leader>vP', '<cmd>Telescope pickers<cr>', { silent = true, desc = "Picker" })
       vim.keymap.set('n', '<leader>vp', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "Live grep" })
-      vim.keymap.set('n', '<leader>vg', '<cmd>Telescope buffers<cr>', { silent = true, desc = "Buffers" })
-      vim.keymap.set('n', '<leader>vb', '<cmd>Telescope search_history<cr>', { silent = true, desc = "Search" })
+      vim.keymap.set('n', '<leader>vb', '<cmd>Telescope buffers<cr>', { silent = true, desc = "Buffers" })
       vim.keymap.set('n', '<leader>vc', '<cmd>Telescope command_history<cr>', { silent = true, desc = "Command" })
       vim.keymap.set('n', '<leader>vz', '<cmd>Telescope oldfiles<cr>', { silent = true, desc = "Old files" })
       vim.keymap.set('n', '<leader>vq', '<cmd>Telescope quickfix<cr>', { silent = true, desc = "Quick fix" })
@@ -2396,6 +2395,26 @@ local plugins = {
     keys = {
       { "<leader>gl", "<cmd>GV<cr>", desc = "Git Log side by side" },
     },
+  },
+  {
+    "sindrets/diffview.nvim",
+    enabled = cond({ "editor" }),
+    cmd = "DiffviewOpen",
+    dependencies = { "nvim-lua/plenary.nvim" },
+    keys = {
+      { "<leader>vg", "<cmd>DiffviewOpen<cr>", desc = "Open Diffview", },
+    },
+    config = function()
+      require("diffview").setup({})
+
+      vim.keymap.set("n", "<leader>vG", function()
+        local files = vim.fn.systemlist("git diff --name-only")
+
+        require("telescope.builtin").live_grep({
+          search_dirs = files,
+        })
+      end)
+    end,
   },
   { -- will hide some importance output message, don't use it
     "folke/noice.nvim",
