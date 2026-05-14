@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+APPIMAGE_URL="https://github.com/neovim/neovim/releases/download/nightly/nvim-linux-x86_64.appimage"
+
+TMP_DIR="$HOME/tmp"
+BASE_DIR="$HOME/.local/share/nvim-appimage"
+INSTALL_DIR="$HOME/.local/bin"
+
+APPIMAGE="$TMP_DIR/nvim.appimage"
+EXTRACT_DIR="$BASE_DIR/squashfs-root"
+
+USER_NVM="$INSTALL_DIR/nvim"
+
+mkdir -p "$TMP_DIR" "$BASE_DIR" "$INSTALL_DIR"
+
+echo "==> Downloading latest Neovim AppImage..."
+
+curl -fL --retry 3 -o "$APPIMAGE" "$APPIMAGE_URL"
+
+echo "==> Validating download..."
+
+if ! file "$APPIMAGE" | grep -q "ELF"; then
+    echo "❌ Invalid AppImage (likely HTML download)"
+    file "$APPIMAGE"
+    exit 1
+fi
+
+chmod +x "$APPIMAGE"
+
+echo "==> Installing Neovim..."
+
+# -------------------------
+# FUSE or extract fallback
+# -------------------------
+if command -v fusermount3 >/dev/null 2>&1 && [ -e /dev/fuse ]; then
+    echo "==> FUSE available → using AppImage directly"
+    ln -sf "$APPIMAGE" "$USER_NVM"
+else
+    echo "==> No FUSE → extracting AppImage"
+
+    cd "$BASE_DIR"
+    rm -rf squashfs-root
+
+    "$APPIMAGE" --appimage-extract >/dev/null
+
+    ln -sf "$EXTRACT_DIR/usr/bin/nvim" "$USER_NVM"
+fi
+
+chmod +x "$USER_NVM"
+
+echo "==> Neovim installed:"
+"$USER_NVM" --version | head -n 1
+
+# -------------------------
+# update-alternatives setup
+# -------------------------
+echo ""
+echo "==> Configuring system vi/vim via update-alternatives..."
+
+if command -v sudo >/dev/null 2>&1; then
+
+    sudo update-alternatives --install /usr/bin/vi vi "$USER_NVM" 100
+    sudo update-alternatives --install /usr/bin/vim vim "$USER_NVM" 100
+    sudo update-alternatives --install /usr/bin/vimdiff vimdiff "$USER_NVM" 100
+
+    sudo update-alternatives --set vi "$USER_NVM" || true
+    sudo update-alternatives --set vim "$USER_NVM" || true
+    sudo update-alternatives --set vimdiff "$USER_NVM" || true
+
+    echo "==> update-alternatives configured"
+
+else
+    echo "⚠️ sudo not available, skipping system-wide vi/vim setup"
+fi
+
+# -------------------------
+# verify
+# -------------------------
+echo ""
+echo "==> Final versions:"
+nvim --version | head -n 1 || true
+vi --version | head -n 1 || true
+vim --version | head -n 1 || true
+
+echo ""
+echo "==> Active paths:"
+which nvim || true
+which vi || true
+which vim || true
+
+

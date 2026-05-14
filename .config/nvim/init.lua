@@ -170,6 +170,42 @@ local plugins = {
   -- ============================================================
   { "tpope/vim-sensible", enabled = cond({ "basic", "log", "editor" }), lazy = false },
   {
+    "echasnovski/mini.ai",
+    enabled = false and cond({ "basic", "log", "editor" }),
+    event = "VeryLazy",
+    config = function()
+      require("mini.ai").setup({
+        -- Table with textobject id as fields, textobject specification as values.
+        custom_textobjects = nil,
+
+        mappings = {
+          -- Main textobject prefixes
+          around = "a",
+          inside = "i",
+
+          -- Next/last variants
+          around_next = "an",
+          inside_next = "in",
+          around_last = "al",
+          inside_last = "il",
+
+          -- Move cursor to edges of textobject
+          goto_left = "g[",
+          goto_right = "g]",
+        },
+
+        -- Number of lines within which textobject is searched
+        n_lines = 50,
+
+        -- Search behavior
+        search_method = "cover_or_next",
+
+        -- Silent mode
+        silent = false,
+      })
+    end,
+  },
+  {
     "huawenyu/vim-basic",
     enabled = cond({ "basic", "log", "editor" }),
     lazy = false,
@@ -571,12 +607,12 @@ local plugins = {
         vim.keymap.set("n", ";w", ":wall<cr>", { desc = "Save all buffers" })
         vim.keymap.set("x", ";w", ":<c-U>wall<cr>")
         if HasPlug("vim-motion") then
-          vim.keymap.set("n", "<a-,>", "<Plug>_JumpPrevIndent")
-          vim.keymap.set("n", "<a-.>", "<Plug>_JumpNextIndent")
-          vim.keymap.set("x", "<a-.>", "<Plug>_JumpPrevIndent")
-          vim.keymap.set("x", "<a-,>", "<Plug>_JumpNextIndent")
-          vim.keymap.set("o", "<a-,>", "<Plug>_JumpPrevIndent")
-          vim.keymap.set("o", "<a-.>", "<Plug>_JumpNextIndent")
+          vim.keymap.set("n", "<a-.>", "<Plug>_JumpPrevIndent")
+          vim.keymap.set("n", "<a-,>", "<Plug>_JumpNextIndent")
+          vim.keymap.set("x", "<a-,>", "<Plug>_JumpPrevIndent")
+          vim.keymap.set("x", "<a-.>", "<Plug>_JumpNextIndent")
+          vim.keymap.set("o", "<a-.>", "<Plug>_JumpPrevIndent")
+          vim.keymap.set("o", "<a-,>", "<Plug>_JumpNextIndent")
         end
         vim.keymap.set("i", "<a-i>", '<c-r>"')
       end
@@ -690,6 +726,71 @@ local plugins = {
           vim.cmd('silent! tab tag ' .. vtag)
         end
       end, { silent = true, desc = "Tag word into new tab" })
+
+
+
+      -- Implement vim-selection-history
+      local M = {}
+      M.history = {}
+      M.index = 0
+      local max_history = 20
+
+      vim.api.nvim_create_autocmd("ModeChanged", {
+        pattern = "[vV\x16]:*",
+        callback = function()
+          local buf = vim.api.nvim_get_current_buf()
+          local mode = vim.fn.visualmode()
+          local start_pos = vim.fn.getpos("'<")
+          local end_pos = vim.fn.getpos("'>")
+
+          if start_pos[2] == 0 or end_pos[2] == 0 then return end
+
+          if #M.history > 0 then
+            local last = M.history[#M.history]
+            if last.buf == buf and last.start_pos[2] == start_pos[2] and last.end_pos[2] == end_pos[2] then
+              return
+            end
+          end
+
+          table.insert(M.history, {
+            buf = buf,
+            mode = mode,
+            start_pos = start_pos,
+            end_pos = end_pos
+          })
+
+          if #M.history > max_history then
+            table.remove(M.history, 1)
+          end
+          M.index = #M.history + 1
+        end
+      })
+
+      local function restore_selection(idx)
+        local sel = M.history[idx]
+        if not sel or not vim.api.nvim_buf_is_valid(sel.buf) then return end
+
+        if vim.api.nvim_get_current_buf() ~= sel.buf then
+          vim.api.nvim_set_current_buf(sel.buf)
+        end
+
+        vim.fn.setpos("'<", sel.start_pos)
+        vim.fn.setpos("'>", sel.end_pos)
+        vim.cmd("normal! gv")
+      end
+
+      vim.keymap.set("n", "g<", function()
+        if #M.history == 0 then return end
+        M.index = M.index > 1 and M.index - 1 or #M.history
+        restore_selection(M.index)
+      end, { desc = "Visual Selection - Previous" })
+
+      vim.keymap.set("n", "g>", function()
+        if #M.history == 0 then return end
+        M.index = M.index < #M.history and M.index + 1 or 1
+        restore_selection(M.index)
+      end, { desc = "Visual Selection - Next" })
+
     end,
   },
 
@@ -1130,7 +1231,28 @@ local plugins = {
       })
     end,
   },
-  { "chrisbra/NrrwRgn", enabled = cond({ "editor" }), cmd = { "NR", "NRV" } },
+
+  {
+    "chrisbra/NrrwRgn",
+    enabled = cond({ "editor" }),
+    -- Load only when running these specific narrowing commands
+    cmd = { "NR", "NrwRgn", "NarrowRegion" },
+    keys = {
+      -- Map <Leader>nr in visual mode to narrow the selected region
+      { "<Leader>ww", ":NR<CR>", mode = "v", desc = "Narrow selected region" },
+    },
+    config = function()
+      -- Enable automatic synchronization when leaving the narrowed buffer
+      vim.g.nrrw_rgn_write_on_synchronize = 1
+
+      -- Prevent the main original file from being accidentally closed
+      vim.g.nrrw_toploaddata = 1
+
+      -- Instruct the plugin to open via standard tabedit commands
+      vim.g.nrrw_rgn_wdth = "tabedit"
+    end,
+  },
+
   { -- UI: pretty tab
     "fweep/vim-tabber",
     lazy = false,
@@ -1826,7 +1948,14 @@ local plugins = {
     end,
   },
 
-  { "nvim-treesitter/nvim-treesitter", enabled = cond({ "editor" }), build = ":TSUpdate", lazy = false },
+  { 
+    "nvim-treesitter/nvim-treesitter", 
+    enabled = cond({ "editor" }), 
+    build = ":TSUpdate", 
+    lazy = false,
+    config = function()
+    end,
+  },
   {
     "nvim-treesitter/nvim-treesitter-context",
     enabled = cond({ "coder" }),
@@ -1836,6 +1965,12 @@ local plugins = {
       enable = true, -- Enable this plugin (Can be enabled/disabled later via commands)
       max_lines = 0, -- How many lines the window should span. Values <= 0 mean no limit.
     },
+  },
+  {
+    "nvim-treesitter/nvim-treesitter-textobjects",
+    enabled = cond({ "basic", "log", "editor" }),
+    dependencies = { "nvim-treesitter/nvim-treesitter" },
+    event = "VeryLazy",
   },
   {
     "neovim/nvim-lspconfig",
@@ -2219,20 +2354,345 @@ local plugins = {
   { "sk1418/blockit", enabled = cond({ "editor" }), cmd = "Block" },
   {
     "rmagatti/auto-session",
-    enabled = false and cond({ "editor" }),
     lazy = false,
+
+    dependencies = {
+      "nvim-telescope/telescope.nvim",
+      "nvim-lua/plenary.nvim",
+    },
+
     config = function()
-      local session_dir = vim.fn.expand('~/.vim/tmp-sessions')
-      if vim.fn.isdirectory(session_dir) == 0 then vim.fn.mkdir(session_dir, 'p') end
+      ----------------------------------------------------------------
+      -- Setup
+      ----------------------------------------------------------------
+      local auto_session = require("auto-session")
+
+      local session_dir = vim.fn.expand("~/.vim/tmp-sessions")
+
+      if vim.fn.isdirectory(session_dir) == 0 then
+        vim.fn.mkdir(session_dir, "p")
+      end
+
+      ----------------------------------------------------------------
+      -- IMPORTANT:
+      -- auto-session still reads this global internally
+      ----------------------------------------------------------------
       vim.g.auto_session_root_dir = session_dir
-      require('auto-session').setup({
-        log_level = 'error', auto_save = true, auto_create = true, auto_restore = false,
-        auto_restore_last_session = false, auto_session_suppress_dirs = { "~/", "~/Projects", "~/Downloads", "/" },
-        allowed_dirs = { "~/work", "~/workref" },
+
+      auto_session.setup({
+        log_level = "error",
+
+        auto_restore_enabled = true,
+        auto_save_enabled = true,
+
+        -- optional
+        -- auto_session_use_git_branch = true,
+
+        auto_session_suppress_dirs = {
+          "~/",
+          "~/Projects",
+          "~/Downloads",
+          "/",
+        },
+
+        auto_session_allowed_dirs = {
+          "~/work",
+          "~/workref",
+        },
+
+        session_lens = {
+          load_on_setup = false,
+          previewer = false,
+
+          theme_conf = {
+            border = true,
+          },
+        },
       })
-      vim.o.sessionoptions = "blank,buffers,curdir,folds,tabpages,winsize,winpos,terminal,localoptions"
-      vim.keymap.set('n', '<leader>sr', '<cmd>SessionRestore<cr>', { silent = true, desc = "Restore workspace session" })
-      vim.keymap.set('n', '<leader>ss', '<cmd>SessionSave<cr>', { silent = true, desc = "Save workspace session" })
+
+      ----------------------------------------------------------------
+      -- Better session persistence
+      ----------------------------------------------------------------
+      vim.o.sessionoptions =
+        "blank,buffers,curdir,folds,help,tabpages,winsize,winpos,terminal,localoptions"
+
+      ----------------------------------------------------------------
+      -- Telescope
+      ----------------------------------------------------------------
+      local pickers = require("telescope.pickers")
+      local finders = require("telescope.finders")
+      local conf = require("telescope.config").values
+      local actions = require("telescope.actions")
+      local action_state = require("telescope.actions.state")
+
+      ----------------------------------------------------------------
+      -- auto-session internals
+      ----------------------------------------------------------------
+      local Lib = require("auto-session.lib")
+
+      ----------------------------------------------------------------
+      -- Helpers
+      ----------------------------------------------------------------
+      local function get_session_prefix()
+        local cwd = vim.fn.getcwd()
+
+        ----------------------------------------------------------------
+        -- Must use auto-session's own escaping
+        ----------------------------------------------------------------
+        return Lib.escape_session_name(cwd)
+      end
+
+      local function get_project_sessions()
+        local sessions = {}
+
+        local prefix = get_session_prefix()
+
+        local handle = vim.loop.fs_scandir(session_dir)
+
+        if not handle then
+          return sessions
+        end
+
+        while true do
+          local file, file_type =
+            vim.loop.fs_scandir_next(handle)
+
+          if not file then
+            break
+          end
+
+          ----------------------------------------------------------------
+          -- Only .vim session files
+          ----------------------------------------------------------------
+          if file_type == "file"
+            and file:sub(-4) == ".vim"
+          then
+            local basename =
+              file:gsub("%.vim$", "")
+
+            ----------------------------------------------------------------
+            -- Match:
+            -- <encoded-cwd>_<workspace-name>
+            ----------------------------------------------------------------
+            if vim.startswith(
+              basename,
+              prefix .. "_"
+            ) then
+              local workspace =
+                basename:sub(#prefix + 2)
+
+              if workspace ~= "" then
+                table.insert(sessions, {
+                  display = workspace,
+                  file = file,
+                  full_path =
+                    session_dir .. "/" .. file,
+                })
+              end
+            end
+          end
+        end
+
+        table.sort(sessions, function(a, b)
+          return a.display < b.display
+        end)
+
+        return sessions
+      end
+
+      ----------------------------------------------------------------
+      -- Save Named Workspace Session
+      ----------------------------------------------------------------
+      local function save_workspace_session()
+        vim.ui.input({
+          prompt = "Workspace session name: ",
+        }, function(input)
+          if not input or input == "" then
+            return
+          end
+
+          local prefix = get_session_prefix()
+
+          local filename =
+            string.format(
+              "%s_%s.vim",
+              prefix,
+              input
+            )
+
+          local path =
+            session_dir .. "/" .. filename
+
+          local exists =
+            vim.loop.fs_stat(path) ~= nil
+
+          local function save()
+            vim.cmd(
+              "AutoSession save "
+                .. vim.fn.fnameescape(input)
+            )
+
+            vim.notify(
+              "Saved workspace session: "
+                .. input,
+              vim.log.levels.INFO
+            )
+          end
+
+          ----------------------------------------------------------------
+          -- Overwrite confirm
+          ----------------------------------------------------------------
+          if exists then
+            vim.ui.select({
+              "Overwrite",
+              "Cancel",
+            }, {
+              prompt =
+                "Workspace already exists",
+            }, function(choice)
+              if choice == "Overwrite" then
+                save()
+              end
+            end)
+          else
+            save()
+          end
+        end)
+      end
+
+      ----------------------------------------------------------------
+      -- Telescope Workspace Picker
+      ----------------------------------------------------------------
+      local function open_workspace_picker()
+        local sessions =
+          get_project_sessions()
+
+        if vim.tbl_isempty(sessions) then
+          vim.notify(
+            "No workspace sessions for current project",
+            vim.log.levels.WARN
+          )
+          return
+        end
+
+        pickers.new({}, {
+          prompt_title =
+            "Project Workspace Sessions",
+
+          finder = finders.new_table({
+            results = sessions,
+
+            entry_maker = function(entry)
+              return {
+                value = entry,
+
+                display = entry.display,
+                ordinal = entry.display,
+
+                filename = entry.full_path,
+                path = entry.full_path,
+              }
+            end,
+          }),
+
+          sorter = conf.generic_sorter({}),
+
+          previewer = false,
+
+          attach_mappings = function(
+            prompt_bufnr,
+            map
+          )
+            ----------------------------------------------------------------
+            -- Restore Session
+            ----------------------------------------------------------------
+            actions.select_default:replace(
+              function()
+                local selection =
+                  action_state
+                    .get_selected_entry()
+
+                actions.close(prompt_bufnr)
+
+                vim.cmd(
+                  "AutoSession restore "
+                    .. vim.fn.fnameescape(
+                      selection.value.display
+                    )
+                )
+
+                vim.notify(
+                  "Loaded workspace: "
+                    .. selection.value.display,
+                  vim.log.levels.INFO
+                )
+              end
+            )
+
+            ----------------------------------------------------------------
+            -- Delete Session
+            ----------------------------------------------------------------
+            map("i", "<C-d>", function()
+              local selection =
+                action_state
+                  .get_selected_entry()
+
+              vim.fn.delete(
+                selection.value.full_path
+              )
+
+              vim.notify(
+                "Deleted workspace: "
+                  .. selection.value.display,
+                vim.log.levels.INFO
+              )
+
+              actions.close(prompt_bufnr)
+
+              vim.schedule(function()
+                open_workspace_picker()
+              end)
+            end)
+
+            return true
+          end,
+        }):find()
+      end
+
+      ----------------------------------------------------------------
+      -- Keymaps
+      ----------------------------------------------------------------
+      vim.keymap.set("n", "<leader>ws", function()
+        require("auto-session")
+          .search_session()
+      end, {
+        desc = "Search all sessions",
+      })
+
+      vim.keymap.set("n", "<leader>wr", function()
+        vim.cmd("AutoSession restore")
+      end, {
+        desc = "Restore latest session",
+      })
+
+      vim.keymap.set(
+        "n",
+        "<leader>wS",
+        save_workspace_session,
+        {
+          desc = "Save named workspace session",
+        }
+      )
+
+      vim.keymap.set(
+        "n",
+        "<leader>wR",
+        open_workspace_picker,
+        {
+          desc =
+            "Open workspace sessions for current project",
+        }
+      )
     end,
   },
   {
