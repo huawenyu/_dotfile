@@ -236,7 +236,7 @@ local plugins = {
           end
         end,
         mode = { "n", "x" },
-        desc = "Clear trailing whitespace *",
+        desc = "[misc] Clear trailing whitespace *",
       },
 
       -- 1. FIX INDENTATION: Uses '=' operator on whole file (n) or selection (x)
@@ -275,7 +275,7 @@ local plugins = {
           end
         end,
         mode = { "n", "x" },
-        desc = "Remove ^M (Windows line endings) *",
+        desc = "[misc] Remove ^M (Windows line endings) *",
       },
 
       -- 3. COLLAPSE BLANK LINES: Shrinks 3+ blank lines into 2 (one gap)
@@ -294,7 +294,7 @@ local plugins = {
           end
         end,
         mode = { "n", "x" },
-        desc = "Collapse blank lines *",
+        desc = "[misc]Collapse blank lines *",
       },
     },
     config = function()
@@ -449,16 +449,16 @@ local plugins = {
       vim.keymap.set('v', '//', function()
         vim.fn.execute('y')
         vim.cmd(':vim /\\<' .. vim.fn.getreg('"') .. '\\C/gj %')
-      end, { desc = "Search visual selection *" })
+      end, { desc = "[find] Search visual selection *" })
 
       -- File open with gf
       vim.keymap.set("n", "gf", function()
         vim.cmd("call utils#GotoFileWithLineNum(0)")
-      end, { desc = "Open file under cursor *" })
+      end, { desc = "[file] Open file under cursor *" })
 
       vim.keymap.set("n", "<leader>gf", function()
         guess_link('n')
-      end, { silent = true, desc = "(tool) Goto file *" })
+      end, { silent = true, desc = "[misc] Goto file *" })
 
       vim.keymap.set("x", "<leader>gf", function()
         guess_link('v')
@@ -476,11 +476,11 @@ local plugins = {
     keys = {
       -- conf_cmd.vim keymaps
       { "<leader>vr", mode = { "n", "v" }, desc = "Replace" },
-      { "<leader>mk", desc = "Make wad *" },
-      { "<leader>ma", desc = "Make all *" },
+      { "<leader>mk", desc = "[misc] Make wad *" },
+      { "<leader>ma", desc = "[misc] Make all *" },
       { "<leader>mw", desc = "Dictionary" },
-      { "<leader>mf", desc = "Quickfix filter *" },
-      { "<leader>mc", desc = "Quickfix add caller *" },
+      { "<leader>mf", desc = "[qf] Quickfix filter *" },
+      { "<leader>mc", desc = "[qf] Quickfix add caller *" },
       { ";q", desc = "SmartClose" },
     },
     config = function()
@@ -604,7 +604,7 @@ local plugins = {
         vim.keymap.set("n", "<a-/>", ":TodoLocList<cr>")
         vim.keymap.set("n", "<a-:>", ":AsyncTask tag4one<cr>")
         vim.keymap.set("n", "<a-'>", ":AsyncTask run<cr>")
-        vim.keymap.set("n", ";w", ":wall<cr>", { desc = "Save all buffers *" })
+        vim.keymap.set("n", ";w", ":wall<cr>", { desc = "[misc] Save all buffers *" })
         vim.keymap.set("x", ";w", ":<c-U>wall<cr>")
         if HasPlug("vim-motion") then
           vim.keymap.set("n", "<a-.>", "<Plug>_JumpPrevIndent")
@@ -620,7 +620,7 @@ local plugins = {
       -- vimConfig/conf_map.vim: Basic mappings
       if vim.g.vim_confi_option.enable_map_basic then
         vim.keymap.set("n", "<C-c>", "<C-c>")
-        vim.keymap.set("n", "<leader>q", function() vim.cmd("qa") end, { silent = true, desc = "Exit all *" })
+        vim.keymap.set("n", "<leader>q", function() vim.cmd("qa") end, { silent = true, desc = "[misc] Exit all *" })
         vim.keymap.set("x", "<leader>q", function() vim.cmd("qa") end, { silent = true })
         vim.keymap.set("i", "<S-Tab>", "<C-v><Tab>")
 
@@ -642,10 +642,10 @@ local plugins = {
 
 
         vim.keymap.set("n", ";#", ":<c-u><c-u>%s///gn<cr>", { desc = "Count search pattern" })
-        vim.keymap.set("n", ";^", ":<c-u>g//p<cr>", { desc = "Popup search pattern *" })
+        vim.keymap.set("n", ";^", ":<c-u>g//p<cr>", { desc = "[misc] Popup search pattern *" })
         vim.keymap.set("n", ";*", ":cexpr []<cr> | :<c-u>g//caddexpr expand('%') ..':' ..line('.') ..':0:' .. getline('.')<cr> | :copen<cr>", { desc = "Quickfix sink search" })
-        vim.keymap.set("n", "<F1>", ":%s///gc<cr>", { desc = "Continue replace all search *" })
-        vim.keymap.set("n", ";.", ":%s//<C-R>\"/gc<cr>", { desc = "Continue replace all search *" })
+        vim.keymap.set("n", "<F1>", ":%s///gc<cr>", { desc = "[misc] Continue replace all search *" })
+        vim.keymap.set("n", ";.", ":%s//<C-R>\"/gc<cr>", { desc = "[misc] Continue replace all search *" })
         vim.keymap.set("n", "<leader>.", "@@", { desc = "Repeat macro" })
         vim.keymap.set("n", "<Esc>", ":nohlsearch<CR><Esc>", { silent = true })
       end
@@ -657,7 +657,7 @@ local plugins = {
           callback = function()
             vim.keymap.set("n", "<leader>fa", function()
               vim.cmd("call JumpToCorrespondingFile()")
-            end, { buffer = true, silent = true, desc = "Toggle source/header *" })
+            end, { buffer = true, silent = true, desc = "[misc] Toggle source/header *" })
           end,
         })
 
@@ -908,16 +908,16 @@ local plugins = {
       "nvim-telescope/telescope-hop.nvim",
     },
     init = function()
-      vim.keymap.set('n', ';vF', '<cmd>Telescope find_files<cr>', { silent = true, desc = "All files *" })
+      vim.keymap.set('n', ';vF', '<cmd>Telescope find_files<cr>', { silent = true, desc = "[picker] All files *" })
       vim.keymap.set('n', ';vy', '<cmd>Telescope yank_history<cr>', { silent = true, desc = "Yanks" })
       vim.keymap.set('n', ';va', '<cmd>Telescope autocommands<cr>', { silent = true, desc = "Auto commands" })
       vim.keymap.set('n', ';vb', '<cmd>Telescope buffers<cr>', { silent = true, desc = "Buffers" })
-      vim.keymap.set('n', ';vC', '<cmd>Telescope git_commits<cr>', { silent = true, desc = "Git commits *" })
-      vim.keymap.set('n', ';vm', '<cmd>Telescope marks<cr>', { silent = true, desc = "Marks *" })
+      vim.keymap.set('n', ';vC', '<cmd>Telescope git_commits<cr>', { silent = true, desc = "[picker] Git commits *" })
+      vim.keymap.set('n', ';vm', '<cmd>Telescope marks<cr>', { silent = true, desc = "[picker] Marks *" })
 
-      vim.keymap.set('n', ';vj', '<cmd>Telescope jumplist<cr>', { silent = true, desc = "Jumps *" })
-      vim.keymap.set('n', '<leader>fl', '<cmd>Telescope current_buffer_fuzzy_find<cr>', { silent = true, desc = "Lines *" })
-      vim.keymap.set('n', '<leader>fL', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "Live grep *" })
+      vim.keymap.set('n', ';vj', '<cmd>Telescope jumplist<cr>', { silent = true, desc = "[picker] Jumps *" })
+      vim.keymap.set('n', '<leader>fl', '<cmd>Telescope current_buffer_fuzzy_find<cr>', { silent = true, desc = "[find] Lines *" })
+      vim.keymap.set('n', '<leader>fL', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "[picker] Live grep *" })
       vim.keymap.set('n', ';vd', '<cmd>Telescope diagnostics<cr>', { silent = true, desc = "Diagnostics" })
       vim.keymap.set('n', ';vQ', '<cmd>Telescope quickfixhistory<cr>', { silent = true, desc = "Quickfix History" })
       vim.keymap.set('n', ';v/', '<cmd>Telescope search_history<cr>', { silent = true, desc = "History /" })
@@ -928,20 +928,20 @@ local plugins = {
         require('telescope.builtin').keymaps({ default_text = "*$" })
       end, { silent = true, desc = "Key maps (Filtered by endwith-*)" })
 
-      vim.keymap.set('n', '<leader>v;', '<cmd>Telescope resume<cr>', { silent = true, desc = "Resume *" })
+      vim.keymap.set('n', '<leader>v;', '<cmd>Telescope resume<cr>', { silent = true, desc = "[picker] Resume *" })
       vim.keymap.set('n', '<leader>vP', '<cmd>Telescope pickers<cr>', { silent = true, desc = "Picker" })
       vim.keymap.set('n', '<leader>vp', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "Live grep" })
       vim.keymap.set('n', '<leader>vb', '<cmd>Telescope buffers<cr>', { silent = true, desc = "Buffers" })
       vim.keymap.set('n', '<leader>vc', '<cmd>Telescope command_history<cr>', { silent = true, desc = "Command" })
-      vim.keymap.set('n', '<leader>vz', '<cmd>Telescope oldfiles<cr>', { silent = true, desc = "Old files *" })
-      vim.keymap.set('n', '<leader>vq', '<cmd>Telescope quickfix<cr>', { silent = true, desc = "Quick fix *" })
+      vim.keymap.set('n', '<leader>vz', '<cmd>Telescope oldfiles<cr>', { silent = true, desc = "[picker] Old files *" })
+      vim.keymap.set('n', '<leader>vq', '<cmd>Telescope quickfix<cr>', { silent = true, desc = "[qf] Quick fix *" })
       vim.keymap.set('n', '<leader>fq',
         function()
           require("telescope.builtin").find_files({
             default_text = vim.fn.expand("<cword>"),
           })
         end,
-        { silent = true, desc = "Find Files (Word Under Cursor) *" }
+        { silent = true, desc = "[find] Find Files (Word Under Cursor) *" }
       )
     end,
 
@@ -1190,15 +1190,15 @@ local plugins = {
     keys = {
       { "<leader>mm", function()
         vim.cmd('silent! call mark#MarkCurrentWord(expand("<cword>"))')
-      end, mode = "n", silent = true, desc = "Colorize current word *" },
+      end, mode = "n", silent = true, desc = "[misc] Colorize current word *" },
 
       { "<leader>mm", function()
         vim.cmd('silent! call mark#GetVisualSelection()')
-      end, mode = "v", silent = true, desc = "Colorize visual selection *" },
+      end, mode = "v", silent = true, desc = "[misc] Colorize visual selection *" },
 
       { "<leader>mx", function()
         vim.cmd('silent! call mark#ClearAll()')
-      end, mode = "n", silent = true, desc = "Clear all colorized words *" },
+      end, mode = "n", silent = true, desc = "[misc] Clear all colorized words *" },
     },
     init = function()
       vim.g.mw_no_mappings = 1
@@ -1248,7 +1248,7 @@ local plugins = {
     cmd = { "NR", "NrwRgn", "NarrowRegion" },
     keys = {
       -- Map <Leader>nr in visual mode to narrow the selected region
-      { "<Leader>ww", ":NR<CR>", mode = "v", desc = "Narrow selected region *" },
+      { "<Leader>ww", ":NR<CR>", mode = "v", desc = "[misc] Narrow selected region *" },
     },
     config = function()
       -- Enable automatic synchronization when leaving the narrowed buffer
@@ -1403,18 +1403,18 @@ local plugins = {
     lazy = true,
     cmd = { "Cscope", "CscopeDbAdd" },
     keys = {
-      { "<leader>fs", desc = "Find references *" },
-      { "<leader>fd", desc = "Find definition *" },
-      { "<leader>fc", desc = "Find callers *" },
-      { "<leader>fC", desc = "Find callees *" },
-      { "<leader>fw", desc = "Find assignments *" },
-      { "<leader>fe", desc = "Egrep pattern *" },
-      { "<leader>ff", desc = "Find file *" },
+      { "<leader>fs", desc = "[lsp] Find references *" },
+      { "<leader>fd", desc = "[lsp] Find definition *" },
+      { "<leader>fc", desc = "[lsp] Find callers *" },
+      { "<leader>fC", desc = "[lsp] Find callees *" },
+      { "<leader>fw", desc = "[lsp] Find assignments *" },
+      { "<leader>fe", desc = "[find] Egrep pattern *" },
+      { "<leader>ff", desc = "[find] Find file *" },
       { "<leader>fb", desc = "Build cscope db" },
       { "<leader>fr", desc = "Reload cscope db" },
       { "<leader>fz", desc = "Debug cscope" },
-      { ";<leader>ff", desc = "Find file (rg) *" },
-      { "<leader>fs", mode = "v", desc = "Find references (visual) *" },
+      { ";<leader>ff", desc = "[find] Find file (rg) *" },
+      { "<leader>fs", mode = "v", desc = "[lsp] Find references (visual) *" },
     },
     dependencies = {
       "nvim-telescope/telescope.nvim",
@@ -1580,11 +1580,11 @@ local plugins = {
     keys = {
       { "<leader><leader>", mode = { "n", "v" }, desc = "Preview Tag" },
       { ";bb", desc = "Search rg all" },
-      { "<leader>bb", desc = "Search rg all *" },
-      { "<leader>gg", mode = { "n", "v" }, desc = "Search to quickfix *" },
-      { ";gg", mode = { "n", "v" }, desc = "Search to loclist *" },
-      { "<leader>vv", mode = { "n", "v" }, desc = "Search all to quickfix *" },
-      { ";vv", mode = { "n", "v" }, desc = "Search all to loclist *" },
+      { "<leader>bb", desc = "[find] Search rg all *" },
+      { "<leader>gg", mode = { "n", "v" }, desc = "[qf] Search to quickfix *" },
+      { ";gg", mode = { "n", "v" }, desc = "[find] Search to loclist *" },
+      { "<leader>vv", mode = { "n", "v" }, desc = "[qf] Search all to quickfix *" },
+      { ";vv", mode = { "n", "v" }, desc = "[misc] Search all to loclist *" },
     },
     config = function()
       local g = vim.g
@@ -1598,8 +1598,8 @@ local plugins = {
 
       local function get_prefer_dir() return (g.c_utils_prefer_dir ~= "") and g.c_utils_prefer_dir or "daemon/wad" end
 
-      vim.keymap.set('n', '<leader><leader>', function() vim.fn["VimMotionPreview"]() end, { silent = true, desc = "Preview Tag *" })
-      vim.keymap.set('v', '<leader><leader>', function() vim.fn["VimMotionPreview"]() end, { silent = true, desc = "Preview Tag *" })
+      vim.keymap.set('n', '<leader><leader>', function() vim.fn["VimMotionPreview"]() end, { silent = true, desc = "[tag] Preview Tag *" })
+      vim.keymap.set('v', '<leader><leader>', function() vim.fn["VimMotionPreview"]() end, { silent = true, desc = "[tag] Preview Tag *" })
 
       local function prepare_grep(is_visual, dir, to_qf)
         vim.cmd("let g:grepper = {}")
@@ -1627,15 +1627,15 @@ local plugins = {
 
 
       -- Grep in Preferred Directory
-      vim.keymap.set('n', '<leader>gg', function() prepare_grep(0, "prefer", 1) end, { desc = "Search to QF (edit) *" })
+      vim.keymap.set('n', '<leader>gg', function() prepare_grep(0, "prefer", 1) end, { desc = "[qf] Search to QF (edit) *" })
       vim.keymap.set('n', ';gg',        function() prepare_grep(0, "prefer", 0) end, { desc = "Search to Loc (edit)" })
-      vim.keymap.set('v', '<leader>gg', function() prepare_grep(1, "prefer", 1) end, { desc = "Search selection to QF (edit) *" })
+      vim.keymap.set('v', '<leader>gg', function() prepare_grep(1, "prefer", 1) end, { desc = "[qf] Search selection to QF (edit) *" })
       vim.keymap.set('v', ';gg',        function() prepare_grep(1, "prefer", 0) end, { desc = "Search selection to Loc (edit)" })
 
       -- Grep All (Empty Directory)
-      vim.keymap.set('n', '<leader>vv', function() prepare_grep(0, "", 1) end, { desc = "Search all to QF (edit) *" })
+      vim.keymap.set('n', '<leader>vv', function() prepare_grep(0, "", 1) end, { desc = "[qf] Search all to QF (edit) *" })
       vim.keymap.set('n', ';vv',        function() prepare_grep(0, "", 0) end, { desc = "Search all to Loc (edit)" })
-      vim.keymap.set('v', '<leader>vv', function() prepare_grep(1, "", 1) end, { desc = "Search all selection to QF (edit) *" })
+      vim.keymap.set('v', '<leader>vv', function() prepare_grep(1, "", 1) end, { desc = "[qf] Search all selection to QF (edit) *" })
       vim.keymap.set('v', ';vv',        function() prepare_grep(1, "", 0) end, { desc = "Search all selection to Loc (edit)" })
     end,
   },
@@ -1651,24 +1651,24 @@ local plugins = {
     dependencies = { "chengzeyi/fzf-preview.vim", "huawenyu/vim-basic" },
     keys = {
       -- File commands
-      { "<leader>ff", "<cmd>CSFileFilter<cr>", desc = "Find files *" },
-      { ";ff", "<cmd>CSFileFilter!<cr>", desc = "Find files (all) *" },
+      { "<leader>ff", "<cmd>CSFileFilter<cr>", desc = "[find] Find files *" },
+      { ";ff", "<cmd>CSFileFilter!<cr>", desc = "[find] Find files (all) *" },
 
       -- Symbol/References
-      { "<leader>fs", "<cmd>call cscope#preview('0', 'n', 0, 0)<cr>", desc = "Find references *" },
-      { "<leader>fS", "<cmd>call cscope#preview('0', 'n', 0, 1)<cr>", desc = "Find references (advanced) *" },
+      { "<leader>fs", "<cmd>call cscope#preview('0', 'n', 0, 0)<cr>", desc = "[lsp] Find references *" },
+      { "<leader>fS", "<cmd>call cscope#preview('0', 'n', 0, 1)<cr>", desc = "[lsp] Find references (advanced) *" },
 
       -- Function calls
-      { "<leader>fc", "<cmd>call cscope#preview('3', 'n', 1, 0)<cr>", desc = "Find callers *" },
+      { "<leader>fc", "<cmd>call cscope#preview('3', 'n', 1, 0)<cr>", desc = "[lsp] Find callers *" },
       { "<leader>fC", "<cmd>call cscope#preview('2', 'n', 1, 0)<cr>", desc = "Find callees" },
 
       -- Assignment
-      { "<leader>fw", "<cmd>call cscope#preview('9', 'n', 0, 0)<cr>", desc = "Find assignments *" },
-      { "<leader>fW", "<cmd>call cscope#preview('9', 'n', 0, 1)<cr>", desc = "Find assignments (advanced) *" },
+      { "<leader>fw", "<cmd>call cscope#preview('9', 'n', 0, 0)<cr>", desc = "[lsp] Find assignments *" },
+      { "<leader>fW", "<cmd>call cscope#preview('9', 'n', 0, 1)<cr>", desc = "[lsp] Find assignments (advanced) *" },
 
       -- Text search
       { "<leader>fe", "<cmd>call utilgrep#Grep(0, 0, '', 1)<cr>", desc = "Search project" },
-      { "<leader>f1", "<cmd>call utilgrep#Grep(0, 0, 'daemon/wad', 1)<cr>", desc = "Search in wad *" },
+      { "<leader>f1", "<cmd>call utilgrep#Grep(0, 0, 'daemon/wad', 1)<cr>", desc = "[find] Search in wad *" },
       { "<leader>f2", "<cmd>call utilgrep#Grep(0, 0, 'cmf/plugin', 1)<cr>", desc = "Search in cmf" },
     },
     init = function()
@@ -1726,7 +1726,7 @@ local plugins = {
     "preservim/tagbar",
     enabled = cond({ "coder" }),
     cmd = { "TagbarToggle", "Tagbar", "TagbarOpen" },
-    keys = { { "<leader>vt", "<cmd>TagbarToggle<cr>", desc = "Toggle Tagbar *" } },
+    keys = { { "<leader>vt", "<cmd>TagbarToggle<cr>", desc = "[view] Tag (tagbar) *" } },
     config = function()
       vim.g.tagbar_autofocus = 0
       vim.g.tagbar_position = 'left'
@@ -1788,7 +1788,7 @@ local plugins = {
     dependencies = { "nvim-telescope/telescope.nvim" },
     keys = {
       { "<leader>vl", "<cmd>TodoLocList<cr>", desc = "Todo Location List" },
-      { "<leader>vt", "<cmd>TodoTelescope<cr>", desc = "Todo Telescope *" },
+      { "<leader>vt", "<cmd>TodoTelescope<cr>", desc = "[picker] Todo *" },
     },
     config = function()
       require("todo-comments").setup()
@@ -1995,7 +1995,7 @@ local plugins = {
       vim.api.nvim_set_keymap('n', ';fN', '<cmd>Telescope diagnostics<CR>', vim.tbl_extend("force", opts, { desc = "Telescope: Diagnostics" }))
 
       -- Rename and Goto Next/Prev stay as standard LSP (no Telescope picker exists for these)
-      vim.api.nvim_set_keymap('n', ';fr', '<cmd>lua vim.lsp.buf.rename()<CR>', vim.tbl_extend("force", opts, { desc = "Refactor rename *" }))
+      vim.api.nvim_set_keymap('n', ';fr', '<cmd>lua vim.lsp.buf.rename()<CR>', vim.tbl_extend("force", opts, { desc = "[lsp] Refactor rename *" }))
 
       vim.api.nvim_set_keymap('n', ';fn', '<cmd>lua vim.lsp.diagnostic.goto_prev()<CR>', vim.tbl_extend("force", opts, { desc = "Diag prev" }))
       vim.api.nvim_set_keymap('n', ';fp', '<cmd>lua vim.lsp.diagnostic.goto_next()<CR>', vim.tbl_extend("force", opts, { desc = "Diag next" }))
@@ -2013,8 +2013,8 @@ local plugins = {
     "terryma/vim-expand-region",
     enabled = cond({ "editor" }),
     keys = {
-      { "W", "<Plug>(expand_region_expand)", mode = { "n", "v" }, desc = "Expand region *" },
-      { "B", "<Plug>(expand_region_shrink)", mode = { "n", "v" }, desc = "Shrink region *" },
+      { "W", "<Plug>(expand_region_expand)", mode = { "n", "v" }, desc = "[vsel] Expand region *" },
+      { "B", "<Plug>(expand_region_shrink)", mode = { "n", "v" }, desc = "[vsel] Shrink region *" },
     },
   },
   {
@@ -2233,7 +2233,7 @@ local plugins = {
       -- Terminal toggle (only if no vim-floaterm-repl or toggleterm)
       vim.keymap.set({ "n", "v" }, "<C-\\>", function()
         toggle_terminal("n")
-      end, { desc = "(Tool) Terminal *" })
+      end, { desc = "(view) Terminal *" })
 
       vim.keymap.set("i", "<C-\\>", function()
         vim.cmd("silent execute ':FloatermNew --name=Shell --wintype=split --position=bottom --autoclose=0 height=0.4 --width=0.6 --title=Shell bash'")
@@ -2279,7 +2279,7 @@ local plugins = {
     enabled = cond({ "admin" }),
     config = function()
       require("toggleterm").setup({ open_mapping = [[<c-\>]], size = 20, direction = "float", start_in_insert = true })
-      vim.keymap.set('n', '<c-\\>', '<cmd>ToggleTerm<cr>', { silent = true, desc = "Toggle Terminal *" })
+      vim.keymap.set('n', '<c-\\>', '<cmd>ToggleTerm<cr>', { silent = true, desc = "[view] Toggle Terminal *" })
     end,
   },
   {
@@ -2454,17 +2454,17 @@ local plugins = {
       ----------------------------------------------------------------
       -- Keymaps
       ----------------------------------------------------------------
-      vim.keymap.set( "n", "<leader>ws", save_workspace, { desc = "Save named workspace *", })
-      vim.keymap.set( "n", "<leader>wl", project_session_search, { desc = "Search sessions *", })
-      vim.keymap.set( "n", "<leader>wr", "<cmd>AutoSession restore<CR>", { desc = "Restore session *", })
+      vim.keymap.set( "n", "<leader>ws", save_workspace, { desc = "[workspace] Save named workspace *", })
+      vim.keymap.set( "n", "<leader>wl", project_session_search, { desc = "[workspace] Search sessions *", })
+      vim.keymap.set( "n", "<leader>wr", "<cmd>AutoSession restore<CR>", { desc = "[workspace] Restore session *", })
     end,
   },
   {
     "preservim/nerdtree",
     cmd = { "NERDTreeToggle", "NERDTreeFind", "NERDTree" },
     keys = {
-      { "<leader>ve", "<cmd>NERDTreeToggle<CR>", desc = "Toggle NERDTree *" },
-      { "<leader>vf", "<cmd>NERDTreeFocus<CR>", desc = "Focus NERDTree *" },
+      { "<leader>ve", "<cmd>NERDTreeToggle<CR>", desc = "[view] Explore (nerdtree) *" },
+      { "<leader>vf", "<cmd>NERDTreeFocus<CR>", desc = "[view]  Explore - Focus (nerdtree) *" },
     },
     init = function()
       vim.g.NERDTreeMapMenu = 'M'
@@ -2527,7 +2527,7 @@ local plugins = {
           },
         },
       })
-      vim.keymap.set('n', '<leader>vE', '<c-U>Neotree toggle<cr>', { silent = true, desc = "Explore File (Toggle) *" })
+      vim.keymap.set('n', '<leader>vE', '<c-U>Neotree toggle<cr>', { silent = true, desc = "[view] Explore (neotree) *" })
       vim.keymap.set('n', '<leader>vF', '<c-U>Neotree reveal<cr>', { silent = true, desc = "Explore Focus (Reveal)" })
     end
   },
@@ -2537,7 +2537,7 @@ local plugins = {
     enabled = false and cond({ "editor", "log" }),
     cmd = { "VoomToggle", "Voom" },
     keys = {
-      { "<leader>vo", "<cmd>VoomToggle<cr>", mode = "n", silent = true, desc = "Toggle Voom outline *" },
+      { "<leader>vo", "<cmd>VoomToggle<cr>", mode = "n", silent = true, desc = "[view] Outline (Voom) *" },
       { "<leader>v0", "<cmd>VoomToggle fmr<cr>", mode = "n", silent = true, desc = "Toggle Voom outline (fmr)" },
     },
   },
@@ -2553,7 +2553,7 @@ local plugins = {
     cmd = { "AerialToggle", "AerialOpen", "AerialNavToggle" },
     -- Or load when pressing these keys
     keys = {
-      { "<leader>vo", "<cmd>AerialToggle!<cr>", desc = "Aerial: Toggle *" },
+      { "<leader>vo", "<cmd>AerialToggle!<cr>", desc = "[view] Outline (Aerial) *" },
     },
     opts = {
       -- Configuration options
@@ -2601,8 +2601,8 @@ local plugins = {
     keys = {
       { "<leader>gl", "<cmd>GV<cr>", desc = "Git Log side by side" },
       { "<leader>gd", "<cmd>Gvdiff<cr>", desc = "Git Diff review" },
-      { "<leader>gD", "<cmd>DiffReview git show<cr>", desc = "Git Diff review tabs *" },
-      { "<leader>gb", "<cmd>Git blame<cr>", desc = "Git Blame *" },
+      { "<leader>gD", "<cmd>DiffReview git show<cr>", desc = "[git] Git Diff review tabs *" },
+      { "<leader>gb", "<cmd>Git blame<cr>", desc = "[git] Git Blame *" },
       { "<leader>bb", "<cmd>Git blame<cr>", desc = "Git Blame" },
       { "<leader>gs", "<cmd>Gstatus<cr>", desc = "Git Status" },
     },
@@ -2617,7 +2617,7 @@ local plugins = {
     cmd = "GV",
     dependencies = { "tpope/vim-fugitive" },
     keys = {
-      { "<leader>gl", "<cmd>GV<cr>", desc = "Git Log side by side *" },
+      { "<leader>gl", "<cmd>GV<cr>", desc = "[git] Git Log side by side *" },
     },
   },
   {
@@ -2626,7 +2626,7 @@ local plugins = {
     cmd = "DiffviewOpen",
     dependencies = { "nvim-lua/plenary.nvim" },
     keys = {
-      { "<leader>vg", "<cmd>DiffviewOpen<cr>", desc = "Open Diffview *", },
+      { "<leader>vg", "<cmd>DiffviewOpen<cr>", desc = "[view,git] Open Diffview *", },
     },
     config = function()
       require("diffview").setup({})
@@ -2728,7 +2728,7 @@ local plugins = {
       vim.g.gitgutter_sign_removed_first_line = '^'
       vim.g.gitgutter_sign_modified_removed = '<'
 
-      vim.keymap.set('n', ';gv', '<c-U>GitGutterToggle<cr>', { silent = true, desc = "Git Gutter Toggle *" })
+      vim.keymap.set('n', ';gv', '<c-U>GitGutterToggle<cr>', { silent = true, desc = "[view,git] Git Gutter Toggle *" })
       vim.keymap.set('n', ';gr', '<c-U>GitGutter<cr>', { silent = true, desc = "Git Gutter" })
       vim.keymap.set('n', ';gn', '<Plug>(GitGutterNextHunk)', { silent = true, desc = "Next Hunk" })
       vim.keymap.set('n', ';gp', '<Plug>(GitGutterPrevHunk)', { silent = true, desc = "Previous Hunk" })
