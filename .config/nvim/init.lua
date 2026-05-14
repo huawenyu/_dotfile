@@ -609,8 +609,8 @@ local plugins = {
         if HasPlug("vim-motion") then
           vim.keymap.set("n", "<a-.>", "<Plug>_JumpPrevIndent")
           vim.keymap.set("n", "<a-,>", "<Plug>_JumpNextIndent")
-          vim.keymap.set("x", "<a-,>", "<Plug>_JumpPrevIndent")
-          vim.keymap.set("x", "<a-.>", "<Plug>_JumpNextIndent")
+          vim.keymap.set("x", "<a-.>", "<Plug>_JumpPrevIndent")
+          vim.keymap.set("x", "<a-,>", "<Plug>_JumpNextIndent")
           vim.keymap.set("o", "<a-.>", "<Plug>_JumpPrevIndent")
           vim.keymap.set("o", "<a-,>", "<Plug>_JumpNextIndent")
         end
