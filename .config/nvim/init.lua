@@ -2354,6 +2354,7 @@ local plugins = {
   { "sk1418/blockit", enabled = cond({ "editor" }), cmd = "Block" },
   {
     "rmagatti/auto-session",
+    enabled = cond({ "coder" }),
     lazy = false,
 
     dependencies = {
@@ -2362,31 +2363,14 @@ local plugins = {
     },
 
     config = function()
-      ----------------------------------------------------------------
-      -- Setup
-      ----------------------------------------------------------------
       local auto_session = require("auto-session")
-
-      local session_dir = vim.fn.expand("~/.vim/tmp-sessions")
-
-      if vim.fn.isdirectory(session_dir) == 0 then
-        vim.fn.mkdir(session_dir, "p")
-      end
-
-      ----------------------------------------------------------------
-      -- IMPORTANT:
-      -- auto-session still reads this global internally
-      ----------------------------------------------------------------
-      vim.g.auto_session_root_dir = session_dir
 
       auto_session.setup({
         log_level = "error",
+        root_dir = vim.fn.stdpath("data") .. "/sessions/",
 
         auto_restore_enabled = true,
         auto_save_enabled = true,
-
-        -- optional
-        -- auto_session_use_git_branch = true,
 
         auto_session_suppress_dirs = {
           "~/",
@@ -2401,298 +2385,74 @@ local plugins = {
         },
 
         session_lens = {
-          load_on_setup = false,
+          load_on_setup = true,
           previewer = false,
-
-          theme_conf = {
-            border = true,
-          },
         },
       })
 
-      ----------------------------------------------------------------
-      -- Better session persistence
-      ----------------------------------------------------------------
       vim.o.sessionoptions =
-        "blank,buffers,curdir,folds,help,tabpages,winsize,winpos,terminal,localoptions"
+      "blank,buffers,curdir,folds,help,tabpages,winsize,winpos,terminal,localoptions"
 
       ----------------------------------------------------------------
-      -- Telescope
+      -- Save named workspace
       ----------------------------------------------------------------
-      local pickers = require("telescope.pickers")
-      local finders = require("telescope.finders")
-      local conf = require("telescope.config").values
-      local actions = require("telescope.actions")
-      local action_state = require("telescope.actions.state")
-
-      ----------------------------------------------------------------
-      -- auto-session internals
-      ----------------------------------------------------------------
-      local Lib = require("auto-session.lib")
-
-      ----------------------------------------------------------------
-      -- Helpers
-      ----------------------------------------------------------------
-      local function get_session_prefix()
+      local function default_workspace_name()
         local cwd = vim.fn.getcwd()
 
         ----------------------------------------------------------------
-        -- Must use auto-session's own escaping
+        -- Make path relative to HOME
         ----------------------------------------------------------------
-        return Lib.escape_session_name(cwd)
+        local home = vim.loop.os_homedir()
+
+        cwd = cwd:gsub("^" .. vim.pesc(home), "~")
+
+        ----------------------------------------------------------------
+        -- Convert path separators into readable tokens
+        ----------------------------------------------------------------
+        cwd = cwd
+        :gsub("^~/", "")
+        :gsub("[/\\]", "__")
+
+        return cwd
       end
 
-      local function get_project_sessions()
-        local sessions = {}
-
-        local prefix = get_session_prefix()
-
-        local handle = vim.loop.fs_scandir(session_dir)
-
-        if not handle then
-          return sessions
-        end
-
-        while true do
-          local file, file_type =
-            vim.loop.fs_scandir_next(handle)
-
-          if not file then
-            break
-          end
-
-          ----------------------------------------------------------------
-          -- Only .vim session files
-          ----------------------------------------------------------------
-          if file_type == "file"
-            and file:sub(-4) == ".vim"
-          then
-            local basename =
-              file:gsub("%.vim$", "")
-
-            ----------------------------------------------------------------
-            -- Match:
-            -- <encoded-cwd>_<workspace-name>
-            ----------------------------------------------------------------
-            if vim.startswith(
-              basename,
-              prefix .. "_"
-            ) then
-              local workspace =
-                basename:sub(#prefix + 2)
-
-              if workspace ~= "" then
-                table.insert(sessions, {
-                  display = workspace,
-                  file = file,
-                  full_path =
-                    session_dir .. "/" .. file,
-                })
-              end
-            end
-          end
-        end
-
-        table.sort(sessions, function(a, b)
-          return a.display < b.display
-        end)
-
-        return sessions
-      end
-
-      ----------------------------------------------------------------
-      -- Save Named Workspace Session
-      ----------------------------------------------------------------
-      local function save_workspace_session()
+      local function save_workspace()
         vim.ui.input({
-          prompt = "Workspace session name: ",
+          prompt = "Workspace name: ",
+          default = default_workspace_name(),
         }, function(input)
           if not input or input == "" then
             return
           end
 
-          local prefix = get_session_prefix()
+          vim.cmd(
+            "AutoSession save "
+            .. vim.fn.fnameescape(input)
+          )
 
-          local filename =
-            string.format(
-              "%s_%s.vim",
-              prefix,
-              input
-            )
-
-          local path =
-            session_dir .. "/" .. filename
-
-          local exists =
-            vim.loop.fs_stat(path) ~= nil
-
-          local function save()
-            vim.cmd(
-              "AutoSession save "
-                .. vim.fn.fnameescape(input)
-            )
-
-            vim.notify(
-              "Saved workspace session: "
-                .. input,
-              vim.log.levels.INFO
-            )
-          end
-
-          ----------------------------------------------------------------
-          -- Overwrite confirm
-          ----------------------------------------------------------------
-          if exists then
-            vim.ui.select({
-              "Overwrite",
-              "Cancel",
-            }, {
-              prompt =
-                "Workspace already exists",
-            }, function(choice)
-              if choice == "Overwrite" then
-                save()
-              end
-            end)
-          else
-            save()
-          end
+          vim.notify(
+            "Saved workspace: " .. input,
+            vim.log.levels.INFO
+          )
         end)
       end
 
-      ----------------------------------------------------------------
-      -- Telescope Workspace Picker
-      ----------------------------------------------------------------
-      local function open_workspace_picker()
-        local sessions =
-          get_project_sessions()
 
-        if vim.tbl_isempty(sessions) then
-          vim.notify(
-            "No workspace sessions for current project",
-            vim.log.levels.WARN
-          )
-          return
-        end
+      local function project_session_search()
+        -- Open Telescope picker
+        vim.cmd("AutoSession search")
 
-        pickers.new({}, {
-          prompt_title =
-            "Project Workspace Sessions",
-
-          finder = finders.new_table({
-            results = sessions,
-
-            entry_maker = function(entry)
-              return {
-                value = entry,
-
-                display = entry.display,
-                ordinal = entry.display,
-
-                filename = entry.full_path,
-                path = entry.full_path,
-              }
-            end,
-          }),
-
-          sorter = conf.generic_sorter({}),
-
-          previewer = false,
-
-          attach_mappings = function(
-            prompt_bufnr,
-            map
-          )
-            ----------------------------------------------------------------
-            -- Restore Session
-            ----------------------------------------------------------------
-            actions.select_default:replace(
-              function()
-                local selection =
-                  action_state
-                    .get_selected_entry()
-
-                actions.close(prompt_bufnr)
-
-                vim.cmd(
-                  "AutoSession restore "
-                    .. vim.fn.fnameescape(
-                      selection.value.display
-                    )
-                )
-
-                vim.notify(
-                  "Loaded workspace: "
-                    .. selection.value.display,
-                  vim.log.levels.INFO
-                )
-              end
-            )
-
-            ----------------------------------------------------------------
-            -- Delete Session
-            ----------------------------------------------------------------
-            map("i", "<C-d>", function()
-              local selection =
-                action_state
-                  .get_selected_entry()
-
-              vim.fn.delete(
-                selection.value.full_path
-              )
-
-              vim.notify(
-                "Deleted workspace: "
-                  .. selection.value.display,
-                vim.log.levels.INFO
-              )
-
-              actions.close(prompt_bufnr)
-
-              vim.schedule(function()
-                open_workspace_picker()
-              end)
-            end)
-
-            return true
-          end,
-        }):find()
+        -- Feed default filter text
+        vim.schedule(function()
+          vim.fn.feedkeys(default_workspace_name(), "t")
+        end)
       end
-
       ----------------------------------------------------------------
       -- Keymaps
       ----------------------------------------------------------------
-      vim.keymap.set("n", "<leader>ws", function()
-        require("auto-session")
-          .search_session()
-      end, {
-        desc = "Search all sessions",
-      })
-
-      vim.keymap.set("n", "<leader>wr", function()
-        vim.cmd("AutoSession restore")
-      end, {
-        desc = "Restore latest session",
-      })
-
-      vim.keymap.set(
-        "n",
-        "<leader>wS",
-        save_workspace_session,
-        {
-          desc = "Save named workspace session",
-        }
-      )
-
-      vim.keymap.set(
-        "n",
-        "<leader>wR",
-        open_workspace_picker,
-        {
-          desc =
-            "Open workspace sessions for current project",
-        }
-      )
+      vim.keymap.set( "n", "<leader>ws", save_workspace, { desc = "Save named workspace", })
+      vim.keymap.set( "n", "<leader>wl", project_session_search, { desc = "Search sessions", })
+      vim.keymap.set( "n", "<leader>wr", "<cmd>AutoSession restore<CR>", { desc = "Restore session", })
     end,
   },
   {
