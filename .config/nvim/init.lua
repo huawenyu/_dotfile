@@ -1267,7 +1267,7 @@ local plugins = {
     "epwalsh/obsidian.nvim",
     version = "*",
     lazy = false,
-    enabled = cond({ "editor", "markdown" }),
+    enabled = false and cond({ "editor", "markdown" }),
     event = "VeryLazy",
     ft = "markdown",
     dependencies = { "nvim-lua/plenary.nvim", "ibhagwan/fzf-lua", "nvim-telescope/telescope.nvim" },
