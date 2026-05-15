@@ -796,17 +796,42 @@ local plugins = {
       -- to jump the right code split to that definition, keeping your focus on the log.
       vim.keymap.set("n", "<leader>;", function()
 
+        --------------------------------------------------------------------
+        -- config
+        --------------------------------------------------------------------
+
+        local RG_TIMEOUT = 2000
+
+        --------------------------------------------------------------------
+        -- symbol
+        --------------------------------------------------------------------
+
         local sym = vim.fn.expand("<cword>")
+
         if sym == "" then
           return
         end
 
-        local cur_win = vim.api.nvim_get_current_win()
+        local esc = vim.pesc(sym)
 
-        local code_win = vim.fn.win_getid(vim.fn.winnr("l"))
-        if code_win == 0 then
-          code_win = cur_win
+        --------------------------------------------------------------------
+        -- target code window
+        --------------------------------------------------------------------
+
+        local trigger_win =
+          vim.api.nvim_get_current_win()
+
+        local code_win = trigger_win
+
+        local right_nr = vim.fn.winnr("l")
+
+        if right_nr ~= vim.fn.winnr() then
+          code_win = vim.fn.win_getid(right_nr)
         end
+
+        --------------------------------------------------------------------
+        -- current file
+        --------------------------------------------------------------------
 
         local file = vim.api.nvim_buf_get_name(
           vim.api.nvim_win_get_buf(code_win)
@@ -823,13 +848,19 @@ local plugins = {
         --------------------------------------------------------------------
 
         local dirs = {}
-        local function add(p)
-          if p and p ~= "" then
-            p = vim.fs.normalize(p)
 
-            if p ~= "/" and not vim.tbl_contains(dirs, p) then
-              table.insert(dirs, p)
-            end
+        local function add(p)
+
+          if not p or p == "" then
+            return
+          end
+
+          p = vim.fs.normalize(p)
+
+          if p ~= "/"
+            and not vim.tbl_contains(dirs, p)
+          then
+            table.insert(dirs, p)
           end
         end
 
@@ -837,147 +868,373 @@ local plugins = {
         add(vim.fs.dirname(dir))
 
         local git_top = vim.fn.systemlist({
-          "git", "-C", dir,
-          "rev-parse", "--show-toplevel",
+          "git",
+          "-C",
+          dir,
+          "rev-parse",
+          "--show-toplevel",
         })[1]
 
         add(git_top)
 
         --------------------------------------------------------------------
-        -- patterns
+        -- validate real function definition
         --------------------------------------------------------------------
 
-        local esc = vim.pesc(sym)
+        local function is_definition(f, line)
 
-        local groups = {
+          local ok, lines =
+            pcall(vim.fn.readfile, f)
 
-          -- function
-          {
-            string.format(
-              [[^[\w\s\*\&]+?\b%s\s*\([^;{}]*\)\s*\{?]],
-              esc
-            ),
-          },
-
-          -- types
-          {
-            -- struct foo {
-            [[^\s*struct\s+]] .. esc .. [[\s*\{]],
-
-            -- typedef struct foo {
-            [[^\s*typedef\s+struct\s+]] .. esc .. [[\s*\{]],
-
-            -- typedef struct { } foo_t;
-            [[typedef\s+struct\s*\{[\s\S]*?\}\s*]]
-              .. esc .. [[\s*;]],
-
-            -- typedef struct xxx { } foo_t;
-            [[typedef\s+struct\s+\w+\s*\{[\s\S]*?\}\s*]]
-              .. esc .. [[\s*;]],
-
-            -- enum foo {
-            [[^\s*enum\s+]] .. esc .. [[\s*\{]],
-
-            -- typedef enum foo {
-            [[^\s*typedef\s+enum\s+]] .. esc .. [[\s*\{]],
-
-            -- typedef enum { } foo_t;
-            [[typedef\s+enum\s*\{[\s\S]*?\}\s*]]
-              .. esc .. [[\s*;]],
-
-            -- typedef enum xxx { } foo_t;
-            [[typedef\s+enum\s+\w+\s*\{[\s\S]*?\}\s*]]
-              .. esc .. [[\s*;]],
-
-            -- union foo {
-            [[^\s*union\s+]] .. esc .. [[\s*\{]],
-
-            -- typedef union xxx { } foo_t;
-            [[typedef\s+union\s+\w+\s*\{[\s\S]*?\}\s*]]
-              .. esc .. [[\s*;]],
-
-            -- typedef function pointer
-            [[typedef\s+.*\(\s*\*\s*]]
-              .. esc
-              .. [[\s*\)\s*\(]],
-
-            -- class foo {
-            "^\\s*class\\s+" .. esc .. "\\s*[:{]",
-          },
-
-        }
-
-        --------------------------------------------------------------------
-        -- rg search
-        --------------------------------------------------------------------
-
-        local found_file, found_line
-
-        for _, d in ipairs(dirs) do
-          for _, g in ipairs(groups) do
-            for _, pat in ipairs(g) do
-
-              local result = vim.fn.systemlist({
-                "rg",
-                "--multiline",
-                "--multiline-dotall",
-                "--line-number",
-                "--no-heading",
-                "--color=never",
-
-                "-g", "*.[ch]",
-                "-g", "*.[ch]pp",
-                "-g", "*.cc",
-                "-g", "*.cpp",
-                "-g", "*.cxx",
-                "-g", "*.hpp",
-
-                pat,
-                d,
-              })
-
-              if vim.v.shell_error == 0 and #result > 0 then
-                found_file, found_line =
-                  result[1]:match("^([^:]+):(%d+):")
-
-                break
-              end
-            end
-
-            if found_file then
-              break
-            end
+          if not ok then
+            return false
           end
 
-          if found_file then
-            break
+          local text = table.concat(
+            vim.list_slice(lines, line, line + 8),
+            "\n"
+          )
+
+          -- reject declaration
+          if text:match("%)%s*;") then
+            return false
           end
+
+          -- require {
+          return text:match("%{") ~= nil
         end
 
         --------------------------------------------------------------------
         -- jump
         --------------------------------------------------------------------
 
-        if found_file then
-          vim.api.nvim_win_call(code_win, function()
-            vim.cmd("edit " .. vim.fn.fnameescape(found_file))
-            vim.api.nvim_win_set_cursor(
-              0,
-              { tonumber(found_line), 0 }
+        local function jump(f, line)
+
+          vim.schedule(function()
+
+            if not vim.api.nvim_win_is_valid(code_win) then
+              return
+            end
+
+            local save_win =
+              vim.api.nvim_get_current_win()
+
+            ----------------------------------------------------------------
+            -- jump in target code window
+            ----------------------------------------------------------------
+
+            vim.api.nvim_set_current_win(code_win)
+
+            vim.cmd(
+              "edit "
+              .. vim.fn.fnameescape(f)
             )
+
+            vim.api.nvim_win_set_cursor(
+              code_win,
+              { line, 0 }
+            )
+
             vim.cmd("normal! zz")
+
+            ----------------------------------------------------------------
+            -- restore original focus
+            ----------------------------------------------------------------
+
+            if vim.api.nvim_win_is_valid(save_win)
+              and save_win ~= code_win
+            then
+              vim.api.nvim_set_current_win(save_win)
+            end
+
           end)
-        else
-          vim.notify(
-            "Definition not found: " .. sym,
-            vim.log.levels.INFO
-          )
         end
+
+        --------------------------------------------------------------------
+        -- search patterns
+        --------------------------------------------------------------------
+
+        local searches = {
+
+          ------------------------------------------------------------------
+          -- fast function candidate
+          ------------------------------------------------------------------
+
+          {
+            pattern = string.format(
+              [[^[\w\s\*\&]+?\b%s\s*\([^;]*\)]],
+              esc
+            ),
+
+            multiline = false,
+
+            validate = true,
+          },
+
+          ------------------------------------------------------------------
+          -- struct
+          ------------------------------------------------------------------
+
+          {
+            pattern =
+              [[^\s*struct\s+]]
+              .. esc
+              .. [[\s*\{]],
+
+            multiline = false,
+          },
+
+          {
+            pattern =
+              [[^\s*typedef\s+struct\s+]]
+              .. esc
+              .. [[\s*\{]],
+
+            multiline = false,
+          },
+
+          {
+            pattern =
+              [[typedef\s+struct\s*\{[^}]{0,2000}\}\s*]]
+              .. esc
+              .. [[\s*;]],
+
+            multiline = true,
+          },
+
+          {
+            pattern =
+              [[typedef\s+struct\s+\w+\s*\{[^}]{0,2000}\}\s*]]
+              .. esc
+              .. [[\s*;]],
+
+            multiline = true,
+          },
+
+          ------------------------------------------------------------------
+          -- enum
+          ------------------------------------------------------------------
+
+          {
+            pattern =
+              [[^\s*enum\s+]]
+              .. esc
+              .. [[\s*\{]],
+
+            multiline = false,
+          },
+
+          {
+            pattern =
+              [[^\s*typedef\s+enum\s+]]
+              .. esc
+              .. [[\s*\{]],
+
+            multiline = false,
+          },
+
+          {
+            pattern =
+              [[typedef\s+enum\s*\{[^}]{0,2000}\}\s*]]
+              .. esc
+              .. [[\s*;]],
+
+            multiline = true,
+          },
+
+          {
+            pattern =
+              [[typedef\s+enum\s+\w+\s*\{[^}]{0,2000}\}\s*]]
+              .. esc
+              .. [[\s*;]],
+
+            multiline = true,
+          },
+
+          ------------------------------------------------------------------
+          -- union
+          ------------------------------------------------------------------
+
+          {
+            pattern =
+              [[^\s*union\s+]]
+              .. esc
+              .. [[\s*\{]],
+
+            multiline = false,
+          },
+
+          {
+            pattern =
+              [[typedef\s+union\s+\w+\s*\{[^}]{0,2000}\}\s*]]
+              .. esc
+              .. [[\s*;]],
+
+            multiline = true,
+          },
+
+          ------------------------------------------------------------------
+          -- typedef function pointer
+          ------------------------------------------------------------------
+
+          {
+            pattern =
+              [[typedef\s+.*\(\s*\*\s*]]
+              .. esc
+              .. [[\s*\)\s*\(]],
+
+            multiline = false,
+          },
+
+          ------------------------------------------------------------------
+          -- class
+          ------------------------------------------------------------------
+
+          {
+            pattern =
+              "^\\s*class\\s+"
+              .. esc
+              .. "\\s*[:{]",
+
+            multiline = false,
+          },
+        }
+
+        --------------------------------------------------------------------
+        -- async search loop
+        --------------------------------------------------------------------
+
+        local search_i = 1
+        local dir_i = 1
+
+        local function next_search()
+
+          if search_i > #searches then
+
+            vim.notify(
+              "Definition not found: " .. sym,
+              vim.log.levels.INFO
+            )
+
+            return
+          end
+
+          local s = searches[search_i]
+
+          local d = dirs[dir_i]
+
+          local cmd = {
+            "rg",
+
+            "--pcre2",
+
+            "--max-count", "1",
+
+            "--line-number",
+            "--no-heading",
+            "--color=never",
+
+            "--max-filesize", "1M",
+
+            "-g", "*.[ch]",
+            "-g", "*.[ch]pp",
+            "-g", "*.cc",
+            "-g", "*.cpp",
+            "-g", "*.cxx",
+            "-g", "*.hpp",
+
+            s.pattern,
+            d,
+          }
+
+          if s.multiline then
+            table.insert(cmd, 2, "--multiline")
+            table.insert(cmd, 3, "--multiline-dotall")
+          end
+
+          vim.system(cmd, {
+            text = true,
+            timeout = RG_TIMEOUT,
+          }, function(obj)
+
+            vim.schedule(function()
+
+              ----------------------------------------------------------------
+              -- timeout
+              ----------------------------------------------------------------
+
+              if obj.code == 124 then
+
+                vim.notify(
+                  string.format(
+                    "rg timeout (%.1fs)",
+                    RG_TIMEOUT / 1000
+                  ),
+                  vim.log.levels.WARN
+                )
+
+              ----------------------------------------------------------------
+              -- found
+              ----------------------------------------------------------------
+
+              elseif obj.code == 0
+                and obj.stdout
+                and obj.stdout ~= ""
+              then
+
+                local first =
+                  vim.split(
+                    obj.stdout,
+                    "\n",
+                    { plain = true }
+                  )[1]
+
+                local f, l =
+                  first:match("^([^:]+):(%d+):")
+
+                l = tonumber(l)
+
+                if f then
+
+                  if s.validate then
+
+                    if is_definition(f, l) then
+                      jump(f, l)
+                      return
+                    end
+
+                  else
+                    jump(f, l)
+                    return
+                  end
+                end
+              end
+
+              ----------------------------------------------------------------
+              -- next
+              ----------------------------------------------------------------
+
+              dir_i = dir_i + 1
+
+              if dir_i > #dirs then
+                dir_i = 1
+                search_i = search_i + 1
+              end
+
+              next_search()
+
+            end)
+
+          end)
+        end
+
+        next_search()
 
       end, {
         silent = true,
-        desc = "[lsp] rg jump definition *",
+        desc = "[lsp] async rg jump definition",
       })
+
 
       -- Maps 'gp' to visually select the last pasted/changed text block
       vim.keymap.set('n', 'gp', '`[v`]', { desc = "Select last pasted text" })
