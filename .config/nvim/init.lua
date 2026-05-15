@@ -796,42 +796,23 @@ local plugins = {
       -- to jump the right code split to that definition, keeping your focus on the log.
       vim.keymap.set("n", "<leader>;", function()
 
-        --------------------------------------------------------------------
-        -- config
-        --------------------------------------------------------------------
-
-        local RG_TIMEOUT = 2000
-
-        --------------------------------------------------------------------
-        -- symbol
-        --------------------------------------------------------------------
-
         local sym = vim.fn.expand("<cword>")
 
         if sym == "" then
           return
         end
 
-        local esc = vim.pesc(sym)
-
         --------------------------------------------------------------------
-        -- target code window
+        -- windows
         --------------------------------------------------------------------
 
-        local trigger_win =
-          vim.api.nvim_get_current_win()
+        local cur_win = vim.api.nvim_get_current_win()
 
-        local code_win = trigger_win
+        local code_win = vim.fn.win_getid(vim.fn.winnr("l"))
 
-        local right_nr = vim.fn.winnr("l")
-
-        if right_nr ~= vim.fn.winnr() then
-          code_win = vim.fn.win_getid(right_nr)
+        if code_win == 0 then
+          code_win = cur_win
         end
-
-        --------------------------------------------------------------------
-        -- current file
-        --------------------------------------------------------------------
 
         local file = vim.api.nvim_buf_get_name(
           vim.api.nvim_win_get_buf(code_win)
@@ -844,12 +825,64 @@ local plugins = {
         local dir = vim.fs.dirname(file)
 
         --------------------------------------------------------------------
-        -- search dirs
+        -- db search dirs
         --------------------------------------------------------------------
 
-        local dirs = {}
+        local db_dirs = {
+          dir,
+          vim.fs.dirname(dir),
+        }
 
-        local function add(p)
+        --------------------------------------------------------------------
+        -- db names
+        --------------------------------------------------------------------
+
+        local tag_names = {
+          "tags",
+          ".tags",
+          "TAGS",
+          "tags.db",
+        }
+
+        local cscope_names = {
+          "cscope.out",
+          ".cscope.out",
+          "cscope.db",
+        }
+
+        --------------------------------------------------------------------
+        -- find db
+        --------------------------------------------------------------------
+
+        local function find_db(dirs, names)
+
+          for _, d in ipairs(dirs) do
+            if d and d ~= "" then
+
+              for _, n in ipairs(names) do
+
+                local p = vim.fs.joinpath(d, n)
+
+                if vim.fn.filereadable(p) == 1 then
+                  return p
+                end
+              end
+            end
+          end
+        end
+
+        local tag_db = find_db(db_dirs, tag_names)
+
+        local cscope_db =
+          find_db(db_dirs, cscope_names)
+
+        --------------------------------------------------------------------
+        -- rg dirs
+        --------------------------------------------------------------------
+
+        local rg_dirs = {}
+
+        local function add_rg_dir(p)
 
           if not p or p == "" then
             return
@@ -857,15 +890,17 @@ local plugins = {
 
           p = vim.fs.normalize(p)
 
-          if p ~= "/"
-            and not vim.tbl_contains(dirs, p)
-          then
-            table.insert(dirs, p)
+          if p == "/" then
+            return
+          end
+
+          if not vim.tbl_contains(rg_dirs, p) then
+            table.insert(rg_dirs, p)
           end
         end
 
-        add(dir)
-        add(vim.fs.dirname(dir))
+        add_rg_dir(dir)
+        add_rg_dir(vim.fs.dirname(dir))
 
         local git_top = vim.fn.systemlist({
           "git",
@@ -875,40 +910,16 @@ local plugins = {
           "--show-toplevel",
         })[1]
 
-        add(git_top)
+        add_rg_dir(git_top)
 
         --------------------------------------------------------------------
-        -- validate real function definition
+        -- jump helper
         --------------------------------------------------------------------
 
-        local function is_definition(f, line)
-
-          local ok, lines =
-            pcall(vim.fn.readfile, f)
-
-          if not ok then
-            return false
+        local function jump(path, line, method)
+          if not path or path == "" then
+            return
           end
-
-          local text = table.concat(
-            vim.list_slice(lines, line, line + 8),
-            "\n"
-          )
-
-          -- reject declaration
-          if text:match("%)%s*;") then
-            return false
-          end
-
-          -- require {
-          return text:match("%{") ~= nil
-        end
-
-        --------------------------------------------------------------------
-        -- jump
-        --------------------------------------------------------------------
-
-        local function jump(f, line)
 
           vim.schedule(function()
 
@@ -916,324 +927,361 @@ local plugins = {
               return
             end
 
-            local save_win =
-              vim.api.nvim_get_current_win()
+            vim.api.nvim_win_call(code_win, function()
 
-            ----------------------------------------------------------------
-            -- jump in target code window
-            ----------------------------------------------------------------
+              vim.cmd(
+                "edit " .. vim.fn.fnameescape(path)
+              )
 
-            vim.api.nvim_set_current_win(code_win)
+              if line then
+                vim.api.nvim_win_set_cursor(
+                  0,
+                  { tonumber(line), 0 }
+                )
+              end
 
-            vim.cmd(
-              "edit "
-              .. vim.fn.fnameescape(f)
+              vim.cmd("normal! zz")
+            end)
+
+            --------------------------------------------------------------
+            -- notify
+            --------------------------------------------------------------
+
+            vim.notify(
+              string.format(
+                "[jump:%s] %s:%s",
+                method or "?",
+                vim.fn.fnamemodify(path, ":."),
+                line or "?"
+              ),
+              vim.log.levels.INFO,
+              {
+                title = "definition",
+              }
             )
-
-            vim.api.nvim_win_set_cursor(
-              code_win,
-              { line, 0 }
-            )
-
-            vim.cmd("normal! zz")
-
-            ----------------------------------------------------------------
-            -- restore original focus
-            ----------------------------------------------------------------
-
-            if vim.api.nvim_win_is_valid(save_win)
-              and save_win ~= code_win
-            then
-              vim.api.nvim_set_current_win(save_win)
-            end
 
           end)
         end
 
         --------------------------------------------------------------------
-        -- search patterns
+        -- tags
         --------------------------------------------------------------------
 
-        local searches = {
+        local function try_tags()
 
-          ------------------------------------------------------------------
-          -- fast function candidate
-          ------------------------------------------------------------------
+          if not tag_db then
+            return false
+          end
 
-          {
-            pattern = string.format(
-              [[^[\w\s\*\&]+?\b%s\s*\([^;]*\)]],
-              esc
-            ),
+          local old_tags = vim.o.tags
 
-            multiline = false,
+          vim.o.tags = tag_db
 
-            validate = true,
-          },
+          local ok, res = pcall(
+            vim.fn.taglist,
+            "^" .. vim.pesc(sym) .. "$"
+          )
 
-          ------------------------------------------------------------------
+          vim.o.tags = old_tags
+
+          if not ok or vim.tbl_isempty(res) then
+            return false
+          end
+
+          local item = res[1]
+
+          local path = item.filename
+
+          if not vim.startswith(path, "/") then
+            path = vim.fs.joinpath(
+              vim.fs.dirname(tag_db),
+              path
+            )
+          end
+
+          local line =
+            tonumber(item.cmd:match("(%d+)"))
+
+          jump(path, line, "tags")
+
+          return true
+        end
+
+        --------------------------------------------------------------------
+        -- cscope
+        --------------------------------------------------------------------
+
+        local function try_cscope()
+
+          if not cscope_db then
+            return false
+          end
+
+          if vim.fn.has("cscope") == 0 then
+            return false
+          end
+
+          --------------------------------------------------------------
+          -- add db only once
+          --------------------------------------------------------------
+
+          if vim.fn.cscope_connection(
+            2,
+            cscope_db
+          ) == 0 then
+
+            pcall(vim.fn.cscope_add, cscope_db)
+          end
+
+          --------------------------------------------------------------
+          -- search
+          --------------------------------------------------------------
+
+          local ok, matches = pcall(
+            vim.fn.cscope_find,
+            "g",
+            sym
+          )
+
+          if not ok or vim.tbl_isempty(matches) then
+            return false
+          end
+
+          local m = matches[1]
+
+          jump(m.filename, m.line, "cscope")
+
+          return true
+        end
+
+        --------------------------------------------------------------------
+        -- rg patterns
+        --------------------------------------------------------------------
+
+        local esc = vim.pesc(sym)
+
+        local patterns = {
+
+          ----------------------------------------------------------------
+          -- function
+          ----------------------------------------------------------------
+
+          string.format(
+            [[^[\w\s\*\&]+?\b%s\s*\([^;{}]*\)\s*\{?]],
+            esc
+          ),
+
+          ----------------------------------------------------------------
           -- struct
-          ------------------------------------------------------------------
+          ----------------------------------------------------------------
 
-          {
-            pattern =
-              [[^\s*struct\s+]]
-              .. esc
-              .. [[\s*\{]],
+          [[^\s*struct\s+]]
+            .. esc
+            .. [[\s*\{]],
 
-            multiline = false,
-          },
+          [[^\s*typedef\s+struct\s+]]
+            .. esc
+            .. [[\s*\{]],
 
-          {
-            pattern =
-              [[^\s*typedef\s+struct\s+]]
-              .. esc
-              .. [[\s*\{]],
+          [[typedef\s+struct\s*\{[\s\S]*?\}\s*]]
+            .. esc
+            .. [[\s*;]],
 
-            multiline = false,
-          },
+          [[typedef\s+struct\s+\w+\s*\{[\s\S]*?\}\s*]]
+            .. esc
+            .. [[\s*;]],
 
-          {
-            pattern =
-              [[typedef\s+struct\s*\{[^}]{0,2000}\}\s*]]
-              .. esc
-              .. [[\s*;]],
-
-            multiline = true,
-          },
-
-          {
-            pattern =
-              [[typedef\s+struct\s+\w+\s*\{[^}]{0,2000}\}\s*]]
-              .. esc
-              .. [[\s*;]],
-
-            multiline = true,
-          },
-
-          ------------------------------------------------------------------
+          ----------------------------------------------------------------
           -- enum
-          ------------------------------------------------------------------
+          ----------------------------------------------------------------
 
-          {
-            pattern =
-              [[^\s*enum\s+]]
-              .. esc
-              .. [[\s*\{]],
+          [[^\s*enum\s+]]
+            .. esc
+            .. [[\s*\{]],
 
-            multiline = false,
-          },
+          [[^\s*typedef\s+enum\s+]]
+            .. esc
+            .. [[\s*\{]],
 
-          {
-            pattern =
-              [[^\s*typedef\s+enum\s+]]
-              .. esc
-              .. [[\s*\{]],
+          [[typedef\s+enum\s*\{[\s\S]*?\}\s*]]
+            .. esc
+            .. [[\s*;]],
 
-            multiline = false,
-          },
+          [[typedef\s+enum\s+\w+\s*\{[\s\S]*?\}\s*]]
+            .. esc
+            .. [[\s*;]],
 
-          {
-            pattern =
-              [[typedef\s+enum\s*\{[^}]{0,2000}\}\s*]]
-              .. esc
-              .. [[\s*;]],
-
-            multiline = true,
-          },
-
-          {
-            pattern =
-              [[typedef\s+enum\s+\w+\s*\{[^}]{0,2000}\}\s*]]
-              .. esc
-              .. [[\s*;]],
-
-            multiline = true,
-          },
-
-          ------------------------------------------------------------------
+          ----------------------------------------------------------------
           -- union
-          ------------------------------------------------------------------
+          ----------------------------------------------------------------
 
-          {
-            pattern =
-              [[^\s*union\s+]]
-              .. esc
-              .. [[\s*\{]],
+          [[^\s*union\s+]]
+            .. esc
+            .. [[\s*\{]],
 
-            multiline = false,
-          },
+          [[typedef\s+union\s+\w+\s*\{[\s\S]*?\}\s*]]
+            .. esc
+            .. [[\s*;]],
 
-          {
-            pattern =
-              [[typedef\s+union\s+\w+\s*\{[^}]{0,2000}\}\s*]]
-              .. esc
-              .. [[\s*;]],
+          ----------------------------------------------------------------
+          -- typedef fn ptr
+          ----------------------------------------------------------------
 
-            multiline = true,
-          },
+          [[typedef\s+.*\(\s*\*\s*]]
+            .. esc
+            .. [[\s*\)\s*\(]],
 
-          ------------------------------------------------------------------
-          -- typedef function pointer
-          ------------------------------------------------------------------
-
-          {
-            pattern =
-              [[typedef\s+.*\(\s*\*\s*]]
-              .. esc
-              .. [[\s*\)\s*\(]],
-
-            multiline = false,
-          },
-
-          ------------------------------------------------------------------
+          ----------------------------------------------------------------
           -- class
-          ------------------------------------------------------------------
+          ----------------------------------------------------------------
 
-          {
-            pattern =
-              "^\\s*class\\s+"
-              .. esc
-              .. "\\s*[:{]",
+          "^\\s*class\\s+"
+            .. esc
+            .. "\\s*[:{]",
 
-            multiline = false,
-          },
+          ----------------------------------------------------------------
+          -- macro
+          ----------------------------------------------------------------
+
+          [[^\s*#\s*define\s+]]
+            .. esc
+            .. [[\b]],
         }
 
         --------------------------------------------------------------------
-        -- async search loop
+        -- async rg fallback
         --------------------------------------------------------------------
 
-        local search_i = 1
-        local dir_i = 1
+        local function try_rg()
 
-        local function next_search()
+          local tasks = {}
 
-          if search_i > #searches then
+          for _, d in ipairs(rg_dirs) do
+            for _, pat in ipairs(patterns) do
 
-            vim.notify(
-              "Definition not found: " .. sym,
-              vim.log.levels.INFO
-            )
-
-            return
+              table.insert(tasks, {
+                dir = d,
+                pat = pat,
+              })
+            end
           end
 
-          local s = searches[search_i]
+          local idx = 1
+          local stopped = false
 
-          local d = dirs[dir_i]
+          local function run_next()
 
-          local cmd = {
-            "rg",
+            if stopped then
+              return
+            end
 
-            "--pcre2",
+            local t = tasks[idx]
 
-            "--max-count", "1",
+            if not t then
 
-            "--line-number",
-            "--no-heading",
-            "--color=never",
-
-            "--max-filesize", "1M",
-
-            "-g", "*.[ch]",
-            "-g", "*.[ch]pp",
-            "-g", "*.cc",
-            "-g", "*.cpp",
-            "-g", "*.cxx",
-            "-g", "*.hpp",
-
-            s.pattern,
-            d,
-          }
-
-          if s.multiline then
-            table.insert(cmd, 2, "--multiline")
-            table.insert(cmd, 3, "--multiline-dotall")
-          end
-
-          vim.system(cmd, {
-            text = true,
-            timeout = RG_TIMEOUT,
-          }, function(obj)
-
-            vim.schedule(function()
-
-              ----------------------------------------------------------------
-              -- timeout
-              ----------------------------------------------------------------
-
-              if obj.code == 124 then
+              vim.schedule(function()
 
                 vim.notify(
-                  string.format(
-                    "rg timeout (%.1fs)",
-                    RG_TIMEOUT / 1000
-                  ),
-                  vim.log.levels.WARN
+                  "Definition not found: " .. sym,
+                  vim.log.levels.INFO
                 )
 
-              ----------------------------------------------------------------
-              -- found
-              ----------------------------------------------------------------
+              end)
 
-              elseif obj.code == 0
+              return
+            end
+
+            idx = idx + 1
+
+            vim.system({
+
+              "rg",
+
+              "--multiline",
+              "--multiline-dotall",
+
+              "--line-number",
+              "--no-heading",
+              "--color=never",
+
+              "--max-count",
+              "1",
+
+              "-g", "*.[ch]",
+              "-g", "*.[ch]pp",
+              "-g", "*.cc",
+              "-g", "*.cpp",
+              "-g", "*.cxx",
+              "-g", "*.hpp",
+
+              "-g", "!build",
+              "-g", "!out",
+              "-g", "!vendor",
+
+              t.pat,
+              t.dir,
+
+            }, {
+              text = true,
+            }, function(obj)
+
+              if stopped then
+                return
+              end
+
+              if obj.code == 0
                 and obj.stdout
                 and obj.stdout ~= ""
               then
 
                 local first =
-                  vim.split(
-                    obj.stdout,
-                    "\n",
-                    { plain = true }
-                  )[1]
+                  vim.split(obj.stdout, "\n", {
+                    trimempty = true,
+                  })[1]
 
-                local f, l =
-                  first:match("^([^:]+):(%d+):")
+                local found_file, found_line =
+                  first:match(
+                    "^([^:]+):(%d+):"
+                  )
 
-                l = tonumber(l)
+                if found_file then
 
-                if f then
+                  stopped = true
 
-                  if s.validate then
+                  jump(found_file, tonumber(found_line), "search")
 
-                    if is_definition(f, l) then
-                      jump(f, l)
-                      return
-                    end
-
-                  else
-                    jump(f, l)
-                    return
-                  end
+                  return
                 end
               end
 
-              ----------------------------------------------------------------
-              -- next
-              ----------------------------------------------------------------
-
-              dir_i = dir_i + 1
-
-              if dir_i > #dirs then
-                dir_i = 1
-                search_i = search_i + 1
-              end
-
-              next_search()
+              run_next()
 
             end)
+          end
 
-          end)
+          run_next()
         end
 
-        next_search()
+        --------------------------------------------------------------------
+        -- execution order
+        --------------------------------------------------------------------
+
+        if try_tags() then
+          return
+        end
+
+        if try_cscope() then
+          return
+        end
+
+        try_rg()
 
       end, {
         silent = true,
-        desc = "[lsp] async rg jump definition",
+        desc = "[jump] tags -> cscope -> rg",
       })
+
+
 
 
       -- Maps 'gp' to visually select the last pasted/changed text block
