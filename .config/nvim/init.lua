@@ -854,7 +854,7 @@ local plugins = {
           -- function
           {
             string.format(
-              [[^[A-Za-z_][A-Za-z0-9_\*\s]*\n?%s\s*\([^;{}]*\)\s*\{]],
+              [[^[\w\s\*\&]+?\b%s\s*\([^;{}]*\)\s*\{?]],
               esc
             ),
           },
