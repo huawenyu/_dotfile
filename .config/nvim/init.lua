@@ -791,6 +791,192 @@ local plugins = {
         restore_selection(M.index)
       end, { desc = "Visual Selection - Next" })
 
+
+      -- Cross-window tracing mapping: Press <Space><Space> on a word in your left log split
+      -- to jump the right code split to that definition, keeping your focus on the log.
+      vim.keymap.set("n", "<leader>;", function()
+
+        local sym = vim.fn.expand("<cword>")
+        if sym == "" then
+          return
+        end
+
+        local cur_win = vim.api.nvim_get_current_win()
+
+        local code_win = vim.fn.win_getid(vim.fn.winnr("l"))
+        if code_win == 0 then
+          code_win = cur_win
+        end
+
+        local file = vim.api.nvim_buf_get_name(
+          vim.api.nvim_win_get_buf(code_win)
+        )
+
+        if file == "" then
+          return
+        end
+
+        local dir = vim.fs.dirname(file)
+
+        --------------------------------------------------------------------
+        -- search dirs
+        --------------------------------------------------------------------
+
+        local dirs = {}
+        local function add(p)
+          if p and p ~= "" then
+            p = vim.fs.normalize(p)
+
+            if p ~= "/" and not vim.tbl_contains(dirs, p) then
+              table.insert(dirs, p)
+            end
+          end
+        end
+
+        add(dir)
+        add(vim.fs.dirname(dir))
+
+        local git_top = vim.fn.systemlist({
+          "git", "-C", dir,
+          "rev-parse", "--show-toplevel",
+        })[1]
+
+        add(git_top)
+
+        --------------------------------------------------------------------
+        -- patterns
+        --------------------------------------------------------------------
+
+        local esc = vim.pesc(sym)
+
+        local groups = {
+
+          -- function
+          {
+            string.format(
+              [[^[A-Za-z_][A-Za-z0-9_\*\s]*\n?%s\s*\([^;{}]*\)\s*\{]],
+              esc
+            ),
+          },
+
+          -- types
+          {
+            -- struct foo {
+            [[^\s*struct\s+]] .. esc .. [[\s*\{]],
+
+            -- typedef struct foo {
+            [[^\s*typedef\s+struct\s+]] .. esc .. [[\s*\{]],
+
+            -- typedef struct { } foo_t;
+            [[typedef\s+struct\s*\{[\s\S]*?\}\s*]]
+              .. esc .. [[\s*;]],
+
+            -- typedef struct xxx { } foo_t;
+            [[typedef\s+struct\s+\w+\s*\{[\s\S]*?\}\s*]]
+              .. esc .. [[\s*;]],
+
+            -- enum foo {
+            [[^\s*enum\s+]] .. esc .. [[\s*\{]],
+
+            -- typedef enum foo {
+            [[^\s*typedef\s+enum\s+]] .. esc .. [[\s*\{]],
+
+            -- typedef enum { } foo_t;
+            [[typedef\s+enum\s*\{[\s\S]*?\}\s*]]
+              .. esc .. [[\s*;]],
+
+            -- typedef enum xxx { } foo_t;
+            [[typedef\s+enum\s+\w+\s*\{[\s\S]*?\}\s*]]
+              .. esc .. [[\s*;]],
+
+            -- union foo {
+            [[^\s*union\s+]] .. esc .. [[\s*\{]],
+
+            -- typedef union xxx { } foo_t;
+            [[typedef\s+union\s+\w+\s*\{[\s\S]*?\}\s*]]
+              .. esc .. [[\s*;]],
+
+            -- class foo {
+            "^\\s*class\\s+" .. esc .. "\\s*[:{]",
+          },
+
+        }
+
+        --------------------------------------------------------------------
+        -- rg search
+        --------------------------------------------------------------------
+
+        local found_file, found_line
+
+        for _, d in ipairs(dirs) do
+          for _, g in ipairs(groups) do
+            for _, pat in ipairs(g) do
+
+              local result = vim.fn.systemlist({
+                "rg",
+                "--multiline",
+                "--multiline-dotall",
+                "--line-number",
+                "--no-heading",
+                "--color=never",
+
+                "-g", "*.[ch]",
+                "-g", "*.[ch]pp",
+                "-g", "*.cc",
+                "-g", "*.cpp",
+                "-g", "*.cxx",
+                "-g", "*.hpp",
+
+                pat,
+                d,
+              })
+
+              if vim.v.shell_error == 0 and #result > 0 then
+                found_file, found_line =
+                  result[1]:match("^([^:]+):(%d+):")
+
+                break
+              end
+            end
+
+            if found_file then
+              break
+            end
+          end
+
+          if found_file then
+            break
+          end
+        end
+
+        --------------------------------------------------------------------
+        -- jump
+        --------------------------------------------------------------------
+
+        if found_file then
+          vim.api.nvim_win_call(code_win, function()
+            vim.cmd("edit " .. vim.fn.fnameescape(found_file))
+            vim.api.nvim_win_set_cursor(
+              0,
+              { tonumber(found_line), 0 }
+            )
+            vim.cmd("normal! zz")
+          end)
+        else
+          vim.notify(
+            "Definition not found: " .. sym,
+            vim.log.levels.INFO
+          )
+        end
+
+      end, {
+        silent = true,
+        desc = "[lsp] rg jump definition *",
+      })
+
+      -- Maps 'gp' to visually select the last pasted/changed text block
+      vim.keymap.set('n', 'gp', '`[v`]', { desc = "Select last pasted text" })
+
     end,
   },
 
