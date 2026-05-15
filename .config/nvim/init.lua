@@ -896,6 +896,11 @@ local plugins = {
             [[typedef\s+union\s+\w+\s*\{[\s\S]*?\}\s*]]
               .. esc .. [[\s*;]],
 
+            -- typedef function pointer
+            [[typedef\s+.*\(\s*\*\s*]]
+              .. esc
+              .. [[\s*\)\s*\(]],
+
             -- class foo {
             "^\\s*class\\s+" .. esc .. "\\s*[:{]",
           },
