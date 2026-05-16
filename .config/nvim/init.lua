@@ -794,7 +794,7 @@ local plugins = {
 
       -- Cross-window tracing mapping: Press <Space><Space> on a word in your left log split
       -- to jump the right code split to that definition, keeping your focus on the log.
-      vim.keymap.set("n", "<leader>;", function()
+      vim.keymap.set("n", "<leader><leader>", function()
 
         local sym = vim.fn.expand("<cword>")
 
@@ -803,16 +803,89 @@ local plugins = {
         end
 
         --------------------------------------------------------------------
-        -- windows
+        -- choose code window
         --------------------------------------------------------------------
 
         local cur_win = vim.api.nvim_get_current_win()
 
-        local code_win = vim.fn.win_getid(vim.fn.winnr("l"))
+        local function is_code_win(win)
 
-        if code_win == 0 then
-          code_win = cur_win
+          if not vim.api.nvim_win_is_valid(win) then
+            return false
+          end
+
+          local buf = vim.api.nvim_win_get_buf(win)
+
+          --------------------------------------------------------------
+          -- ignore special buffers
+          --------------------------------------------------------------
+
+          if vim.bo[buf].buftype ~= "" then
+            return false
+          end
+
+          return true
         end
+
+        local code_win
+
+        local wins = vim.api.nvim_tabpage_list_wins(0)
+
+        --------------------------------------------------------------
+        -- only one window -> create right split
+        --------------------------------------------------------------
+
+        if #wins == 1 then
+
+          vim.cmd("rightbelow vsplit")
+
+          code_win = vim.api.nvim_get_current_win()
+
+          vim.api.nvim_set_current_win(cur_win)
+
+        else
+
+          ------------------------------------------------------------
+          -- prefer right window
+          ------------------------------------------------------------
+
+          local right_winnr = vim.fn.winnr("l")
+
+          if right_winnr ~= vim.fn.winnr() then
+
+            local right_win =
+              vim.fn.win_getid(right_winnr)
+
+            if is_code_win(right_win) then
+              code_win = right_win
+            end
+          end
+
+          ------------------------------------------------------------
+          -- fallback to current window
+          ------------------------------------------------------------
+
+          if not code_win and is_code_win(cur_win) then
+            code_win = cur_win
+          end
+
+          ------------------------------------------------------------
+          -- create split if still missing
+          ------------------------------------------------------------
+
+          if not code_win then
+
+            vim.cmd("rightbelow vsplit")
+
+            code_win = vim.api.nvim_get_current_win()
+
+            vim.api.nvim_set_current_win(cur_win)
+          end
+        end
+
+
+
+
 
         local file = vim.api.nvim_buf_get_name(
           vim.api.nvim_win_get_buf(code_win)
@@ -822,7 +895,7 @@ local plugins = {
           return
         end
 
-        local dir = vim.fs.dirname(file)
+        local dir = vim.fn.getcwd()
 
         --------------------------------------------------------------------
         -- db search dirs
@@ -841,21 +914,17 @@ local plugins = {
           "tags",
           ".tags",
           "TAGS",
-          "tags.db",
         }
 
         local cscope_names = {
           "cscope.out",
           ".cscope.out",
-          "cscope.db",
         }
 
         --------------------------------------------------------------------
         -- find db
         --------------------------------------------------------------------
-
         local function find_db(dirs, names)
-
           for _, d in ipairs(dirs) do
             if d and d ~= "" then
 
@@ -863,7 +932,9 @@ local plugins = {
 
                 local p = vim.fs.joinpath(d, n)
 
-                if vim.fn.filereadable(p) == 1 then
+                local stat = vim.uv.fs_stat(p)
+
+                if stat and stat.type == "file" then
                   return p
                 end
               end
@@ -872,9 +943,7 @@ local plugins = {
         end
 
         local tag_db = find_db(db_dirs, tag_names)
-
-        local cscope_db =
-          find_db(db_dirs, cscope_names)
+        local cscope_db = find_db(db_dirs, cscope_names)
 
         --------------------------------------------------------------------
         -- rg dirs
@@ -966,7 +1035,6 @@ local plugins = {
         --------------------------------------------------------------------
         -- tags
         --------------------------------------------------------------------
-
         local function try_tags()
 
           if not tag_db then
@@ -982,27 +1050,34 @@ local plugins = {
             "^" .. vim.pesc(sym) .. "$"
           )
 
-          vim.o.tags = old_tags
-
           if not ok or vim.tbl_isempty(res) then
+            vim.o.tags = old_tags
             return false
           end
 
-          local item = res[1]
+          --------------------------------------------------------------
+          -- use native tag jump
+          --------------------------------------------------------------
 
-          local path = item.filename
+          vim.schedule(function()
 
-          if not vim.startswith(path, "/") then
-            path = vim.fs.joinpath(
-              vim.fs.dirname(tag_db),
-              path
+            vim.o.tags = tag_db
+
+            vim.api.nvim_win_call(code_win, function()
+
+              vim.cmd("tag " .. vim.fn.fnameescape(sym))
+
+              vim.cmd("normal! zz")
+            end)
+
+            vim.notify(
+              "[jump:tags] " .. sym,
+              vim.log.levels.INFO
             )
-          end
 
-          local line =
-            tonumber(item.cmd:match("(%d+)"))
+            vim.o.tags = old_tags
 
-          jump(path, line, "tags")
+          end)
 
           return true
         end
@@ -2074,7 +2149,7 @@ local plugins = {
     enabled = cond({ "coder" }),
     lazy = true,
     keys = {
-      { "<leader><leader>", mode = { "n", "v" }, desc = "Preview Tag" },
+      { "<leader>;", mode = { "n", "v" }, desc = "Preview Tag" },
       { ";bb", desc = "Search rg all" },
       { "<leader>bb", desc = "[find] Search rg all *" },
       { "<leader>gg", mode = { "n", "v" }, desc = "[qf] Search to quickfix *" },
