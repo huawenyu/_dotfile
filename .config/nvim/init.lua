@@ -3194,6 +3194,7 @@ local plugins = {
   {
     "sindrets/diffview.nvim",
     enabled = cond({ "editor" }),
+    lazy = false,
     cmd = "DiffviewOpen",
     dependencies = { "nvim-lua/plenary.nvim" },
     keys = {
@@ -3209,6 +3210,30 @@ local plugins = {
           search_dirs = files,
         })
       end)
+
+
+      vim.api.nvim_create_user_command("GitDiff", function(opts)
+        require("diffview").setup({
+          git_cmd = { "git" }
+        })
+        vim.cmd("DiffviewOpen " .. opts.args)
+      end, { nargs = "*" })
+
+      -- Helper for Yadm diff
+      vim.api.nvim_create_user_command("YadmDiff", function(opts)
+        require("diffview").setup({
+          git_cmd = { "/usr/bin/yadm" }
+        })
+        vim.cmd("DiffviewOpen " .. opts.args)
+      end, { nargs = "*" })
+
+      vim.api.nvim_create_user_command("MeYadmDiff", function(opts)
+        require("diffview").setup({
+          git_cmd = { "me-yadm" }
+        })
+        vim.cmd("DiffviewOpen " .. opts.args)
+      end, { nargs = "*" })
+
     end,
   },
   { -- will hide some importance output message, don't use it

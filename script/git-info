@@ -118,6 +118,8 @@ color?when show colored output (always|never|auto)
         echo "Untracked:"
         git ls-files . --exclude-standard --others | grep -v ".cache/clangd" | sed 's/^/    /'
     fi
+
+    git count-objects -vH
 }
 
 initialize_colors () {
