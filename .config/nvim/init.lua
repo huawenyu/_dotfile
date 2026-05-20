@@ -3214,7 +3214,7 @@ local plugins = {
 
         -- 2. Ask the binary to list files specifically inside your current directory.
         -- 'grep -q .' instantly verifies if git outputs even a single tracked file.
-        local cmd = string.format("%s ls-files %q | grep -q .", binary, cwd)
+        local cmd = string.format("%s ls-files %q  2>/dev/null | grep -q .", binary, cwd)
 
         return run_cmd_status(cmd)
       end
@@ -3386,7 +3386,7 @@ local plugins = {
 
         -- 2. Ask the binary to list files specifically inside your current directory.
         -- 'grep -q .' instantly verifies if git outputs even a single tracked file.
-        local cmd = string.format("%s ls-files %q | grep -q .", binary, cwd)
+        local cmd = string.format("%s ls-files %q  2>/dev/null | grep -q .", binary, cwd)
 
         return run_cmd_status(cmd)
       end
