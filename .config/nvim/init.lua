@@ -3192,27 +3192,64 @@ local plugins = {
     },
   },
   {
-    "sindrets/diffview.nvim",
+    "huawenyu/diffview.nvim",   -- "dlyongemallo/diffview.nvim",
     enabled = cond({ "editor" }),
     lazy = false,
-    cmd = "DiffviewOpen",
+    cmd = { "DiffviewOpen", "DiffviewLog" },
     dependencies = { "nvim-lua/plenary.nvim" },
     keys = {
-      { "<leader>vg", "<cmd>DiffviewOpen<cr>", desc = "[view,git] Open Diffview *", },
+      { "<leader>vg", "<cmd>DiffviewFileHistory<cr>", desc = "[view,git] Open Diffview *", },
     },
     config = function()
-      require("diffview").setup({})
 
-      vim.keymap.set("n", "<leader>vG", function()
-        local files = vim.fn.systemlist("git diff --name-only")
+      local function run_cmd_status(cmd)
+        local success = os.execute(cmd .. " 2>/dev/null")
+        return success == true or success == 0
+      end
 
-        require("telescope.builtin").live_grep({
-          search_dirs = files,
-        })
-      end)
+      local function is_current_dir_tracked(binary)
+        -- 1. Get the absolute path of your current working directory
+        local cwd = vim.fn.getcwd()
+
+        -- 2. Ask the binary to list files specifically inside your current directory.
+        -- 'grep -q .' instantly verifies if git outputs even a single tracked file.
+        local cmd = string.format("%s ls-files %q | grep -q .", binary, cwd)
+
+        return run_cmd_status(cmd)
+      end
+
+      -- Both functions now run flawlessly across yadm, me-yadm, and standard git
+      local function is_yadm_repo()
+        return is_current_dir_tracked("yadm")
+      end
+
+      local function is_me_yadm_repo()
+        return is_current_dir_tracked("me-yadm")
+      end
 
 
-      vim.api.nvim_create_user_command("GitDiff", function(opts)
+      local cwd = vim.fn.getcwd()
+      local home = vim.env.HOME
+      local is_git_repo = vim.fn.isdirectory(cwd .. "/.git") == 1
+
+      local target_cmd = { "git" }
+      if not is_git_repo then
+        if cwd == home then
+          target_cmd = { "yadm" }
+        elseif is_yadm_repo() then
+          target_cmd = { "yadm" }
+        elseif is_me_yadm_repo() then
+          target_cmd = { "me-yadm" }
+        end
+      end
+
+      require("diffview").setup({
+        git_cmd = target_cmd,
+      })
+
+
+      -- Create cmd to switch
+      vim.api.nvim_create_user_command("DiffGit", function(opts)
         require("diffview").setup({
           git_cmd = { "git" }
         })
@@ -3220,18 +3257,18 @@ local plugins = {
       end, { nargs = "*" })
 
       -- Helper for Yadm diff
-      vim.api.nvim_create_user_command("YadmDiff", function(opts)
+      vim.api.nvim_create_user_command("DiffYadm", function(opts)
         require("diffview").setup({
           git_cmd = { "/usr/bin/yadm" }
         })
-        vim.cmd("DiffviewOpen " .. opts.args)
+        vim.cmd("DiffviewFileHistory " .. opts.args)
       end, { nargs = "*" })
 
-      vim.api.nvim_create_user_command("MeYadmDiff", function(opts)
+      vim.api.nvim_create_user_command("DiffMeYadm", function(opts)
         require("diffview").setup({
           git_cmd = { "me-yadm" }
         })
-        vim.cmd("DiffviewOpen " .. opts.args)
+        vim.cmd("DiffviewFileHistory " .. opts.args)
       end, { nargs = "*" })
 
     end,
