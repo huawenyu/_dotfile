@@ -1,0 +1,3 @@
+#!/bin/sh
+exec yadm --yadm-dir "$HOME/.config/me-yadm" --yadm-data "$HOME/.local/share/me-yadm" --yadm-repo "$HOME/.local/share/me-yadm/repo.git" "$@"
+
