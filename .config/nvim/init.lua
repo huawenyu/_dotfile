@@ -3198,7 +3198,8 @@ local plugins = {
     cmd = { "DiffviewOpen", "DiffviewLog" },
     dependencies = { "nvim-lua/plenary.nvim" },
     keys = {
-      { "<leader>vg", "<cmd>DiffviewFileHistory<cr>", desc = "[view,git] Open Diffview *", },
+      { "<leader>vg", "<cmd>DiffviewToggle<cr>", desc = "[view,git] Diffview Toggle *", },
+      { "<leader>vG", "<cmd>DiffviewFileHistory<cr>", desc = "[view,git] Diffview Log *", },
     },
     config = function()
 
@@ -3224,7 +3225,7 @@ local plugins = {
       end
 
       local function is_me_yadm_repo()
-        return is_current_dir_tracked("me-yadm")
+        return is_current_dir_tracked("yadme")
       end
 
 
@@ -3239,7 +3240,7 @@ local plugins = {
         elseif is_yadm_repo() then
           target_cmd = { "yadm" }
         elseif is_me_yadm_repo() then
-          target_cmd = { "me-yadm" }
+          target_cmd = { "yadme" }
         end
       end
 
@@ -3259,16 +3260,16 @@ local plugins = {
       -- Helper for Yadm diff
       vim.api.nvim_create_user_command("DiffYadm", function(opts)
         require("diffview").setup({
-          git_cmd = { "/usr/bin/yadm" }
+          git_cmd = { "yadm" }
         })
-        vim.cmd("DiffviewFileHistory " .. opts.args)
+        vim.cmd("DiffviewOpen " .. opts.args)
       end, { nargs = "*" })
 
-      vim.api.nvim_create_user_command("DiffMeYadm", function(opts)
+      vim.api.nvim_create_user_command("DiffYadme", function(opts)
         require("diffview").setup({
-          git_cmd = { "me-yadm" }
+          git_cmd = { "yadme" }
         })
-        vim.cmd("DiffviewFileHistory " .. opts.args)
+        vim.cmd("DiffviewOpen " .. opts.args)
       end, { nargs = "*" })
 
     end,
@@ -3374,16 +3375,46 @@ local plugins = {
     enabled = cond({ "editor" }),
     event = "BufReadPre",
     config = function()
+      local function run_cmd_status(cmd)
+        local success = os.execute(cmd .. " 2>/dev/null")
+        return success == true or success == 0
+      end
+
+      local function is_current_dir_tracked(binary)
+        -- 1. Get the absolute path of your current working directory
+        local cwd = vim.fn.getcwd()
+
+        -- 2. Ask the binary to list files specifically inside your current directory.
+        -- 'grep -q .' instantly verifies if git outputs even a single tracked file.
+        local cmd = string.format("%s ls-files %q | grep -q .", binary, cwd)
+
+        return run_cmd_status(cmd)
+      end
+
+      -- Both functions now run flawlessly across yadm, me-yadm, and standard git
       local function is_yadm_repo()
-        local handle = io.popen("yadm rev-parse --is-inside-work-tree 2>/dev/null")
-        local result = handle:read("*a")
+        return is_current_dir_tracked("yadm")
       end
+
       local function is_me_yadm_repo()
-        local handle = io.popen("me-yadm rev-parse --is-inside-work-tree 2>/dev/null")
-        local result = handle:read("*a")
-        handle:close()
-        return result:gsub("%s+", "") == "true"
+        return is_current_dir_tracked("yadme")
       end
+
+      local cwd = vim.fn.getcwd()
+      local home = vim.env.HOME
+      local is_git_repo = vim.fn.isdirectory(cwd .. "/.git") == 1
+
+      local target_cmd = "git"
+      if not is_git_repo then
+        if cwd == home then
+          target_cmd = "yadm"
+        elseif is_yadm_repo() then
+          target_cmd = "yadm"
+        elseif is_me_yadm_repo() then
+          target_cmd = "yadme"
+        end
+      end
+
       require('gitsigns').setup({
         signs = { add = { text = '+' }, change = { text = '>' }, delete = { text = '-' }, topdelete = { text = '^' }, changedelete = { text = '<' } },
         signcolumn = true, numhl = false, linehl = true, word_diff = false,
@@ -3391,8 +3422,9 @@ local plugins = {
         current_line_blame = false, sign_priority = 6, update_debounce = 100, max_file_length = 40000,
         on_attach = function(bufnr)
           local gs = require('gitsigns')
-          if is_yadm_repo() then vim.b.gitsigns_git_command = "yadm"
-          elseif is_me_yadm_repo() then vim.b.gitsigns_git_command = "me-yadm" end
+
+          vim.b.gitsigns_git_command = target_cmd
+
           vim.keymap.set('n', ';gn', gs.next_hunk, { buffer = bufnr, desc = "Next Hunk" })
           vim.keymap.set('n', ';gp', gs.prev_hunk, { buffer = bufnr, desc = "Previous Hunk" })
           vim.keymap.set('n', ';ga', gs.stage_hunk, { buffer = bufnr, desc = "Stage Hunk" })
@@ -3402,6 +3434,11 @@ local plugins = {
           vim.keymap.set({ 'o', 'x' }, 'ih', ':Gitsigns select_hunk<CR>', { buffer = bufnr })
         end,
       })
+
+      vim.api.nvim_create_user_command("GitsignsYadme", function(opts)
+        vim.b.gitsigns_git_command = "yadme"
+        vim.cmd("Gitsigns setqflist " .. opts.args)
+      end, { nargs = "*" })
     end,
   },
 
