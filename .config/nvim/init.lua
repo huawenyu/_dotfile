@@ -1373,7 +1373,15 @@ local plugins = {
   -- ============================================================
   -- Coder Plugins
   -- ============================================================
-  { "tpope/vim-commentary", enabled = cond({ "coder" }), lazy = false }, -- gc, gcc
+  {
+    "tpope/vim-commentary",
+    enabled = cond({ "coder" }),
+    keys = {
+      { "gcc", "gcc", mode = "n", remap = true, desc = "[misc] Comment current line *" },
+      { "gc",  "gc",  mode = "v", remap = true, desc = "[misc] Comment selection *" },
+    },
+  },
+
   {
     "huawenyu/nerdcommenter",
     enabled = cond({ "coder" }),
