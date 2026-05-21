@@ -1373,7 +1373,7 @@ local plugins = {
   -- ============================================================
   -- Coder Plugins
   -- ============================================================
-  { "tpope/vim-commentary", enabled = cond({ "coder" }), lazy = false },
+  { "tpope/vim-commentary", enabled = cond({ "coder" }), lazy = false }, -- gc, gcc
   {
     "huawenyu/nerdcommenter",
     enabled = cond({ "coder" }),
@@ -1495,11 +1495,21 @@ local plugins = {
       vim.keymap.set('n', ';v:', '<cmd>Telescope commands<cr>', { silent = true, desc = "Commands" })
       vim.keymap.set('n', ';v;', '<cmd>Telescope command_history<cr>', { silent = true, desc = "Command History" })
 
-      vim.keymap.set('n', '<leader>vk', function()
-        require('telescope.builtin').keymaps({ default_text = "*$" })
+
+      vim.keymap.set('n', '<leader>vh', function()
+        require('telescope.builtin').keymaps({
+          default_text = " *$",
+          attach_mappings = function(_, map)
+            -- Schedule the keypress so it runs immediately after Telescope opens: move input to begin
+            vim.schedule(function()
+              vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Left><Left><Left>", true, false, true), "n", false)
+            end)
+            return true -- Keep default Telescope mappings working
+          end,
+        })
       end, { silent = true, desc = "Key maps (Filtered by endwith-*)" })
 
-      vim.keymap.set('n', '<leader>v;', '<cmd>Telescope resume<cr>', { silent = true, desc = "[picker] Resume *" })
+      vim.keymap.set('n', '<leader>vv', '<cmd>Telescope resume<cr>', { silent = true, desc = "[picker] Resume *" })
       vim.keymap.set('n', '<leader>vP', '<cmd>Telescope pickers<cr>', { silent = true, desc = "Picker" })
       vim.keymap.set('n', '<leader>vp', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "Live grep" })
       vim.keymap.set('n', '<leader>vb', '<cmd>Telescope buffers<cr>', { silent = true, desc = "Buffers" })
@@ -2148,15 +2158,6 @@ local plugins = {
     "huawenyu/c-utils.vim",
     enabled = cond({ "coder" }),
     lazy = true,
-    keys = {
-      { "<leader>;", mode = { "n", "v" }, desc = "Preview Tag" },
-      { ";bb", desc = "Search rg all" },
-      { "<leader>bb", desc = "[find] Search rg all *" },
-      { "<leader>gg", mode = { "n", "v" }, desc = "[qf] Search to quickfix *" },
-      { ";gg", mode = { "n", "v" }, desc = "[find] Search to loclist *" },
-      { "<leader>vv", mode = { "n", "v" }, desc = "[qf] Search all to quickfix *" },
-      { ";vv", mode = { "n", "v" }, desc = "[misc] Search all to loclist *" },
-    },
     config = function()
       local g = vim.g
       local home = os.getenv("HOME")
@@ -2197,17 +2198,13 @@ local plugins = {
       end
 
 
-      -- Grep in Preferred Directory
-      vim.keymap.set('n', '<leader>gg', function() prepare_grep(0, "prefer", 1) end, { desc = "[qf] Search to QF (edit) *" })
-      vim.keymap.set('n', ';gg',        function() prepare_grep(0, "prefer", 0) end, { desc = "Search to Loc (edit)" })
-      vim.keymap.set('v', '<leader>gg', function() prepare_grep(1, "prefer", 1) end, { desc = "[qf] Search selection to QF (edit) *" })
-      vim.keymap.set('v', ';gg',        function() prepare_grep(1, "prefer", 0) end, { desc = "Search selection to Loc (edit)" })
+      -- Grep in specific dir
+      vim.keymap.set('n', '<leader>gg', function() prepare_grep(0, "prefer", 1) end, { desc = "[find] Search in *" })
+      vim.keymap.set('v', '<leader>gg', function() prepare_grep(1, "prefer", 1) end, { desc = "[find] Search selection in *" })
 
-      -- Grep All (Empty Directory)
-      vim.keymap.set('n', '<leader>vv', function() prepare_grep(0, "", 1) end, { desc = "[qf] Search all to QF (edit) *" })
-      vim.keymap.set('n', ';vv',        function() prepare_grep(0, "", 0) end, { desc = "Search all to Loc (edit)" })
-      vim.keymap.set('v', '<leader>vv', function() prepare_grep(1, "", 1) end, { desc = "[qf] Search all selection to QF (edit) *" })
-      vim.keymap.set('v', ';vv',        function() prepare_grep(1, "", 0) end, { desc = "Search all selection to Loc (edit)" })
+      -- Grep All
+      vim.keymap.set('n', ';gg', function() prepare_grep(0, "", 1) end, { desc = "[find] Search all *" })
+      vim.keymap.set('v', ';gg', function() prepare_grep(1, "", 1) end, { desc = "[find] Search all *" })
     end,
   },
   {
