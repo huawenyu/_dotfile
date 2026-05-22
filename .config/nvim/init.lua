@@ -1755,8 +1755,6 @@ local plugins = {
       })
     end,
   },
-  { "ellisonleao/glow.nvim", enabled = cond({ "editor", "markdown" }), cmd = "Glow", ft = "markdown" },
-
   {
     "ethanholz/nvim-lastplace",
     lazy = false,
@@ -2602,12 +2600,16 @@ local plugins = {
     "neovim/nvim-lspconfig",
     enabled = cond({ "coder" }),
     event = "VeryLazy",
-    dependencies = { "ojroques/nvim-lspfuzzy", "williamboman/nvim-lsp-installer" },
+    dependencies = {
+      "ojroques/nvim-lspfuzzy",
+      "williamboman/mason.nvim",
+      "williamboman/mason-lspconfig.nvim",
+    },
     config = function()
       vim.lsp.config('clangd', {})
       vim.lsp.config('rust_analyzer', {})
       vim.lsp.config('lua_ls', {})
-      vim.lsp.enable({ 'lua_ls', 'clangd', 'rust_analyzer' })
+
       require('lspfuzzy').setup({})
 
       local opts = { noremap = true, silent = true }
@@ -2645,7 +2647,7 @@ local plugins = {
     dependencies = {
       "michaeljsmith/vim-indent-object", "glts/vim-textobj-indblock", "kana/vim-textobj-entire",
       "mattn/vim-textobj-url", "kana/vim-textobj-diff", "Julian/vim-textobj-brace",
-      "whatyouhide/vim-textobj-xmlattr", "pocke/vim-textobj-markdown", "glts/vim-textobj-comment",
+      "whatyouhide/vim-textobj-xmlattr", "glts/vim-textobj-comment",
       "preservim/vim-textobj-sentence", "kana/vim-textobj-function",
     },
   },
@@ -2668,7 +2670,7 @@ local plugins = {
       local compile_run_swap = 0
 
       local function compile_run(mode)
-        local command = ":FloatermNew --name=repl --wintype=split --position=bottom --autoclose=0 height=0.4 --width=0.6 --title=Repl-" .. vim.bo.filetype
+        local command = ":FloatermNew --name=repl --wintype=split --position=bottom --autoclose=0 --title=Repl-" .. vim.bo.filetype
 
         local fname_org = vim.fn.expand("%")
         local fname, fname_bin, fpath_bin
@@ -2819,7 +2821,7 @@ local plugins = {
       end
 
       local function toggle_terminal(mode)
-        local command = ":FloatermNew --name=Shell --wintype=split --position=bottom --autoclose=0 height=0.4 --width=0.6 --title=Shell bash"
+        local command = ":FloatermNew --name=Shell --wintype=split --position=bottom --autoclose=0 --title=Shell bash"
         vim.cmd("silent execute '" .. command .. "'")
       end
 
@@ -2858,19 +2860,19 @@ local plugins = {
       end, { desc = "(view) Terminal *" })
 
       vim.keymap.set("i", "<C-\\>", function()
-        vim.cmd("silent execute ':FloatermNew --name=Shell --wintype=split --position=bottom --autoclose=0 height=0.4 --width=0.6 --title=Shell bash'")
+        vim.cmd("silent execute ':FloatermNew --name=Shell --wintype=split --position=bottom --autoclose=0 --title=Shell bash'")
       end, { desc = "(Tool) Terminal" })
 
       -- Custom Tldr command
       vim.api.nvim_create_user_command("Tldr", function(opts)
-        vim.cmd(string.format("FloatermNew --name=Help --wintype=split --position=bottom --autoclose=1 height=0.4 --width=0.6 --title=Tldr tldr -e %s", opts.args))
+        vim.cmd(string.format("FloatermNew --name=Help --wintype=split --position=bottom --autoclose=1 --title=Tldr tldr -e %s", opts.args))
       end, { nargs = 1 })
     end,
   },
-  { "huawenyu/vim-floaterm-repl", enabled = cond({ "editor" }), cmd = "FloatermRepl" },
   {
     "huawenyu/vim-floaterm-repl",
     enabled = cond({ "editor" }),
+    lazy = false,
     cmd = "FloatermRepl",
     ft = "markdown",
     keys = {
@@ -2905,13 +2907,27 @@ local plugins = {
     end,
   },
   {
-    "huawenyu/asyncrun.vim",
-    enabled = cond({ "admin" }),
+    'skywind3000/asynctasks.vim',
+    enabled = cond({ "coder" }),
+    lazy = false,
+    dependencies = {
+      "huawenyu/asyncrun.vim",
+    },
+
+    init = function()
+      local src = vim.fn.expand('~/.vim_tasks.ini')
+      local dst = vim.fn.expand('~/.config/nvim/tasks.ini')
+
+      if vim.fn.filereadable(src) == 1 and vim.fn.getftype(dst) == '' then
+        vim.fn.system('ln -sf ' .. src .. ' ' .. dst)
+      end
+    end,
+
     config = function()
       -- Mappings
-      vim.keymap.set('n', '<leader>gc', ':AsyncStop! <bar> AsyncTask gitclean-dryrun<CR>', { desc = "(git)clean-dryrun" })
-      vim.keymap.set('n', '<leader>gx', ':AsyncStop! <bar> AsyncTask gitclean<CR>', { desc = "(git)clean" })
-      vim.keymap.set('n', '<leader>f]', ':AsyncRun! tagme<CR>', { desc = "(tool)Auto generate tags" })
+      vim.keymap.set('n', '<leader>gc', ':AsyncStop! <bar> AsyncTask gitclean-dryrun<CR>', { desc = "(task) git clean-dryrun *" })
+      vim.keymap.set('n', '<leader>gx', ':AsyncStop! <bar> AsyncTask gitclean<CR>', { desc = "(task) git clean *" })
+      vim.keymap.set('n', '<leader>f]', ':AsyncRun! tagme<CR>', { desc = "(task) Generate tags *" })
 
       -- Settings
       vim.g.asyncrun_silent = 1
@@ -2920,9 +2936,6 @@ local plugins = {
       vim.g.asynctasks_term_reuse = 1
       vim.g.asynctasks_term_focus = 1
       vim.g.asynctasks_term_pos = 'bottom'
-
-      -- Link tasks file if needed
-      vim.fn.system('ln -sf ~/.vim_tasks.ini ~/.vim/tasks.ini')
 
       -- Template
       vim.g.asynctasks_template = {}
@@ -3511,6 +3524,7 @@ local plugins = {
   -- ============================================================
   {
     "huawenyu/vimlogger",
+    lazy = false,
     enabled = cond({ "admin", "coder" }),
     config = function()
       if vim.g.vim_confi_option.debug == 1 then
