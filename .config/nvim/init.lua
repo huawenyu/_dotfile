@@ -1446,25 +1446,8 @@ local plugins = {
       { "<leader>vG", "<cmd>DiffviewFileHistory<cr>", desc = "[view,git] Diffview Log *", },
     },
     config = function()
-      local function run_cmd_status(cmd)
-        local success = os.execute(cmd .. " 2>/dev/null")
-        return success == true or success == 0
-      end
-      local function is_current_dir_tracked(binary)
-        local cwd = vim.fn.getcwd()
-        local cmd = string.format("%s ls-files %q  2>/dev/null | grep -q .", binary, cwd)
-        return run_cmd_status(cmd)
-      end
-      local cwd = vim.fn.getcwd()
-      local is_git_repo = vim.fn.isdirectory(cwd .. "/.git") == 1
-      local target_cmd = { "git" }
-      if not is_git_repo then
-        if cwd == vim.env.HOME then target_cmd = { "yadm" }
-        elseif is_current_dir_tracked("yadm") then target_cmd = { "yadm" }
-        elseif is_current_dir_tracked("yadme") then target_cmd = { "yadme" }
-        end
-      end
-      require("diffview").setup({ git_cmd = target_cmd })
+      local git_cmd = require("vimconfig.git").detect_git_cmd()
+      require("diffview").setup({ git_cmd = { git_cmd } })
       vim.api.nvim_create_user_command("DiffGit", function(opts)
         require("diffview").setup({ git_cmd = { "git" } }); vim.cmd("DiffviewOpen " .. opts.args)
       end, { nargs = "*" })
@@ -1577,45 +1560,7 @@ local plugins = {
     enabled = cond({ "editor" }),
     event = "BufReadPre",
     config = function()
-      local function run_cmd_status(cmd)
-        local success = os.execute(cmd .. " 2>/dev/null")
-        return success == true or success == 0
-      end
-
-      local function is_current_dir_tracked(binary)
-        -- 1. Get the absolute path of your current working directory
-        local cwd = vim.fn.getcwd()
-
-        -- 2. Ask the binary to list files specifically inside your current directory.
-        -- 'grep -q .' instantly verifies if git outputs even a single tracked file.
-        local cmd = string.format("%s ls-files %q  2>/dev/null | grep -q .", binary, cwd)
-
-        return run_cmd_status(cmd)
-      end
-
-      -- Both functions now run flawlessly across yadm, me-yadm, and standard git
-      local function is_yadm_repo()
-        return is_current_dir_tracked("yadm")
-      end
-
-      local function is_me_yadm_repo()
-        return is_current_dir_tracked("yadme")
-      end
-
-      local cwd = vim.fn.getcwd()
-      local home = vim.env.HOME
-      local is_git_repo = vim.fn.isdirectory(cwd .. "/.git") == 1
-
-      local target_cmd = "git"
-      if not is_git_repo then
-        if cwd == home then
-          target_cmd = "yadm"
-        elseif is_yadm_repo() then
-          target_cmd = "yadm"
-        elseif is_me_yadm_repo() then
-          target_cmd = "yadme"
-        end
-      end
+	      local target_cmd = require("vimconfig.git").detect_git_cmd()
 
       require('gitsigns').setup({
         signs = { add = { text = '+' }, change = { text = '>' }, delete = { text = '-' }, topdelete = { text = '^' }, changedelete = { text = '<' } },
