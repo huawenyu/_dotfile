@@ -2,6 +2,21 @@
 
 -- ~/.config/nvim/init.lua
 -- Performance-optimized Neovim configuration with lazy.nvim
+--
+-- KEYMAPS  (LEADER = <Space>)
+--   Navigation   h/j/k/l=windows  c-n/p=quickfix  a-n/p=loclist  gf=open-file  ;1-9=tabs
+--   Find         ff=cscope→git→rg  ;ff=git-ls-files  fd/fs=LSP def/ref  fq=find-word
+--                fc/C/w=LSP callers/callees/assign  fl=fuzzy-buf  fL=live-grep
+--   Picker       vv=resume  vp=live-grep  vb=buffers  vz=oldfiles  vq=quickfix
+--                ;vF=files  ;vC=commits  ;vm=marks  ;vj=jumps  ;vd=diag  ;v/=history
+--   View         ve=NERDTree  vE=neo-tree  vt=tagbar  vo=outline  vl=todo
+--   Git          gl=log  gd=diff  gb=blame  gs=status  vg/vG=diffview  gn/p=hunk
+--   Edit         gcc=comment  ct=trim-ws  ci=indent  cm=rm-^M  cn=collapse-blank
+--                ga=align  vr=replace  K=man  ;s/;;=hop  gp=select-pasted
+--   Run          ee=compile-run  mk/ma=make-wad/all  gc/gx=git-clean  f]=tags
+--   General      q=quit-all  ;q=smart-close  Esc=clear-hl  <leader><leader>=trace
+--   Alt          a-e/w/t/b/g/q = NERDTree/window/tagbar/buffers/git/quit
+--                a-f=search  a-s=git-status  a-/=todo  a-./,=jump-indent
 
 -- ============================================================
 -- Core Settings & Bootstrap
