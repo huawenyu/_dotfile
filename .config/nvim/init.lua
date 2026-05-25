@@ -957,7 +957,7 @@ local plugins = {
     enabled = cond({ "coder" }),
     cmd = { "TagbarToggle", "Tagbar", "TagbarOpen" },
     keys = { { "<leader>vt", "<cmd>TagbarToggle<cr>", desc = "[view] Tag (tagbar) *" } },
-    config = function() require("vimconfig.tagbar").setup() end,
+    init = function() require("vimconfig.tagbar").setup() end,
   },
 
   -- { "huawenyu/quickfix-reflector.vim", enabled = cond({ "editor" }) }, -- Disable it for it confuse neovim and create multiple-quickfix window
@@ -976,8 +976,7 @@ local plugins = {
     cmd = { "TodoLocList", "TodoQuickFix", "TodoTelescope" },
     dependencies = { "nvim-telescope/telescope.nvim" },
     keys = {
-      { "<leader>vl", "<cmd>TodoLocList<cr>", desc = "Todo Location List" },
-      { "<leader>vt", "<cmd>TodoTelescope<cr>", desc = "[picker] Todo *" },
+      { "<leader>vT", "<cmd>TodoTelescope<cr>", desc = "[picker] Todo *" },
     },
     config = function()
       require("todo-comments").setup()
@@ -1122,6 +1121,9 @@ local plugins = {
       vim.lsp.config('clangd', {})
       vim.lsp.config('rust_analyzer', {})
       vim.lsp.config('lua_ls', {})
+      vim.lsp.enable('clangd')
+      vim.lsp.enable('rust_analyzer')
+      vim.lsp.enable('lua_ls')
       require('lspfuzzy').setup({})
 
       local opts = { noremap = true, silent = true }
