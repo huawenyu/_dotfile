@@ -274,7 +274,7 @@ local plugins = {
       require("vimconfig").setup()
       local prefer_dir = vim.g.c_utils_prefer_dir
       if prefer_dir == nil or prefer_dir == "" then prefer_dir = "daemon/wad" end
-      local dir_arg = " " .. vim.fn.shellescape(prefer_dir)
+      local dir_arg = " " .. prefer_dir
       vim.keymap.set("n", "<leader>gg", function()
         local word = vim.fn.expand("<cword>")
         if word == "" then return end
