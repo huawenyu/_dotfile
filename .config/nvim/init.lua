@@ -267,8 +267,55 @@ local plugins = {
       { "<leader>mf", desc = "[qf] Quickfix filter *" },
       { "<leader>mc", desc = "[qf] Quickfix add caller *" },
       { ";q", desc = "SmartClose" },
+      { "<leader>gg", mode = { "n", "v" }, desc = "[find] Search to-quickfix *" },
+      { ";gg", mode = { "n", "v" }, desc = "[find] Search to-loclist *" },
     },
-    config = function() require("vimconfig").setup() end,
+    config = function()
+      require("vimconfig").setup()
+      local prefer_dir = vim.g.c_utils_prefer_dir
+      if prefer_dir == nil or prefer_dir == "" then prefer_dir = "daemon/wad" end
+      local dir_arg = " " .. vim.fn.shellescape(prefer_dir)
+      vim.keymap.set("n", "<leader>gg", function()
+        local word = vim.fn.expand("<cword>")
+        if word == "" then return end
+        vim.g["grepper"].quickfix = 1
+        local cmd = "GrepperRg -w " .. vim.fn.shellescape(word) .. dir_arg
+        vim.fn.feedkeys(":" .. cmd, "n")
+      end, { silent = true, desc = "[find] Search to-quickfix *" })
+      vim.keymap.set("v", "<leader>gg", function()
+        local _, sl, sc = unpack(vim.fn.getpos("'<"))
+        local _, el, ec = unpack(vim.fn.getpos("'>"))
+        local lines = vim.fn.getline(sl, el)
+        if #lines == 0 then return end
+        lines[1] = lines[1]:sub(sc)
+        lines[#lines] = lines[#lines]:sub(1, ec)
+        local text = table.concat(lines, " ")
+        if #text < 2 then return end
+        vim.g["grepper"].quickfix = 1
+        local cmd = "GrepperRg -F -- " .. vim.fn.shellescape(text) .. dir_arg
+        vim.fn.feedkeys(":" .. cmd, "n")
+      end, { silent = true, desc = "[find] Search to-quickfix *" })
+      vim.keymap.set("n", ";gg", function()
+        local word = vim.fn.expand("<cword>")
+        if word == "" then return end
+        vim.g["grepper"].quickfix = 1
+        local cmd = "GrepperRg -w " .. vim.fn.shellescape(word)
+        vim.fn.feedkeys(":" .. cmd, "n")
+      end, { silent = true, desc = "[find] Search to-quickfix *" })
+      vim.keymap.set("v", ";gg", function()
+        local _, sl, sc = unpack(vim.fn.getpos("'<"))
+        local _, el, ec = unpack(vim.fn.getpos("'>"))
+        local lines = vim.fn.getline(sl, el)
+        if #lines == 0 then return end
+        lines[1] = lines[1]:sub(sc)
+        lines[#lines] = lines[#lines]:sub(1, ec)
+        local text = table.concat(lines, " ")
+        if #text < 2 then return end
+        vim.g["grepper"].quickfix = 1
+        local cmd = "GrepperRg -F -- " .. vim.fn.shellescape(text)
+        vim.fn.feedkeys(":" .. cmd, "n")
+      end, { silent = true, desc = "[find] Search to-quickfix *" })
+    end,
   },
 
   -- ============================================================
@@ -853,7 +900,7 @@ local plugins = {
   -- ============================================================
   -- Search / Jump / Motion
   -- ============================================================
-  { "huawenyu/vim-grepper", enabled = cond({ "editor" }), cmd = { "Grepper", "GrepperAg", "GrepperGit", "GrepperGrep", "GrepperRg" } },
+  { "huawenyu/vim-grepper", enabled = cond({ "editor" }), lazy = false },
   {
     "dhananjaylatkar/cscope_maps.nvim",
     enabled = cond({ "coder" }),
@@ -878,7 +925,7 @@ local plugins = {
   {
     "huawenyu/c-utils.vim",
     enabled = cond({ "coder" }),
-    lazy = true,
+    lazy = false,
     config = function() require("c-utils").setup() end,
   },
   {
