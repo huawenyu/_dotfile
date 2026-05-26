@@ -116,6 +116,16 @@ _G.HasNoPlug = function(name)
   return plugin == nil
 end
 
+-- Expose to vimscript (vim-plug compatibility for conf_plug.vim guards)
+vim.cmd([[
+  function! HasPlug(name) abort
+    return luaeval('_G.HasPlug(_A)', a:name)
+  endfunction
+  function! HasNoPlug(name) abort
+    return luaeval('_G.HasNoPlug(_A)', a:name)
+  endfunction
+]])
+
 -- Symlink builder for external repos
 local function symlink_repo(target_path)
   return function(plugin)
