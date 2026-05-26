@@ -1738,6 +1738,10 @@ vim.cmd.colorscheme("jellybeans")
 -- Search highlight: background color instead of underline
 vim.api.nvim_set_hl(0, 'Search', { bg = '#f0a0c0', fg = '#302028', ctermbg = 217, ctermfg = 16, cterm = nil, gui = nil })
 
+-- Override vimConfig's <Esc> mapping to avoid command-line enter/leave events
+-- which can cause edgy to re-focus pinned windows (e.g. quickfix)
+vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<CR>", { silent = true, desc = "Clear search highlight" })
+
 -- Select High-Contrast Reverse Mode
 vim.api.nvim_set_hl(0, 'Visual', { reverse = true })
 vim.api.nvim_create_autocmd('ColorScheme', {
@@ -1797,6 +1801,12 @@ if cond({ "coder" }) then
         -- Force n/N to standard search for QF only
         vim.keymap.set("n", "n", "n", { buffer = true })
         vim.keymap.set("n", "N", "N", { buffer = true })
+
+        -- Split the previous (main) window, not the qf window
+        vim.keymap.set("n", "<C-w>v", "<C-w>p<C-w>v", { buffer = true })
+        vim.keymap.set("n", "<C-w>s", "<C-w>p<C-w>s", { buffer = true })
+        vim.keymap.set("n", "<C-w><C-v>", "<C-w>p<C-w>v", { buffer = true })
+        vim.keymap.set("n", "<C-w><C-s>", "<C-w>p<C-w>s", { buffer = true })
       end
 
       -- 3. Mappings for ALL types in the pattern list
