@@ -1520,8 +1520,6 @@ local plugins = {
       },
     },
   },
-  { "mhinz/vim-signify", enabled = false, },
-  { "mattn/gist-vim", enabled = cond({ "editor", "extra" }), cmd = "Gist" },
   {
     "airblade/vim-gitgutter",
     enabled = false, -- better: gitsigns.nvim
@@ -1558,21 +1556,46 @@ local plugins = {
     end,
   },
   {
-    "lewis6991/gitsigns.nvim",
+    "huawenyu/gitsigns.nvim",
     enabled = cond({ "editor" }),
     event = "BufReadPre",
     config = function()
-	      local target_cmd = require("vimconfig.git").detect_git_cmd()
+      local vcs_dirs = {}
+      local default_untracked = false  -- user's default; saved to restore on git switch
 
       require('gitsigns').setup({
-        signs = { add = { text = '+' }, change = { text = '>' }, delete = { text = '-' }, topdelete = { text = '^' }, changedelete = { text = '<' } },
+          git_command = require("vimconfig.git").detect_git_cmd(),
+          signs = { add = { text = '+' }, change = { text = '>' }, delete = { text = '-' }, topdelete = { text = '^' }, changedelete = { text = '<' } },
         signcolumn = true, numhl = false, linehl = true, word_diff = false,
         watch_gitdir = { follow_files = true }, auto_attach = true, attach_to_untracked = false,
         current_line_blame = false, sign_priority = 6, update_debounce = 100, max_file_length = 40000,
+        _on_attach_pre = function(bufnr, callback)
+          local target = require("vimconfig.git").detect_git_cmd()
+          if target ~= "git" and target ~= "" then
+            if not vcs_dirs[target] then
+              local lines = vim.fn.systemlist({ target, "introspect", "repo" })
+              local git_dir = lines[1] and lines[1] ~= "" and lines[1] or nil
+              if git_dir then
+                vcs_dirs[target] = { gitdir = git_dir, toplevel = vim.env.HOME or vim.fn.expand("~") }
+              end
+            end
+            local info = vcs_dirs[target]
+            if info then
+              local cfg = require("gitsigns.config").config
+              cfg.git_command = target
+              cfg.attach_to_untracked = false
+              callback(info)
+              return
+            end
+          else
+            -- Restore default when back on git
+            require("gitsigns.config").config.attach_to_untracked = default_untracked
+          end
+          callback(nil)
+        end,
+
         on_attach = function(bufnr)
           local gs = require('gitsigns')
-
-          vim.b.gitsigns_git_command = target_cmd
 
           vim.keymap.set('n', ';gn', gs.next_hunk, { buffer = bufnr, desc = "Next Hunk" })
           vim.keymap.set('n', ';gp', gs.prev_hunk, { buffer = bufnr, desc = "Previous Hunk" })
@@ -1584,9 +1607,35 @@ local plugins = {
         end,
       })
 
+      local function with_vcs(vcs, cmd_args)
+        local cfg = require("gitsigns.config").config
+        cfg.git_command = vcs
+        cfg.attach_to_untracked = (vcs == "git") and default_untracked or false
+        -- Resolve gitdir for non-git VCS tools
+        if vcs ~= "git" and not vcs_dirs[vcs] then
+          local lines = vim.fn.systemlist({ vcs, "introspect", "repo" })
+          local git_dir = lines[1] and lines[1] ~= "" and lines[1] or nil
+          if git_dir then
+            vcs_dirs[vcs] = { gitdir = git_dir, toplevel = vim.env.HOME or vim.fn.expand("~") }
+          end
+        end
+        -- Detach and re-attach with new git_command
+        local bufnr = vim.api.nvim_get_current_buf()
+        require("gitsigns.attach").detach(bufnr)
+        require("gitsigns.actions").attach({ bufnr = bufnr, force = true })
+        -- setqflist needs the attach to complete; defer to next event loop tick
+        vim.schedule(function()
+          vim.cmd("Gitsigns setqflist " .. cmd_args)
+        end)
+      end
+      vim.api.nvim_create_user_command("GitsignGit", function(opts)
+        with_vcs("git", opts.args)
+      end, { nargs = "*" })
+      vim.api.nvim_create_user_command("GitsignYadm", function(opts)
+        with_vcs("yadm", opts.args)
+      end, { nargs = "*" })
       vim.api.nvim_create_user_command("GitsignsYadme", function(opts)
-        vim.b.gitsigns_git_command = "yadme"
-        vim.cmd("Gitsigns setqflist " .. opts.args)
+        with_vcs("yadme", opts.args)
       end, { nargs = "*" })
     end,
   },
