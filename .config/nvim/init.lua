@@ -63,9 +63,11 @@ local function ensure_apt_packages(packages)
 end
 
 
--- Avoid "SIXEL IMAGE" noise from tmux terminfo advertising sixel to Neovim
--- (via OSC52 clipboard provider). xterm-256color has no sixel capability.
-if vim.env.TERM:find("^tmux") then
+-- Avoid "SIXEL IMAGE" noise from terminals advertising sixel to Neovim.
+-- tmux passes through sixel queries to the outer terminal, which responds
+-- positively even though the terminfo (screen-256color/tmux-256color) lacks
+-- the capability. xterm-256color has no sixel, so Neovim never negotiates it.
+if vim.env.TERM:find("^tmux") or vim.env.TERM:find("^screen") then
   vim.env.TERM = "xterm-256color"
 end
 
@@ -871,8 +873,7 @@ local plugins = {
   },
   {
     "chengzeyi/fzf-preview.vim",
-    enabled = cond({ "editor" }),
-    lazy = false,
+    enabled = cond({ "editor" }), lazy = false,
     dependencies = { "junegunn/fzf.vim" },
   },
   {
@@ -1085,9 +1086,9 @@ local plugins = {
   },
 
   { 
-    "nvim-treesitter/nvim-treesitter", 
-    enabled = cond({ "editor" }), 
-    build = ":TSUpdate", 
+    "nvim-treesitter/nvim-treesitter",
+    enabled = cond({ "editor" }),
+    build = ":TSUpdate",
     lazy = false,
     config = function()
     end,
@@ -1180,8 +1181,7 @@ local plugins = {
   },
   {
     "huawenyu/vim-floaterm-repl",
-    enabled = cond({ "editor" }),
-    lazy = false,
+    enabled = cond({ "editor" }), lazy = false,
     cmd = "FloatermRepl",
     ft = "markdown",
     keys = {
