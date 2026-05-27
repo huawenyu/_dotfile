@@ -23,7 +23,12 @@
 -- ============================================================
 
 -- System detection
+local function is_windows()
+  return vim.fn.has("win32") == 1 or vim.fn.has("win64") == 1
+end
+
 local function is_ubuntu()
+  if is_windows() then return false end
   local f = io.open("/etc/os-release", "r")
   if not f then return false end
   local content = f:read("*all")
@@ -67,7 +72,7 @@ end
 -- tmux passes through sixel queries to the outer terminal, which responds
 -- positively even though the terminfo (screen-256color/tmux-256color) lacks
 -- the capability. xterm-256color has no sixel, so Neovim never negotiates it.
-if vim.env.TERM:find("^tmux") or vim.env.TERM:find("^screen") then
+if vim.env.TERM and (vim.env.TERM:find("^tmux") or vim.env.TERM:find("^screen")) then
   vim.env.TERM = "xterm-256color"
 end
 
@@ -145,46 +150,44 @@ end
 -- Global Configuration
 -- ============================================================
 
-vim.cmd([[
-  let g:vim_confi_option = {
-        \ 'mode': ['basic', 'theme', 'local', 'editor', 'admin', 'coder', 'log', 'c', 'markdown', 'git', 'script', 'tool'],
-        \ 'remap_leader': 1,
-        \ 'theme': 1,
-        \ 'conf': 1,
-        \ 'verbose': 0,
-        \ 'debug': 0,
-        \ 'upper_keyfixes': 1,
-        \ 'enable_map_basic': 1,
-        \ 'enable_map_useful': 1,
-        \ 'auto_chdir': 0,
-        \ 'auto_save': 1,
-        \ 'auto_restore_cursor': 1,
-        \ 'keywordprg_filetype': 1,
-        \ 'modeline': 0,
-        \ 'view_folding': 0,
-        \ 'show_number': 0,
-        \ 'wrapline': 0,
-        \ 'indentline': 0,
-        \ 'help_keys': 1,
-        \ 'alt_shortcut': 1,
-        \ 'wiki_dirs': ['~/dotwiki', '~/wiki', '~/dotfiles'],
-        \ 'tmp_file': '/tmp/vim.tmp',
-        \}
+vim.g.vim_confi_option = {
+  mode = is_windows() and {'basic', 'theme', 'local', 'editor', 'log'} or {'basic', 'theme', 'local', 'editor', 'admin', 'coder', 'log', 'c', 'markdown', 'git', 'script', 'tool'},
+  remap_leader = 1,
+  theme = 1,
+  conf = 1,
+  verbose = 0,
+  debug = 0,
+  upper_keyfixes = 1,
+  enable_map_basic = 1,
+  enable_map_useful = 1,
+  auto_chdir = 0,
+  auto_save = 1,
+  auto_restore_cursor = 1,
+  keywordprg_filetype = 1,
+  modeline = 0,
+  view_folding = 0,
+  show_number = 0,
+  wrapline = 0,
+  indentline = 0,
+  help_keys = 1,
+  alt_shortcut = 1,
+  wiki_dirs = {'~/dotwiki', '~/wiki', '~/dotfiles'},
+  tmp_file = '/tmp/vim.tmp',
+}
 
-  if !empty($mode)
-      let g:vim_confi_option.mode = [$mode]
-  endif
+if os.getenv("mode") then
+  vim.g.vim_confi_option.mode = {os.getenv("mode")}
+end
 
-  if !empty($debug)
-      let g:vim_confi_option.debug = 1
-  endif
+if os.getenv("debug") then
+  vim.g.vim_confi_option.debug = 1
+end
 
-  if g:vim_confi_option.remap_leader
-      let mapleader = "\<Space>"
-      let maplocalleader="\<Space>"
-      map Q <Nop>
-  endif
-]])
+if vim.g.vim_confi_option.remap_leader == 1 then
+  vim.g.mapleader = " "
+  vim.g.maplocalleader = " "
+  vim.keymap.set('', 'Q', '<Nop>')
+end
 
 -- ============================================================
 -- Plugin Specifications
@@ -272,6 +275,8 @@ local plugins = {
     },
     config = function()
       require("vimconfig").setup()
+      local has_rg = vim.fn.executable("rg") == 1
+      local grepper_cmd = has_rg and "GrepperRg" or "Grepper"
       local prefer_dir = vim.g.c_utils_prefer_dir
       if prefer_dir == nil or prefer_dir == "" then prefer_dir = "daemon/wad" end
       local dir_arg = " " .. prefer_dir
@@ -279,7 +284,7 @@ local plugins = {
         local word = vim.fn.expand("<cword>")
         if word == "" then return end
         vim.g["grepper"].quickfix = 1
-        local cmd = "GrepperRg -w " .. vim.fn.shellescape(word) .. dir_arg
+        local cmd = grepper_cmd .. " -w " .. vim.fn.shellescape(word) .. dir_arg
         vim.fn.feedkeys(":" .. cmd, "n")
       end, { silent = true, desc = "[find] Search to-quickfix *" })
       vim.keymap.set("v", "<leader>gg", function()
@@ -292,16 +297,16 @@ local plugins = {
         local text = table.concat(lines, " ")
         if #text < 2 then return end
         vim.g["grepper"].quickfix = 1
-        local cmd = "GrepperRg -F -- " .. vim.fn.shellescape(text) .. dir_arg
+        local cmd = grepper_cmd .. " -F -- " .. vim.fn.shellescape(text) .. dir_arg
         vim.fn.feedkeys(":" .. cmd, "n")
       end, { silent = true, desc = "[find] Search to-quickfix *" })
       vim.keymap.set("n", ";gg", function()
         local word = vim.fn.expand("<cword>")
         if word == "" then return end
-        vim.g["grepper"].quickfix = 1
-        local cmd = "GrepperRg -w " .. vim.fn.shellescape(word)
+        vim.g["grepper"].quickfix = 0
+        local cmd = grepper_cmd .. " -w " .. vim.fn.shellescape(word)
         vim.fn.feedkeys(":" .. cmd, "n")
-      end, { silent = true, desc = "[find] Search to-quickfix *" })
+      end, { silent = true, desc = "[find] Search to-loclist *" })
       vim.keymap.set("v", ";gg", function()
         local _, sl, sc = unpack(vim.fn.getpos("'<"))
         local _, el, ec = unpack(vim.fn.getpos("'>"))
@@ -311,10 +316,10 @@ local plugins = {
         lines[#lines] = lines[#lines]:sub(1, ec)
         local text = table.concat(lines, " ")
         if #text < 2 then return end
-        vim.g["grepper"].quickfix = 1
-        local cmd = "GrepperRg -F -- " .. vim.fn.shellescape(text)
+        vim.g["grepper"].quickfix = 0
+        local cmd = grepper_cmd .. " -F -- " .. vim.fn.shellescape(text)
         vim.fn.feedkeys(":" .. cmd, "n")
-      end, { silent = true, desc = "[find] Search to-quickfix *" })
+      end, { silent = true, desc = "[find] Search to-loclist *" })
     end,
   },
 
@@ -414,7 +419,7 @@ local plugins = {
   {
     "nvim-telescope/telescope.nvim",
     version = "*",
-    enabled = cond({ "coder" }),
+    enabled = cond({ "editor" }),
     cmd = "Telescope",
     dependencies = {
       "nvim-lua/plenary.nvim",
@@ -465,6 +470,9 @@ local plugins = {
         end,
         { silent = true, desc = "[find] Find Files (Word Under Cursor) *" }
       )
+      -- Find files using Telescope (Windows-compatible alternative to cscope_maps)
+      vim.keymap.set('n', '<leader>ff', '<cmd>Telescope find_files<cr>', { silent = true, desc = "[find] Find file *" })
+      vim.keymap.set('n', ';ff', '<cmd>Telescope find_files<cr>', { silent = true, desc = "[find] Find files (all) *" })
     end,
 
     config = function()
@@ -522,8 +530,9 @@ local plugins = {
       })
 
 
-      -- Force telescope to load the compiled native extension
-      telescope.load_extension("fzf")
+      -- Force telescope to load the compiled native extension (fzf only if built)
+      local fzf_ok = pcall(require, "telescope._extensions.fzf")
+      if fzf_ok then telescope.load_extension("fzf") end
       telescope.load_extension("hop")
     end,
 
@@ -803,7 +812,7 @@ local plugins = {
   -- ============================================================
   -- Syntax
   -- ============================================================
-  { "justinmk/vim-syntax-extra", enabled = cond({ "coder" }), ft = "vim" },
+  { "justinmk/vim-syntax-extra", enabled = cond({ "editor" }), ft = "vim" },
   -- { "huawenyu/vim-log-syntax", enabled = cond({ "editor", "log" }), ft = "log" },
   { "fei6409/log-highlight.nvim", enabled = cond({ "editor", "log" }), ft = "log" },
   { "huawenyu/vim-autotest-syntax", enabled = cond({ "editor", "log" }), ft = "case" },
@@ -1012,7 +1021,7 @@ local plugins = {
   { "huawenyu/vim-windowswap", enabled = cond({ "editor" }) },
   {
     "preservim/tagbar",
-    enabled = cond({ "coder" }),
+    enabled = cond({ "editor" }),
     cmd = { "TagbarToggle", "Tagbar", "TagbarOpen" },
     keys = { { "<leader>vt", "<cmd>TagbarToggle<cr>", desc = "[view] Tag (tagbar) *" } },
     init = function() require("vimconfig.tagbar").setup() end,
@@ -1614,7 +1623,7 @@ local plugins = {
   },
   {
     "huawenyu/gitsigns.nvim",
-    enabled = cond({ "editor" }),
+    enabled = cond({ "coder" }),
     event = "BufReadPre",
     config = function()
       local vcs_dirs = {}
@@ -1706,7 +1715,6 @@ local plugins = {
   -- ============================================================
   -- Libraries
   -- ============================================================
-  { "vim-jp/vital.vim", enabled = cond({ "coder", "library" }) },
   { "google/vim-maktaba", enabled = cond({ "coder", "library" }) },
   { "tomtom/tlib_vim", enabled = cond({ "coder", "library" }) },
 
