@@ -151,7 +151,7 @@ end
 -- ============================================================
 
 vim.g.vim_confi_option = {
-  mode = is_windows() and {'basic', 'theme', 'local', 'editor', 'log'} or {'basic', 'theme', 'local', 'editor', 'admin', 'coder', 'log', 'c', 'markdown', 'git', 'script', 'tool'},
+  mode = is_windows() and {'basic', 'theme', 'local', 'editor', 'log', 'admin'} or {'basic', 'theme', 'local', 'editor', 'admin', 'coder', 'log', 'c', 'markdown', 'git', 'script', 'tool'},
   remap_leader = 1,
   theme = 1,
   conf = 1,
@@ -473,6 +473,52 @@ local plugins = {
       -- Find files using Telescope (Windows-compatible alternative to cscope_maps)
       vim.keymap.set('n', '<leader>ff', '<cmd>Telescope find_files<cr>', { silent = true, desc = "[find] Find file *" })
       vim.keymap.set('n', ';ff', '<cmd>Telescope find_files<cr>', { silent = true, desc = "[find] Find files (all) *" })
+      -- AsyncTasks picker via telescope
+      local pick_task = (function()
+        return function()
+          local vimrc = vim.env.MYVIMRC or vim.fn.expand('<sfile>:p')
+          local tasks_file = vim.fn.fnamemodify(vimrc, ':p:h') .. "/tasks.ini"
+          if vim.fn.filereadable(tasks_file) ~= 1 then
+            vim.notify("tasks.ini not found: " .. tasks_file, vim.log.levels.WARN)
+            return
+          end
+          local tasks = {}
+          for line in io.lines(tasks_file) do
+            if line:match("^%[.-%]$") then
+              local name = line:match("^%[(.-)%]$")
+              table.insert(tasks, name)
+            end
+          end
+          if #tasks == 0 then
+            vim.notify("No tasks found", vim.log.levels.WARN)
+            return
+          end
+          local actions = require("telescope.actions")
+          require("telescope.pickers").new({
+            prompt_title = "AsyncTasks",
+            finder = require("telescope.finders").new_table({ results = tasks }),
+            sorter = require("telescope.sorters").get_generic_fuzzy_sorter(),
+            attach_mappings = function(prompt_bufnr, map)
+              actions.select_default:replace(function()
+                local selection = require("telescope.actions.state").get_selected_entry(prompt_bufnr)
+                actions.close(prompt_bufnr)
+                if selection then
+                  vim.defer_fn(function()
+                    vim.cmd("AsyncTask " .. selection.value)
+                  end, 100)
+                end
+              end)
+              return true
+            end,
+          }):find()
+        end
+      end)()
+      vim.keymap.set('n', '<leader>tt', pick_task, { silent = true, desc = "[task] Run task *" })
+      vim.keymap.set('n', '<leader>te', function()
+        local vimrc = vim.env.MYVIMRC or vim.fn.expand('<sfile>:p')
+        local tasks_file = vim.fn.fnamemodify(vimrc, ':p:h') .. "/tasks.ini"
+        vim.cmd("edit " .. tasks_file)
+      end, { silent = true, desc = "[task] Edit tasks *" })
     end,
 
     config = function()
@@ -1283,22 +1329,19 @@ local plugins = {
   },
   {
     'skywind3000/asynctasks.vim',
-    enabled = cond({ "coder" }),
+    enabled = cond({ "admin" }),
     lazy = false,
     dependencies = { "huawenyu/asyncrun.vim" },
     init = function()
-      local src = vim.fn.expand('~/.vim_tasks.ini')
-      local dst = vim.fn.expand('~/.config/nvim/tasks.ini')
+      local vimrc = vim.env.MYVIMRC or vim.fn.expand('<sfile>:p')
+      local config_dir = vim.fn.fnamemodify(vimrc, ':p:h')
+      local dst = config_dir .. "/tasks.ini"
+      local src = vim.fn.expand("~/.vim_tasks.ini")
       if vim.fn.filereadable(src) == 1 and vim.fn.getftype(dst) == '' then
         vim.fn.system('ln -sf ' .. src .. ' ' .. dst)
       end
     end,
     config = function() require("asyncrun.config").setup() end,
-  },
-  {
-    "huawenyu/asyncrun.vim",
-    enabled = cond({ "coder" }),
-    lazy = true,
   },
   {
     "folke/edgy.nvim",
