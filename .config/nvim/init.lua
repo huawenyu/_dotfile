@@ -473,7 +473,50 @@ local plugins = {
       -- Find files using Telescope (Windows-compatible alternative to cscope_maps)
       vim.keymap.set('n', '<leader>ff', '<cmd>Telescope find_files<cr>', { silent = true, desc = "[find] Find file *" })
       vim.keymap.set('n', ';ff', '<cmd>Telescope find_files<cr>', { silent = true, desc = "[find] Find files (all) *" })
-      -- AsyncTasks picker via telescope
+      -- Tasks picker via telescope (parse comments as doc, show command in preview)
+      local function parse_tasks_with_doc(tasks_file)
+        local tasks = {}
+        local lines = vim.fn.readfile(tasks_file)
+        local current_name = nil
+        local current_doc = {}
+        local current_command = ""
+
+        for i, line in ipairs(lines) do
+          local trimmed = vim.fn.substitute(line, "^\\s*", "", "")
+          local comment_trimmed = vim.fn.substitute(line, "^\\s*;\\s*", "", "")
+
+          if vim.fn.match(trimmed, "^\\[[^]]*\\]$") == 0 then
+            -- Save previous task
+            if current_name then
+              tasks[current_name] = {
+                name = current_name,
+                doc = table.concat(current_doc, "\n"),
+                command = current_command,
+              }
+            end
+            -- Start new task
+            current_name = string.match(trimmed, "%[(.-)%]")
+            current_doc = {}
+            current_command = ""
+          elseif current_name and current_command == "" and vim.fn.match(trimmed, "^[^=]*=") == 0 then
+            if vim.fn.match(trimmed, "command%s*=") == 0 then
+              current_command = vim.fn.substitute(trimmed, "[^=]*=%s*", "", "")
+            end
+          elseif current_name and comment_trimmed ~= "" then
+            table.insert(current_doc, comment_trimmed)
+          end
+        end
+        -- Save last task
+        if current_name then
+          tasks[current_name] = {
+            name = current_name,
+            doc = table.concat(current_doc, "\n"),
+            command = current_command,
+          }
+        end
+        return tasks
+      end
+
       local pick_task = (function()
         return function()
           local vimrc = vim.env.MYVIMRC or vim.fn.expand('<sfile>:p')
@@ -482,30 +525,62 @@ local plugins = {
             vim.notify("tasks.ini not found: " .. tasks_file, vim.log.levels.WARN)
             return
           end
-          local tasks = {}
-          for line in io.lines(tasks_file) do
-            if line:match("^%[.-%]$") then
-              local name = line:match("^%[(.-)%]$")
-              table.insert(tasks, name)
-            end
-          end
-          if #tasks == 0 then
+
+          local tasks_map = parse_tasks_with_doc(tasks_file)
+          local task_list = vim.tbl_values(tasks_map)
+          if #task_list == 0 then
             vim.notify("No tasks found", vim.log.levels.WARN)
             return
           end
+
           local actions = require("telescope.actions")
-          require("telescope.pickers").new({
-            prompt_title = "AsyncTasks",
-            finder = require("telescope.finders").new_table({ results = tasks }),
+          local action_state = require("telescope.actions.state")
+          require("telescope.pickers").new({}, {
+            prompt_title = "Tasks",
+            finder = require("telescope.finders").new_table({
+              results = task_list,
+              entry_maker = function(entry)
+                return {
+                  value = entry.name,
+                  display = entry.name,
+                  command = entry.command,
+                  doc = entry.doc,
+                  ordinal = entry.name .. " " .. entry.command .. " " .. entry.doc,
+                }
+              end,
+            }),
             sorter = require("telescope.sorters").get_generic_fuzzy_sorter(),
             attach_mappings = function(prompt_bufnr, map)
               actions.select_default:replace(function()
-                local selection = require("telescope.actions.state").get_selected_entry(prompt_bufnr)
+                local selection = action_state.get_selected_entry(prompt_bufnr)
                 actions.close(prompt_bufnr)
                 if selection then
-                  vim.defer_fn(function()
-                    vim.cmd("AsyncTask " .. selection.value)
-                  end, 100)
+                  local cmd = selection.command
+                  local name = selection.value
+                  vim.cmd("vsplit")
+                  vim.cmd("enew")
+                  local bufnr = vim.api.nvim_get_current_buf()
+                  local lines = {
+                    "# " .. name,
+                    "",
+                    "**Command:**",
+                    "```sh",
+                    cmd ~= "" and cmd or "(no command)",
+                    "```",
+                    "",
+                    "**Documentation:**",
+                    selection.doc ~= "" and selection.doc or "_No documentation_",
+                    "",
+                    "Press q to close, Enter to run"
+                  }
+                  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+                  vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
+                  vim.api.nvim_buf_set_option(bufnr, "filetype", "markdown")
+                  vim.keymap.set("n", "q", "<cmd>bd!<CR>", { buffer = bufnr })
+                  vim.keymap.set("n", "<CR>", function()
+                    vim.api.nvim_command("bd!")
+                    vim.cmd("AsyncTask " .. name)
+                  end, { buffer = bufnr })
                 end
               end)
               return true
@@ -981,7 +1056,11 @@ local plugins = {
     "huawenyu/c-utils.vim",
     enabled = cond({ "coder" }),
     lazy = false,
-    config = function() require("c-utils").setup() end,
+    config = function()
+      if not is_wsl() then
+        require("c-utils").setup()
+      end
+    end,
   },
   {
     "chengzeyi/fzf-preview.vim",
