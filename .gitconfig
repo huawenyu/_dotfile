@@ -435,7 +435,7 @@
 	threads = 1
 	window = 0
 [http]
-	sslVerify = true
+	sslVerify = false
 [gitreview]
 	remote = origin
 	username = Yu,Huawen(Wilson)
