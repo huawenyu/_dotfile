@@ -1463,7 +1463,7 @@ local plugins = {
           { ft = "toggleterm", size = { height = 0.3 }, filter = function(buf, win) return vim.api.nvim_buf_get_name(buf):match("term://") end },
           { ft = "lazyterm", title = "LazyTerm", size = { height = 0.4 }, filter = function(buf) return not vim.b[buf].lazyterm_cmd end },
           "Trouble",
-          { ft = "qf", buftype = 'quickfix', title = 'QuickFix', pinned = true, open = "copen" },
+          { ft = "qf", buftype = 'quickfix', title = 'QuickFix', size = { height = 20 }, pinned = true, open = "copen" },
           { ft = "help", size = { height = 20 }, filter = function(buf) return vim.bo[buf].buftype == "help" end },
           { ft = "spectre_panel", size = { height = 0.4 } },
         },
