@@ -1447,35 +1447,63 @@ local plugins = {
     "folke/edgy.nvim",
     enabled = cond({ "coder" }),
     event = "VeryLazy",
+
     config = function()
-      require("which-key").setup({
+      vim.o.equalalways = false
+
+      local function neo(src)
+        return function(buf)
+          return vim.b[buf].neo_tree_source == src
+        end
+      end
+
+      require("edgy").setup({
         left = {
-          { title = "Explore-legacy", ft = "nerdtree", pinned = false, open = "NERDTree", close = "NERDTreeClose", size = { height = 0.4 } },
-          { title = "Functions", ft = "tagbar", pinned = false, open = "TagbarOpen", close = "TagbarClose", size = { height = 0.4 } },
-          { title = "Explore-neo", ft = "neo-tree", pinned = false, filter = function(buf) return vim.b[buf].neo_tree_source == "filesystem" end, size = { height = 0.4 } },
-          { title = "Buffers", ft = "neo-tree", filter = function(buf) return vim.b[buf].neo_tree_source == "buffers" end, pinned = false, collapsed = false, open = "Neotree position=top buffers", size = { height = 0.25 } },
-          { title = "Git-status", ft = "neo-tree", filter = function(buf) return vim.b[buf].neo_tree_source == "git_status" end, pinned = false, collapsed = false, open = "Neotree position=top git_status", size = { height = 0.25 } },
-          { title = function() return vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0) or "[No Name]", ":t") end, ft = "Outline", pinned = false, open = "SymbolsOutlineOpen" },
-          { title = "Outline", ft = "voomtree", pinned = false, open = "VoomToggle", size = { height = 0.5 } },
+          { title = "Explore-legacy", ft = "nerdtree", open = "NERDTree", close = "NERDTreeClose", size = { height = 0.4 } },
+          { title = "Functions", ft = "tagbar", open = "TagbarOpen", close = "TagbarClose", size = { height = 0.4 } },
+          { title = "Explore-neo", ft = "neo-tree", filter = neo("filesystem"), size = { height = 0.4 } },
+          { title = "Buffers", ft = "neo-tree", filter = neo("buffers"), open = "Neotree position=top buffers", collapsed = false, size = { height = 0.25 } },
+          { title = "Git-status", ft = "neo-tree", filter = neo("git_status"), open = "Neotree position=top git_status", collapsed = false, size = { height = 0.25 } },
+          { title = function() return vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":t") end, ft = "Outline", open = "SymbolsOutlineOpen" },
+          { title = "Outline", ft = "voomtree", open = "VoomToggle", size = { height = 0.5 } },
           "neo-tree",
         },
+
         bottom = {
-          { ft = "toggleterm", size = { height = 0.3 }, filter = function(buf, win) return vim.api.nvim_buf_get_name(buf):match("term://") end },
+          { ft = "toggleterm", size = { height = 0.3 }, filter = function(buf) return vim.api.nvim_buf_get_name(buf):match("term://") end },
           { ft = "lazyterm", title = "LazyTerm", size = { height = 0.4 }, filter = function(buf) return not vim.b[buf].lazyterm_cmd end },
           "Trouble",
-          { ft = "qf", buftype = 'quickfix', title = 'QuickFix', size = { height = 20 }, pinned = true, open = "copen" },
+          { ft = "qf", buftype = "quickfix", title = "QuickFix", open = "copen 20", pinned = true, size = { height = 20 }, wo = { winfixheight = true } },
           { ft = "help", size = { height = 20 }, filter = function(buf) return vim.bo[buf].buftype == "help" end },
           { ft = "spectre_panel", size = { height = 0.4 } },
         },
+
         open_files_do_not_replace_types = { "terminal", "Trouble", "qf", "edgy" },
-        animate = { enabled = false, fps = 100, cps = 120, on_begin = function() vim.g.minianimate_disable = true end, on_end = function() vim.g.minianimate_disable = false end, spinner = { frames = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }, interval = 80 } },
+
+        animate = {
+          enabled = false,
+          fps = 100,
+          cps = 120,
+          on_begin = function() vim.g.minianimate_disable = true end,
+          on_end = function() vim.g.minianimate_disable = false end,
+        },
+
         exit_when_last = false,
         close_when_all_hidden = true,
-        wo = { winbar = true, winfixwidth = true, winfixheight = false, winhighlight = "WinBar:EdgyWinBar,Normal:EdgyNormal", spell = false, signcolumn = "no" },
+
+        wo = {
+          winbar = true,
+          winfixwidth = true,
+          winfixheight = true,
+          winhighlight = "WinBar:EdgyWinBar,Normal:EdgyNormal",
+          spell = false,
+          signcolumn = "no",
+        },
+
         icons = { closed = " ", open = " " },
         fix_win_height = vim.fn.has("nvim-0.10.0") == 0,
       })
-    end
+    end,
   },
   { "sk1418/blockit", enabled = cond({ "editor" }), cmd = "Block" },
   {
