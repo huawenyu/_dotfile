@@ -428,22 +428,9 @@ local plugins = {
     },
     init = function()
       vim.keymap.set('n', ';vF', '<cmd>Telescope find_files<cr>', { silent = true, desc = "[picker] All files *" })
-      vim.keymap.set('n', ';vy', '<cmd>Telescope yank_history<cr>', { silent = true, desc = "Yanks" })
-      vim.keymap.set('n', ';va', '<cmd>Telescope autocommands<cr>', { silent = true, desc = "Auto commands" })
-      vim.keymap.set('n', ';vb', '<cmd>Telescope buffers<cr>', { silent = true, desc = "Buffers" })
-      vim.keymap.set('n', ';vC', '<cmd>Telescope git_commits<cr>', { silent = true, desc = "[picker] Git commits *" })
-      vim.keymap.set('n', ';vm', '<cmd>Telescope marks<cr>', { silent = true, desc = "[picker] Marks *" })
-
-      vim.keymap.set('n', ';vj', '<cmd>Telescope jumplist<cr>', { silent = true, desc = "[picker] Jumps *" })
-      vim.keymap.set('n', '<leader>fl', '<cmd>Telescope current_buffer_fuzzy_find<cr>', { silent = true, desc = "[find] Lines *" })
-      vim.keymap.set('n', '<leader>fL', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "[picker] Live grep *" })
       vim.keymap.set('n', ';vd', '<cmd>Telescope diagnostics<cr>', { silent = true, desc = "Diagnostics" })
-      vim.keymap.set('n', ';vQ', '<cmd>Telescope quickfixhistory<cr>', { silent = true, desc = "Quickfix History" })
-      vim.keymap.set('n', ';v/', '<cmd>Telescope search_history<cr>', { silent = true, desc = "History /" })
-      vim.keymap.set('n', ';v:', '<cmd>Telescope commands<cr>', { silent = true, desc = "Commands" })
-      vim.keymap.set('n', ';v;', '<cmd>Telescope command_history<cr>', { silent = true, desc = "Command History" })
 
-      vim.keymap.set('n', '<leader>vh', function()
+      vim.keymap.set('n', '<leader>vk', function()
         require('telescope.builtin').keymaps({
           default_text = " *$",
           attach_mappings = function(_, map)
@@ -456,12 +443,25 @@ local plugins = {
       end, { silent = true, desc = "Key maps (Filtered by endwith-*)" })
 
       vim.keymap.set('n', '<leader>vv', '<cmd>Telescope resume<cr>', { silent = true, desc = "[picker] Resume *" })
-      vim.keymap.set('n', '<leader>vP', '<cmd>Telescope pickers<cr>', { silent = true, desc = "Picker" })
-      vim.keymap.set('n', '<leader>vp', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "Live grep" })
+      vim.keymap.set('n', '<leader>vp', '<cmd>Telescope pickers<cr>', { silent = true, desc = "Picker" })
       vim.keymap.set('n', '<leader>vb', '<cmd>Telescope buffers<cr>', { silent = true, desc = "Buffers" })
-      vim.keymap.set('n', '<leader>vc', '<cmd>Telescope command_history<cr>', { silent = true, desc = "Command" })
-      vim.keymap.set('n', '<leader>vz', '<cmd>Telescope oldfiles<cr>', { silent = true, desc = "[picker] Old files *" })
+      vim.keymap.set('n', '<leader>vh', '<cmd>Telescope oldfiles<cr>', { silent = true, desc = "[picker] Old files *" })
+      vim.keymap.set('n', '<leader>vy', '<cmd>Telescope yank_history<cr>', { silent = true, desc = "Yanks" })
+      vim.keymap.set('n', '<leader>va', '<cmd>Telescope autocommands<cr>', { silent = true, desc = "Auto commands" })
+      vim.keymap.set('n', '<leader>vc', '<cmd>Telescope git_commits<cr>', { silent = true, desc = "[picker] Git commits *" })
+      vim.keymap.set('n', '<leader>vm', '<cmd>Telescope marks<cr>', { silent = true, desc = "[picker] Marks *" })
+      vim.keymap.set('n', '<leader>vj', '<cmd>Telescope jumplist<cr>', { silent = true, desc = "[picker] Jumps *" })
+
+      vim.keymap.set('n', '<leader>vT', '<cmd>Telescope current_buffer_tags<cr>', { silent = true, desc = "[find] Lines *" })
+      vim.keymap.set('n',        ';vl', '<cmd>Telescope current_buffer_fuzzy_find<cr>', { silent = true, desc = "[find] Lines *" })
+      vim.keymap.set('n', '<leader>vL', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "[picker] Live grep *" })
+
       vim.keymap.set('n', '<leader>vq', '<cmd>Telescope quickfix<cr>', { silent = true, desc = "[qf] Quick fix *" })
+      vim.keymap.set('n', '<leader>vQ', '<cmd>Telescope quickfixhistory<cr>', { silent = true, desc = "Quickfix History" })
+      vim.keymap.set('n', '<leader>v/', '<cmd>Telescope search_history<cr>', { silent = true, desc = "History /" })
+      vim.keymap.set('n', '<leader>v:', '<cmd>Telescope commands<cr>', { silent = true, desc = "Commands" })
+      vim.keymap.set('n', '<leader>v;', '<cmd>Telescope command_history<cr>', { silent = true, desc = "Command History" })
+
       vim.keymap.set('n', '<leader>fq',
         function()
           require("telescope.builtin").find_files({
@@ -609,8 +609,8 @@ local plugins = {
           }):find()
         end
       end)()
-      vim.keymap.set('n', '<leader>tt', pick_task, { silent = true, desc = "[task] Run task *" })
-      vim.keymap.set('n', '<leader>te', function()
+      vim.keymap.set('n', '<leader>vs', pick_task, { silent = true, desc = "[task] Run task *" })
+      vim.keymap.set('n', '<leader>vS', function()
         local vimrc = vim.env.MYVIMRC or vim.fn.expand('<sfile>:p')
         local tasks_file = vim.fn.fnamemodify(vimrc, ':p:h') .. "/tasks.ini"
         vim.cmd("edit " .. tasks_file)
@@ -1193,7 +1193,7 @@ local plugins = {
     },
     config = function()
       require("todo-comments").setup()
-      vim.keymap.set('n', '<leader>vT', function() require("telescope").extensions.todo_comments.todo_comments() end, { silent = true, desc = "Telescope Todo" })
+      vim.keymap.set('n', '<leader>vf', function() require("telescope").extensions.todo_comments.todo_comments() end, { silent = true, desc = "Telescope Todo" })
     end,
   },
   { "windwp/nvim-autopairs", enabled = cond({ "editor" }), event = "InsertEnter" },
@@ -1473,7 +1473,7 @@ local plugins = {
           { ft = "toggleterm", size = { height = 0.3 }, filter = function(buf) return vim.api.nvim_buf_get_name(buf):match("term://") end },
           { ft = "lazyterm", title = "LazyTerm", size = { height = 0.4 }, filter = function(buf) return not vim.b[buf].lazyterm_cmd end },
           "Trouble",
-          { ft = "qf", buftype = "quickfix", title = "QuickFix", open = "copen 20", pinned = true, size = { height = 20 }, wo = { winfixheight = true } },
+          { ft = "qf", buftype = "quickfix", title = "QuickFix", open = "copen", pinned = true, size = { height = 0.2 }, wo = { winfixheight = true } },
           { ft = "help", size = { height = 20 }, filter = function(buf) return vim.bo[buf].buftype == "help" end },
           { ft = "spectre_panel", size = { height = 0.4 } },
         },
@@ -1518,7 +1518,7 @@ local plugins = {
     cmd = { "NERDTreeToggle", "NERDTreeFind", "NERDTree" },
     keys = {
       { "<leader>ve", "<cmd>NERDTreeToggle<CR>", desc = "[view] Explore (nerdtree) *" },
-      { "<leader>vf", "<cmd>NERDTreeFocus<CR>", desc = "[view]  Explore - Focus (nerdtree) *" },
+      { "<leader>vE", "<cmd>NERDTreeFocus<CR>", desc = "[view] Explore - Focus (nerdtree) *" },
     },
     init = function()
       vim.g.NERDTreeMapMenu = 'M'
@@ -1581,17 +1581,17 @@ local plugins = {
           },
         },
       })
-      vim.keymap.set('n', '<leader>vE', '<c-U>Neotree toggle<cr>', { silent = true, desc = "[view] Explore (neotree) *" })
-      vim.keymap.set('n', '<leader>vF', '<c-U>Neotree reveal<cr>', { silent = true, desc = "Explore Focus (Reveal)" })
+      vim.keymap.set('n', ';ve', '<c-U>Neotree toggle<cr>', { silent = true, desc = "[view] Explore (neotree) *" })
+      vim.keymap.set('n', ';vE', '<c-U>Neotree reveal<cr>', { silent = true, desc = "Explore Focus (Reveal)" })
     end
   },
 
   {
     "huawenyu/VOoM",
-    enabled = false and cond({ "editor", "log" }),
+    enabled = cond({ "editor", "log" }),
     cmd = { "VoomToggle", "Voom" },
     keys = {
-      { "<leader>vo", "<cmd>VoomToggle<cr>", mode = "n", silent = true, desc = "[view] Outline (Voom) *" },
+      { "<leader>vO", "<cmd>VoomToggle<cr>", mode = "n", silent = true, desc = "[view] Outline (Voom) *" },
       { "<leader>v0", "<cmd>VoomToggle fmr<cr>", mode = "n", silent = true, desc = "Toggle Voom outline (fmr)" },
     },
   },
