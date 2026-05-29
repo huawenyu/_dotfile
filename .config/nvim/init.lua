@@ -477,41 +477,58 @@ local plugins = {
       local function parse_tasks_with_doc(tasks_file)
         local tasks = {}
         local lines = vim.fn.readfile(tasks_file)
+        local pending_doc = {}
         local current_name = nil
-        local current_doc = {}
-        local current_command = ""
+        local current_commands = {}
+        local first_command_found = false
 
         for i, line in ipairs(lines) do
           local trimmed = vim.fn.substitute(line, "^\\s*", "", "")
-          local comment_trimmed = vim.fn.substitute(line, "^\\s*;\\s*", "", "")
 
           if vim.fn.match(trimmed, "^\\[[^]]*\\]$") == 0 then
-            -- Save previous task
+            -- Save previous task with its doc
             if current_name then
               tasks[current_name] = {
                 name = current_name,
-                doc = table.concat(current_doc, "\n"),
-                command = current_command,
+                doc = table.concat(pending_doc, "\n"),
+                commands = current_commands,
               }
+              pending_doc = {}  -- Clear for next task's pre-task docs
             end
             -- Start new task
             current_name = string.match(trimmed, "%[(.-)%]")
-            current_doc = {}
-            current_command = ""
-          elseif current_name and current_command == "" and vim.fn.match(trimmed, "^[^=]*=") == 0 then
-            if vim.fn.match(trimmed, "command%s*=") == 0 then
-              current_command = vim.fn.substitute(trimmed, "[^=]*=%s*", "", "")
+            current_commands = {}
+            first_command_found = false
+          elseif current_name then
+            -- Inside task body: check if it's a comment or command
+            if not first_command_found then
+              local hash_idx = line:match("^%s*#%s*(.*)$")
+              local semic_idx = line:match("^%s*;%s*(.*)$")
+              local comment = semic_idx or hash_idx or ""
+              if comment ~= "" and comment ~= trimmed then
+                table.insert(pending_doc, comment)
+              end
             end
-          elseif current_name and comment_trimmed ~= "" then
-            table.insert(current_doc, comment_trimmed)
+            if trimmed:match("^command[^=]*=") then
+              first_command_found = true
+              table.insert(current_commands, trimmed)
+            end
+          else
+            -- Before any task: collect comments as pending doc
+            local hash_idx = line:match("^%s*#%s*(.*)$")
+            local semic_idx = line:match("^%s*;%s*(.*)$")
+            local comment = semic_idx or hash_idx or ""
+            if comment ~= "" and comment ~= trimmed then
+              table.insert(pending_doc, comment)
+            end
           end
         end
         -- Save last task
         if current_name then
           tasks[current_name] = {
             name = current_name,
-            doc = table.concat(current_doc, "\n"),
-            command = current_command,
+            doc = table.concat(pending_doc, "\n"),
+            commands = current_commands,
           }
         end
         return tasks
@@ -543,9 +560,9 @@ local plugins = {
                 return {
                   value = entry.name,
                   display = entry.name,
-                  command = entry.command,
+                  commands = entry.commands,
                   doc = entry.doc,
-                  ordinal = entry.name .. " " .. entry.command .. " " .. entry.doc,
+                  ordinal = entry.name .. " " .. table.concat(entry.commands, " ") .. " " .. entry.doc,
                 }
               end,
             }),
@@ -555,7 +572,7 @@ local plugins = {
                 local selection = action_state.get_selected_entry(prompt_bufnr)
                 actions.close(prompt_bufnr)
                 if selection then
-                  local cmd = selection.command
+                  local commands = selection.commands
                   local name = selection.value
                   vim.cmd("vsplit")
                   vim.cmd("enew")
@@ -563,16 +580,20 @@ local plugins = {
                   local lines = {
                     "# " .. name,
                     "",
-                    "**Command:**",
-                    "```sh",
-                    cmd ~= "" and cmd or "(no command)",
-                    "```",
-                    "",
-                    "**Documentation:**",
-                    selection.doc ~= "" and selection.doc or "_No documentation_",
-                    "",
-                    "Press q to close, Enter to run"
                   }
+                  -- Add commands section
+                  if #commands > 0 then
+                    vim.list_extend(lines, { "**Commands:**", "```sh" })
+                    vim.list_extend(lines, commands)
+                    vim.list_extend(lines, { "```", "" })
+                  end
+                  -- Add documentation section
+                  if selection.doc ~= "" then
+                    vim.list_extend(lines, { "**Documentation:**" })
+                    vim.list_extend(lines, vim.split(selection.doc, "\n"))
+                    vim.list_extend(lines, { "" })
+                  end
+                  vim.list_extend(lines, { "", "Press q to close, Enter to run" })
                   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
                   vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
                   vim.api.nvim_buf_set_option(bufnr, "filetype", "markdown")
