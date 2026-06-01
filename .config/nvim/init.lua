@@ -248,11 +248,18 @@ local plugins = {
     lazy = false,
     keys = {
       { "<leader>ct", mode = { "n", "x" }, desc = "[misc] Clear trailing whitespace *" },
-      { "<leader>ci", mode = { "n", "x" }, desc = "Fix indentation" },
+      { "<leader>ci", mode = { "n", "x" }, desc = "[misc] Fix indentation" },
       { "<leader>cm", mode = { "n", "x" }, desc = "[misc] Remove ^M (Windows line endings) *" },
       { "<leader>cn", mode = { "n", "x" }, desc = "[misc] Collapse blank lines *" },
     },
-    config = function() require("vim-basic").setup() end,
+    config = function()
+      require("vim-basic").setup()
+
+      vim.keymap.set('n', '<c-h>', '<c-w>h', { noremap = true, silent = true })
+      vim.keymap.set('n', '<c-j>', '<c-w>j', { noremap = true, silent = true })
+      vim.keymap.set('n', '<c-k>', '<c-w>k', { noremap = true, silent = true })
+      vim.keymap.set('n', '<c-l>', '<c-w>l', { noremap = true, silent = true })
+    end,
   },
   {
     "huawenyu/vimConfig",
@@ -1221,10 +1228,6 @@ local plugins = {
     init = function()
       vim.g.tmux_navigator_disable_when_zoomed = 1
       vim.g.tmux_navigator_no_mappings = 1
-      vim.keymap.set('n', '<c-h>', '<c-w>h', { noremap = true, silent = true })
-      vim.keymap.set('n', '<c-j>', '<c-w>j', { noremap = true, silent = true })
-      vim.keymap.set('n', '<c-k>', '<c-w>k', { noremap = true, silent = true })
-      vim.keymap.set('n', '<c-l>', '<c-w>l', { noremap = true, silent = true })
     end
   },
   { "mg979/vim-visual-multi", enabled = cond({ "editor" }) },
