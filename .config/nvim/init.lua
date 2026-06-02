@@ -146,6 +146,16 @@ local function symlink_repo(target_path)
   end
 end
 
+
+local function get_visual_or_cword_simple()
+  local mode = vim.fn.mode()
+  if mode:find("[vV]") then
+    vim.cmd([[normal! "vy"]])
+    return vim.fn.getreg("v")
+  end
+  return vim.fn.expand("<cword>")
+end
+
 -- ============================================================
 -- Global Configuration
 -- ============================================================
@@ -450,36 +460,76 @@ local plugins = {
       end, { silent = true, desc = "Key maps (Filtered by endwith-*)" })
 
       vim.keymap.set('n', '<leader>vv', '<cmd>Telescope resume<cr>', { silent = true, desc = "[picker] Resume *" })
-      vim.keymap.set('n', '<leader>vp', '<cmd>Telescope pickers<cr>', { silent = true, desc = "Picker" })
-      vim.keymap.set('n', '<leader>vb', '<cmd>Telescope buffers<cr>', { silent = true, desc = "Buffers" })
+      vim.keymap.set('n', '<leader>vp', '<cmd>Telescope pickers<cr>', { silent = true, desc = "[picker] Picker" })
+      vim.keymap.set('n', '<leader>vb', '<cmd>Telescope buffers<cr>', { silent = true, desc = "[picker] Buffers" })
       vim.keymap.set('n', '<leader>vh', '<cmd>Telescope oldfiles<cr>', { silent = true, desc = "[picker] Old files *" })
-      vim.keymap.set('n', '<leader>vy', '<cmd>Telescope yank_history<cr>', { silent = true, desc = "Yanks" })
-      vim.keymap.set('n', '<leader>va', '<cmd>Telescope autocommands<cr>', { silent = true, desc = "Auto commands" })
+      vim.keymap.set('n', '<leader>vy', '<cmd>Telescope yank_history<cr>', { silent = true, desc = "[picker] Yanks" })
+      -- vim.keymap.set('n', '<leader>va', '<cmd>Telescope autocommands<cr>', { silent = true, desc = "[picker] Auto commands" })
       vim.keymap.set('n', '<leader>vc', '<cmd>Telescope git_commits<cr>', { silent = true, desc = "[picker] Git commits *" })
       vim.keymap.set('n', '<leader>vm', '<cmd>Telescope marks<cr>', { silent = true, desc = "[picker] Marks *" })
       vim.keymap.set('n', '<leader>vj', '<cmd>Telescope jumplist<cr>', { silent = true, desc = "[picker] Jumps *" })
 
-      vim.keymap.set('n', '<leader>vT', '<cmd>Telescope current_buffer_tags<cr>', { silent = true, desc = "[find] Lines *" })
-      vim.keymap.set('n',        ';vl', '<cmd>Telescope current_buffer_fuzzy_find<cr>', { silent = true, desc = "[find] Lines *" })
-      vim.keymap.set('n', '<leader>vL', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "[picker] Live grep *" })
-
       vim.keymap.set('n', '<leader>vq', '<cmd>Telescope quickfix<cr>', { silent = true, desc = "[qf] Quick fix *" })
-      vim.keymap.set('n', '<leader>vQ', '<cmd>Telescope quickfixhistory<cr>', { silent = true, desc = "Quickfix History" })
-      vim.keymap.set('n', '<leader>v/', '<cmd>Telescope search_history<cr>', { silent = true, desc = "History /" })
-      vim.keymap.set('n', '<leader>v:', '<cmd>Telescope commands<cr>', { silent = true, desc = "Commands" })
-      vim.keymap.set('n', '<leader>v;', '<cmd>Telescope command_history<cr>', { silent = true, desc = "Command History" })
+      vim.keymap.set('n', '<leader>vQ', '<cmd>Telescope quickfixhistory<cr>', { silent = true, desc = "[qf] Quickfix History" })
+      vim.keymap.set('n', '<leader>v/', '<cmd>Telescope search_history<cr>', { silent = true, desc = "[picker] History /" })
+      vim.keymap.set('n', '<leader>v:', '<cmd>Telescope commands<cr>', { silent = true, desc = "[picker] Commands" })
+      vim.keymap.set('n', '<leader>v;', '<cmd>Telescope command_history<cr>', { silent = true, desc = "[picker] Command History" })
 
-      vim.keymap.set('n', '<leader>fq',
+      -- find/files
+      vim.keymap.set('n', '<leader>ft', '<cmd>Telescope current_buffer_tags<cr>', { silent = true, desc = "[find] Tags *" })
+      vim.keymap.set('n', '<leader>fl', '<cmd>Telescope current_buffer_fuzzy_find<cr>', { silent = true, desc = "[find] Lines *" })
+      vim.keymap.set('v', '<leader>fl',
+        function()
+          require("telescope.builtin").current_buffer_fuzzy_find({
+            default_text = "'" .. get_visual_or_cword_simple(),
+          })
+        end,
+        { silent = true, desc = "[find] Lines (Word Under Cursor) *" }
+      )
+      vim.keymap.set({'n', 'v'}, '<leader>fL',
+        function()
+          require("telescope.builtin").current_buffer_fuzzy_find({
+            default_text = "'" .. get_visual_or_cword_simple(),
+          })
+        end,
+        { silent = true, desc = "[find] Lines (Word Under Cursor) *" }
+      )
+
+      vim.keymap.set('n', '<leader>fe', '<cmd>Telescope live_grep<cr>', { silent = true, desc = "[find] Live grep *" })
+      vim.keymap.set('v', '<leader>fe',
+        function()
+          require("telescope.builtin").live_grep({
+            default_text = "'" .. get_visual_or_cword_simple(),
+          })
+        end,
+        { silent = true, desc = "[find] Live grep (Word Under Cursor) *" }
+      )
+      vim.keymap.set({'n', 'v'}, '<leader>fE',
+        function()
+          require("telescope.builtin").live_grep({
+            default_text = "'" .. get_visual_or_cword_simple(),
+          })
+        end,
+        { silent = true, desc = "[find] Live grep (Word Under Cursor) *" }
+      )
+
+      vim.keymap.set({'n', 'v'}, '<leader>fF',
         function()
           require("telescope.builtin").find_files({
-            default_text = vim.fn.expand("<cword>"),
+            default_text = "'" .. get_visual_or_cword_simple(),
           })
         end,
         { silent = true, desc = "[find] Find Files (Word Under Cursor) *" }
       )
+
+
       -- Find files using Telescope (Windows-compatible alternative to cscope_maps)
-      vim.keymap.set('n', '<leader>ff', '<cmd>Telescope find_files<cr>', { silent = true, desc = "[find] Find file *" })
-      vim.keymap.set('n', ';ff', '<cmd>Telescope find_files<cr>', { silent = true, desc = "[find] Find files (all) *" })
+      if is_windows() then
+        vim.keymap.set('n', '<leader>ff', '<cmd>Telescope find_files<cr>', { silent = true, desc = "[find] Find file *" })
+        vim.keymap.set('n', ';ff', '<cmd>Telescope find_files<cr>', { silent = true, desc = "[find] Find files (all) *" })
+      end
+
+
       -- Tasks picker via telescope (parse comments as doc, show command in preview)
       local function parse_tasks_with_doc(tasks_file)
         local tasks = {}
@@ -616,8 +666,8 @@ local plugins = {
           }):find()
         end
       end)()
-      vim.keymap.set('n', '<leader>vs', pick_task, { silent = true, desc = "[task] Run task *" })
-      vim.keymap.set('n', '<leader>vS', function()
+      vim.keymap.set('n', '<leader>vt', pick_task, { silent = true, desc = "[task] Run task *" })
+      vim.keymap.set('n', '<leader>vT', function()
         local vimrc = vim.env.MYVIMRC or vim.fn.expand('<sfile>:p')
         local tasks_file = vim.fn.fnamemodify(vimrc, ':p:h') .. "/tasks.ini"
         vim.cmd("edit " .. tasks_file)
@@ -1595,7 +1645,7 @@ local plugins = {
     cmd = { "VoomToggle", "Voom" },
     keys = {
       { "<leader>vO", "<cmd>VoomToggle<cr>", mode = "n", silent = true, desc = "[view] Outline (Voom) *" },
-      { "<leader>v0", "<cmd>VoomToggle fmr<cr>", mode = "n", silent = true, desc = "Toggle Voom outline (fmr)" },
+      { "<leader>v0", "<cmd>VoomToggle fmr<cr>", mode = "n", silent = true, desc = "[view] Outline (Voom fmr)" },
     },
   },
 
