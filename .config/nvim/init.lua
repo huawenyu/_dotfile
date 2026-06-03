@@ -382,6 +382,7 @@ local plugins = {
     branch = "develop",
     enabled = cond({ "coder", "python" }),
     ft = "python",
+    pin = true,
     cond = function()
       local handle = io.popen("which python3")
       local result = handle:read("*a")
@@ -408,8 +409,8 @@ local plugins = {
       vim.g.pymode_folding = 0
     end,
   },
-  { "davidhalter/jedi-vim", enabled = cond({ "coder", "python" }), ft = "python" },
-  { "pangloss/vim-javascript", enabled = cond({ "coder", "javascript" }), ft = { "javascript", "typescript" } },
+  { "davidhalter/jedi-vim", enabled = cond({ "coder", "python" }), ft = "python", pin = true, },
+  { "pangloss/vim-javascript", enabled = cond({ "coder", "javascript" }), ft = { "javascript", "typescript" }, pin = true, },
   {
     "fatih/vim-go",
     enabled = cond({ "coder", "golang" }),
@@ -1193,7 +1194,7 @@ local plugins = {
   {
     "huawenyu/improved-search.nvim",
     enabled = cond({ "editor" }),
-    branch = "master",
+    branch = "main",
     lazy = false,
     config = function()
       local search = require("improved-search")
@@ -1743,7 +1744,7 @@ local plugins = {
   {
     "huawenyu/diffview.nvim",
     enabled = cond({ "editor" }),
-    branch = "master",
+    branch = "main",
     lazy = false,
     cmd = { "DiffviewOpen", "DiffviewLog" },
     dependencies = { "nvim-lua/plenary.nvim" },
@@ -1862,7 +1863,7 @@ local plugins = {
   {
     "huawenyu/gitsigns.nvim",
     enabled = cond({ "coder" }),
-    branch = "master",
+    branch = "main",
     event = "BufReadPre",
     config = function()
       local vcs_dirs = {}
