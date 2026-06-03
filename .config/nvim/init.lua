@@ -670,8 +670,8 @@ local plugins = {
           }):find()
         end
       end)()
-      vim.keymap.set('n', '<leader>vt', pick_task, { silent = true, desc = "[task] Run task *" })
-      vim.keymap.set('n', '<leader>vT', function()
+      vim.keymap.set('n', "<leader>vs", pick_task, { silent = true, desc = "[task] Run task *" })
+      vim.keymap.set('n', "<leader>vS", function()
         local vimrc = vim.env.MYVIMRC or vim.fn.expand('<sfile>:p')
         local tasks_file = vim.fn.fnamemodify(vimrc, ':p:h') .. "/tasks.ini"
         vim.cmd("edit " .. tasks_file)
