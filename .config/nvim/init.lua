@@ -1332,6 +1332,7 @@ local plugins = {
   {
     "saghen/blink.cmp",
     enabled = cond({ "editor" }) and vim.loop.os_uname().sysname == "Linux",
+    event = "InsertEnter",
     version = "1.*",
     dependencies = { "rafamadriz/friendly-snippets" },
     config = function()
