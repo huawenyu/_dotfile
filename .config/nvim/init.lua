@@ -207,8 +207,8 @@ local plugins = {
   -- ============================================================
   -- Others tools/repo manage through plugin
   -- ============================================================
-  { "huawenyu/dotfiles", branch = "master", lazy = true, build = symlink_repo("~/dotfiles") },
-  { "huawenyu/zsh-local", branch = "master", lazy = true, build = symlink_repo("~/.oh-my-zsh/custom/plugins/zsh-local") },
+  { "huawenyu/dotfiles", build = "git switch master", lazy = true, build = symlink_repo("~/dotfiles") },
+  { "huawenyu/zsh-local", build = "git switch master", lazy = true, build = symlink_repo("~/.oh-my-zsh/custom/plugins/zsh-local") },
   { "zsh-users/zsh-completions", lazy = true, build = symlink_repo("~/.oh-my-zsh/custom/plugins/zsh-completions") },
   { "dooblem/bsync", lazy = true, build = symlink_repo("~/bin/repo-bsync") },
 
@@ -255,7 +255,7 @@ local plugins = {
   {
     "huawenyu/vim-basic",
     enabled = cond({ "basic", "log", "editor" }),
-    branch = "master",
+    build = "git switch master",
     lazy = false,
     keys = {
       { "<leader>ct", mode = { "n", "x" }, desc = "[misc] Clear trailing whitespace *" },
@@ -275,7 +275,7 @@ local plugins = {
   {
     "huawenyu/vimConfig",
     enabled = cond({ "basic", "log", "editor" }),
-    branch = "master",
+    build = "git switch master",
     lazy = false,
     dependencies = {
       "huawenyu/vim-motion",
@@ -345,7 +345,7 @@ local plugins = {
   -- ============================================================
   -- Color Themes
   -- ============================================================
-  { "huawenyu/jellybeans.vim", enabled = cond({ "log", "editor" }), branch = "master", lazy = false },
+  { "huawenyu/jellybeans.vim", enabled = cond({ "log", "editor" }), build = "git switch master", lazy = false },
 
   -- ============================================================
   -- Coder Plugins
@@ -360,7 +360,7 @@ local plugins = {
   {
     "huawenyu/nerdcommenter",
     enabled = cond({ "coder" }),
-    branch = "master",
+    build = "git switch master",
     config = function() require("nerdcommenter").setup() end,
   },
   { "Chiel92/vim-autoformat", enabled = cond({ "coder" }) },
@@ -369,12 +369,12 @@ local plugins = {
   { "tenfyzhong/CompleteParameter.vim", enabled = cond({ "coder", "extra" }) },
   { "FooSoft/vim-argwrap", enabled = cond({ "coder", "extra" }) },
   { "ericcurtin/CurtineIncSw.vim", enabled = cond({ "coder" }) },
-  { "huawenyu/neogdb2.vim", enabled = cond({ "coder" }), branch = "master", },
+  { "huawenyu/neogdb2.vim", enabled = cond({ "coder" }), build = "git switch master", },
   { "chrisbra/vim-diff-enhanced", enabled = cond({ "editor" }) },
   { "fidian/hexmode", enabled = cond({ "editor" }), cmd = "Hexmode" },
 
   -- Language Specific
-  { "huawenyu/vim-linux-coding-style", enabled = cond({ "coder", "c" }), branch = "master", ft = { "c", "cpp" } },
+  { "huawenyu/vim-linux-coding-style", enabled = cond({ "coder", "c" }), build = "git switch master", ft = { "c", "cpp" } },
   { "octol/vim-cpp-enhanced-highlight", enabled = cond({ "coder", "c" }), ft = { "c", "cpp" } },
   { "bfrg/vim-cpp-modern", enabled = vim.fn.has("nvim") == 1, ft = { "c", "cpp" }, dependencies = { "vim-cpp-enhanced-highlight" } },
   {
@@ -919,7 +919,7 @@ local plugins = {
   {
     "huawenyu/vim-mark",
     enabled = cond({ "editor" }),
-    branch = "master",
+    build = "git switch master",
     keys = {
       { "<leader>mm", mode = "n", desc = "[misc] Colorize current word *" },
       { "<leader>mm", mode = "v", desc = "[misc] Colorize visual selection *" },
@@ -928,7 +928,7 @@ local plugins = {
     init = function() vim.g.mw_no_mappings = 1 end,
     config = function() require("vim-mark").setup() end,
   },
-  { "huawenyu/vim-signature", enabled = cond({ "editor" }), branch = "master", },
+  { "huawenyu/vim-signature", enabled = cond({ "editor" }), build = "git switch master", },
   {
     "lukas-reineke/indent-blankline.nvim",
     enabled = cond({ "editor" }) and (vim.g.vim_confi_option.indentline == 1),
@@ -1017,9 +1017,9 @@ local plugins = {
   -- Syntax
   -- ============================================================
   { "justinmk/vim-syntax-extra", enabled = cond({ "editor" }), ft = "vim" },
-  -- { "huawenyu/vim-log-syntax", enabled = cond({ "editor", "log" }), branch = "master", ft = "log" },
+  -- { "huawenyu/vim-log-syntax", enabled = cond({ "editor", "log" }), build = "git switch master", ft = "log" },
   { "fei6409/log-highlight.nvim", enabled = cond({ "editor", "log" }), ft = "log" },
-  { "huawenyu/vim-autotest-syntax", enabled = cond({ "editor", "log" }), branch = "master", ft = "case" },
+  { "huawenyu/vim-autotest-syntax", enabled = cond({ "editor", "log" }), build = "git switch master", ft = "case" },
   { "nickhutchinson/vim-cmake-syntax", enabled = cond({ "editor" }), ft = "cmake" },
   { "xuhdev/syntax-dosini.vim", enabled = cond({ "editor" }), ft = "dosini" },
   { "tmux-plugins/vim-tmux", enabled = cond({ "editor" }), ft = "tmux" },
@@ -1113,7 +1113,7 @@ local plugins = {
   -- ============================================================
   -- Search / Jump / Motion
   -- ============================================================
-  { "huawenyu/vim-grepper", enabled = cond({ "editor" }), branch = "master", lazy = false },
+  { "huawenyu/vim-grepper", enabled = cond({ "editor" }), build = "git switch master", lazy = false },
   {
     "dhananjaylatkar/cscope_maps.nvim",
     enabled = cond({ "coder" }),
@@ -1138,7 +1138,7 @@ local plugins = {
   {
     "huawenyu/c-utils.vim",
     enabled = cond({ "coder" }),
-    branch = "master",
+    build = "git switch master",
     lazy = false,
     config = function()
       if not is_wsl() then
@@ -1154,7 +1154,7 @@ local plugins = {
   {
     "huawenyu/fzf-cscope.vim",
     enabled = false and cond({ "editor" }),
-    branch = "master",
+    build = "git switch master",
     dependencies = { "chengzeyi/fzf-preview.vim", "huawenyu/vim-basic" },
     keys = {
       -- File commands
@@ -1194,7 +1194,7 @@ local plugins = {
   {
     "huawenyu/improved-search.nvim",
     enabled = cond({ "editor" }),
-    branch = "main",
+    build = "git switch main",
     lazy = false,
     config = function()
       local search = require("improved-search")
@@ -1229,7 +1229,7 @@ local plugins = {
       })
     end,
   },
-  { "huawenyu/vim-windowswap", enabled = cond({ "editor" }), branch = "master", },
+  { "huawenyu/vim-windowswap", enabled = cond({ "editor" }), build = "git switch master", },
   {
     "preservim/tagbar",
     enabled = cond({ "editor" }),
@@ -1238,7 +1238,7 @@ local plugins = {
     init = function() require("vimconfig.tagbar").setup() end,
   },
 
-  -- { "huawenyu/quickfix-reflector.vim", enabled = cond({ "editor" }), branch = "master", }, -- Disable it for it confuse neovim and create multiple-quickfix window
+  -- { "huawenyu/quickfix-reflector.vim", enabled = cond({ "editor" }), build = "git switch master", }, -- Disable it for it confuse neovim and create multiple-quickfix window
   {
     'stevearc/quicker.nvim',
     enabled = cond({ "editor" }),
@@ -1268,7 +1268,7 @@ local plugins = {
   {
     "huawenyu/vim-unimpaired",
     enabled = cond({ "editor" }),
-    branch = "master",
+    build = "git switch master",
     lazy = false,
     init = function() vim.g.unimpaired_listchar = 0 end,
     config = function() require("vim-unimpaired").setup() end,
@@ -1293,7 +1293,7 @@ local plugins = {
   {
     "huawenyu/hop.nvim",
     enabled = cond({ "editor" }),
-    branch = "master",
+    build = "git switch master",
     keys = {
       { ";s", "<cmd>HopChar1CurrentLine<cr>", desc = "Hop to char (current line)" },
       { ";;", "<cmd>HopChar2<cr>", desc = "Hop to 2-char sequence" },
@@ -1306,7 +1306,7 @@ local plugins = {
   {
     "huawenyu/vim-motion",
     enabled = cond({ "editor" }),
-    branch = "master",
+    build = "git switch master",
     dependencies = { "skywind3000/vim-preview" },
     keys = {
       { "<leader>;",  function() vim.cmd('call VimMotionTag()') end, mode = "n", silent = true, desc = "Jump Tag" },
@@ -1458,7 +1458,7 @@ local plugins = {
   {
     "huawenyu/vim-floaterm-repl",
     enabled = cond({ "editor" }), lazy = false,
-    branch = "master",
+    build = "git switch master",
     cmd = "FloatermRepl",
     ft = "markdown",
     keys = {
@@ -1492,7 +1492,7 @@ local plugins = {
       vim.keymap.set('n', '<c-\\>', '<cmd>ToggleTerm<cr>', { silent = true, desc = "[view] Toggle Terminal *" })
     end,
   },
-  { "huawenyu/asyncrun.vim", enabled = cond({ "admin" }), branch = "master", },
+  { "huawenyu/asyncrun.vim", enabled = cond({ "admin" }), build = "git switch master", },
   {
     'skywind3000/asynctasks.vim',
     enabled = cond({ "admin" }),
@@ -1655,7 +1655,7 @@ local plugins = {
   {
     "huawenyu/VOoM",
     enabled = cond({ "editor", "log" }),
-    branch = "master",
+    build = "git switch master",
     cmd = { "VoomToggle", "Voom" },
     keys = {
       { "<leader>vO", "<cmd>VoomToggle<cr>", mode = "n", silent = true, desc = "[view] Outline (Voom) *" },
@@ -1744,7 +1744,7 @@ local plugins = {
   {
     "huawenyu/diffview.nvim",
     enabled = cond({ "editor" }),
-    branch = "main",
+    build = "git switch main",
     lazy = false,
     cmd = { "DiffviewOpen", "DiffviewLog" },
     dependencies = { "nvim-lua/plenary.nvim" },
@@ -1863,7 +1863,7 @@ local plugins = {
   {
     "huawenyu/gitsigns.nvim",
     enabled = cond({ "coder" }),
-    branch = "main",
+    build = "git switch main",
     event = "BufReadPre",
     config = function()
       local vcs_dirs = {}
@@ -1949,7 +1949,7 @@ local plugins = {
   -- ============================================================
   -- Other Utilities
   -- ============================================================
-  { "huawenyu/tldr.nvim", enabled = not is_wsl() and vim.fn.executable("tldr") == 1 and cond({ "editor" }), branch = "master", },
+  { "huawenyu/tldr.nvim", enabled = not is_wsl() and vim.fn.executable("tldr") == 1 and cond({ "editor" }), build = "git switch master", },
   { "s1n7ax/nvim-window-picker", enabled = cond({ "editor", "tool" }) },
 
   -- ============================================================
