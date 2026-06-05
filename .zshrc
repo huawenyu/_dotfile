@@ -111,25 +111,6 @@ function git_prompt_info() {
 # Customize to your needs...
 #
 
-# Our local dir: data, tools, home
-#if [ ! -f "/tmp/zsh_init_flag" ]; then
-#  # remap caps to ESC
-#  xmodmap -e 'clear Lock' -e 'keycode 0x42 = Escape'
-#  echo "have init" > "/tmp/zsh_init_flag"
-#fi
-
-#alias emacs='emacs -nw'
-
-# Avoid mosh flash when <c-l> tmux-pane jump
-# bindkey -r "^L"
-# bindkey "^L" clear-screen
-
-
-# Use these lines to enable search by globs, e.g. gcc*foo.c
-#
-
-#[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
-
 if [ -e "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then . "$HOME/.nix-profile/etc/profile.d/nix.sh"; fi # added by Nix installer
 export LFTP_ATCMD="lftp --norc -c 'open -u ftpuser,ftpuser 172.16.80.139; set ftp:ssl-allow off; set xfer:clobber on; set ssl:verify-certificate no;'"
 

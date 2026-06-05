@@ -1289,7 +1289,22 @@ local plugins = {
       vim.g.tmux_navigator_no_mappings = 1
     end
   },
-  { "mg979/vim-visual-multi", enabled = cond({ "editor" }) },
+  {
+    "mg979/vim-visual-multi",
+    enabled = cond({ "editor" }),
+    lazy = false,
+    init = function()
+      vim.g.VM_maps = {
+        ["Find Under"]         = "<M-n>",
+        ["Find Subword Under"] = "<M-n>",
+
+        ["Skip Region"]        = "<M-p>",
+        ["Remove Region"]      = "<M-x>",
+
+        ["Select All"]         = "<M-a>",
+      }
+    end,
+  },
   {
     "huawenyu/hop.nvim",
     enabled = cond({ "editor" }),

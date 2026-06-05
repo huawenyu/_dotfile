@@ -36,3 +36,5 @@ migadmin/node_modules/grunt-jscs/*
 target/rls/*
 .dotfile
 
+
+**/.claude/settings.local.json
