@@ -119,3 +119,4 @@ export LFTP_ATCMD="lftp --norc -c 'open -u ftpuser,ftpuser 172.16.80.139; set ft
 # Don't do this, will make shell mess: Removes duplicate path
 #export PATH=$(echo $PATH | tr ':' '\n' | sort -u | tr '\n' ':')
 
+alias motd='run-parts /etc/update-motd.d/'

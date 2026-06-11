@@ -1112,5 +1112,15 @@ fi
 
 parse_args "$@"
 
-main "$@"
+# Use parsed args (set by eval set -- in parse_args)
+main_with_parsed_args () {
+    if [ "$#" -eq 0 ] || { [ "$#" -eq 1 ] && [ "$1" = "--" ]; }; then
+        echo "$(show_help)"
+        exit 0
+    fi
+    do_args "$@"
+    do_task "$@"
+    cleanup
+}
+main_with_parsed_args "$@"
 echo "Bootstrap complete!"
