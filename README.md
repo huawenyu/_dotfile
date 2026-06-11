@@ -6,6 +6,22 @@
     - myssh -t work "tmux new -As default"  ### autossh
 ---
 
+# config
+
+~/.local/share/yadm/repo.git/       # bare repo
+~/.local/share/yadm/repo.git/config # yadm config local.class
+~/.config/yadm/bootstrap            # yadm bootstrap
+~/.config/yadm/alt                  # yadm alt used
+
+```sh
+    $ ls -la ~/.config/me-yadm/alt
+    total 16
+    drwxr-xr-x 4 hyu hyu 4096 Jun  5 15:35 .
+    drwxr-xr-x 3 hyu hyu 4096 May 22 22:28 ..
+    drwxr-xr-x 3 hyu hyu 4096 Jun  5 15:36 .config
+    drwxr-xr-x 3 hyu hyu 4096 May 22 22:28 .oh-my-zsh
+```
+
 # dotfiles
 
 linux config files: zsh, ssh, tmux, vim, script, ...

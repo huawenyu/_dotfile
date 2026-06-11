@@ -100,7 +100,48 @@ ftPython=("python3"
 ftNix=()
 ftNixTool=("presenterm")
 
-_Usage=$(cat <<-END
+# Usage: var_TopCmd=$( get_top_cmd )
+# Get the top-level command name from the script's location.
+# Script path: ~/.config/yadm/bootstrap → top-cmd is "yadm"
+get_top_cmd () {
+    local script="$0"
+    local dir=$(dirname "$script")
+    local base=$(basename "$dir")
+    # If basename is a known wrapper (e.g., "bootstrap"), go up one level
+    case "$base" in
+        bootstrap|boot)
+            local parent_dir=$(dirname "$dir")
+            base=$(basename "$parent_dir")
+            ;;
+    esac
+    echo "$base"
+}
+
+
+# Usage: var_Class=$( get_class "<top-cmd>" )
+# Get class from top-cmd config (e.g., yadm config local.class), fallback to "yadm" then "default"
+get_class () {
+    local top_cmd="$1"
+    local class=""
+
+    # Try top-cmd first
+    if command -v "$top_cmd" &> /dev/null; then
+        class=$("$top_cmd" config local.class 2>/dev/null)
+    fi
+
+    # If top-cmd didn't work and it's not "yadm", fallback to yadm
+    if [[ -z "$class" && "$top_cmd" != "yadm" ]]; then
+        if command -v yadm &> /dev/null; then
+            class=$(yadm config local.class 2>/dev/null)
+        fi
+    fi
+
+    [ -z "$class" ] && class="default"
+    echo "$class"
+}
+
+show_help () {
+    cat <<END
     option:
       -h,--help     Help
       -n,--dryrun   Dryrun: only show all variables and exit
@@ -119,6 +160,12 @@ _Usage=$(cat <<-END
         kvm         # Virtual Machine Manager
         editor      # neovim
         python      # python
+      -A,--action  Action:
+        init        Install tools and setup system (default when no action)
+        update      Update specific tools: -A update [-t tools] nvim,cscope
+        list        List available tools and install status
+        motd-only   Symlink custom welcome, disable other motd scripts
+        motd        Symlink custom welcome, enable other motd scripts
 
     Sample:
       bash -x script        # Run the script with debug mode enabled.
@@ -126,16 +173,25 @@ _Usage=$(cat <<-END
 
       script -m all
       script -m dev -f ",python,editor,"
+      script -A init        # install tools and setup system
+      script -A update -t nvim,cscope   # update specific tools
+      script -A list       # list available/installed tools
+      script -A motd-only   # show only my custom motd
+      script -A motd        # show all motd
 
 END
-)
+}
+
+# Pre-compute top-cmd and class before parse_args (needed for help text)
+var_TopCmd=$(get_top_cmd)
+var_Class=$(get_class "$var_TopCmd")
 
 # Process options
 parse_args () {
 
     # Define options
-    OPTIONS="hns:m:f:o:"
-    LONGOPTIONS="help,dryrun,shell:,mode:,feature:,output:"
+    OPTIONS="hns:m:f:o:A:t:"
+    LONGOPTIONS="help,dryrun,shell:,mode:,feature:,output:,action:,tool:"
 
     # Parse options
     PARSED=$(getopt -o "$OPTIONS" --long "$LONGOPTIONS" -- "$@")
@@ -161,7 +217,7 @@ parse_args () {
     while true; do
         case "$1" in
             -h|--help)
-                echo "$_Usage"
+                echo "$(show_help)"
                 exit 0
                 ;;
             -n|--dryrun)
@@ -184,6 +240,14 @@ parse_args () {
                 var_output="$2"
                 shift 2
                 ;;
+            -A|--action)
+                var_Action="$2"
+                shift 2
+                ;;
+            -t|--tool)
+                var_UpdateTools="$2"
+                shift 2
+                ;;
             --)
                 shift
                 break
@@ -199,6 +263,13 @@ parse_args () {
 }
 
 
+# Handle -A without argument (getopt would fail, but be safe)
+if [[ "$var_Action" == "-A" ]] || [[ "$var_Action" == "--action" ]]; then
+    echo "Option -A/--action requires an argument"
+    echo "$(show_help)"
+    exit 1
+fi
+
 # Usage: varNum1=$( int var1 )
 int ()
 {
@@ -207,22 +278,61 @@ int ()
 
 
 do_args () {
-    ### Extra arguments
-    case "$#" in
-        2)
-            var_Action="$1"
-            var_SubAct="$2"
-            ;;
-        1)
-            var_Action="$1"
-            ;;
-        0)
+    # Validate known actions
+    case "$var_Action" in
+        init|update|list|motd|motd-only|"")
             ;;
         *)
-            echo "$_Usage"
-            die "Incorrect arguments"
+            echo "Unknown action: '$var_Action'"
+            echo "$(show_help)"
+            exit 1
             ;;
     esac
+
+    # Standalone actions skip tool/init tasks
+    if [[ "$var_Action" =~ ^(motd|motd-only|list|update)$ ]]; then
+        var_SKIP_INIT=1
+    fi
+
+    # Parse update tools from positional arguments
+    if [[ "$var_Action" == "update" ]]; then
+        # If already set via -t/--tool option, use that
+        if [[ -z "$var_UpdateTools" ]]; then
+            # Find first non-option, non-action argument
+            for arg in "$@"; do
+                if [[ "$arg" != -* && "$arg" != "$var_Action" ]]; then
+                    var_UpdateTools="$arg"
+                    break
+                fi
+            done
+        fi
+
+        if [[ -z "$var_UpdateTools" ]]; then
+            # No tools specified - try interactive prompt if in a terminal
+            if [[ -t 0 ]]; then
+                echo ""
+                echo "  Available tools to update:"
+                echo "  ========================="
+                echo "  nvim       - Neovim editor"
+                echo "  cscope     - Cscope code browser"
+                echo ""
+                echo -n "  Enter tools to update (e.g., nvim,cscope): "
+                read -r var_UpdateTools
+                if [[ -z "$var_UpdateTools" ]]; then
+                    echo "  no tools specified, skipping"
+                    exit 0
+                fi
+            else
+                echo "update action requires tool names:"
+                echo "  Available tools: nvim, cscope"
+                echo "  Usage: script -A update nvim,cscope"
+                echo "         script -A update -t nvim,cscope"
+                exit 1
+            fi
+        fi
+        # Normalize separators to comma
+        var_UpdateTools="${var_UpdateTools//;/,}"
+    fi
 
 
     # Handle shell
@@ -232,7 +342,7 @@ do_args () {
         var_FeatureList+="ftZsh:"
     else
         echo "-s,--shell [bash|zsh], but '$var_Shell'"
-        echo "$_Usage"
+        echo "$(show_help)"
         die "Incorrect arguments"
     fi
 
@@ -241,6 +351,11 @@ do_args () {
         if lscpu | grep -q "Hypervisor"; then
             var_IsPhysicalPC="false"
         fi
+
+    # Get top command and class
+        var_TopCmd=$(get_top_cmd)
+        var_Class=$(get_class "$var_TopCmd")
+        echo "  top-cmd: '$var_TopCmd', class: '$var_Class'"
 
     # Handle mode
     if [[ "$var_Mode" == "none" ]]; then
@@ -261,7 +376,7 @@ do_args () {
         fi
     else
         echo "-m,--mode [none|basic|dev|kvm|all], but '$var_Mode'"
-        echo "$_Usage"
+        echo "$(show_help)"
         die "Incorrect arguments"
     fi
 
@@ -336,7 +451,8 @@ do_args () {
     ### Handle arguments
     if [[ -n "$var_DRYRUN" ]]; then
         ( set -o posix ; set ) | grep -e '^var_'
-        exit 1
+        echo ""
+        echo "[dryrun mode - actions will be shown but not executed]"
     fi
 
     if [[ "$var_VERBOSE" -ge 3 ]]; then
@@ -350,6 +466,10 @@ do_args () {
 
 
 main () {
+    if [ "$#" -eq 0 ] || { [ "$#" -eq 1 ] && [ "$1" = "--" ]; }; then
+        echo "$(show_help)"
+        exit 0
+    fi
     do_args "$@"
     do_task "$@"
     cleanup
@@ -378,6 +498,11 @@ do_task () {
 }
 
 do_task_linux () {
+    # Skip Linux setup for standalone actions
+    if [[ "$var_SKIP_INIT" == "1" ]]; then
+        return
+    fi
+
     echo "Running Linux setup..."
     # yadm alt --os Linux
 
@@ -417,6 +542,11 @@ do_task_macos () {
 }
 
 do_task_wsl () {
+    # Skip WSL setup for standalone actions
+    if [[ "$var_SKIP_INIT" == "1" ]]; then
+        return
+    fi
+
     echo "Running Windows (WSL) setup..."
     #yadm alt --os Windows
 
@@ -445,15 +575,319 @@ do_task_wsl () {
 }
 
 do_task_common () {
-    echo "Running common task ..."
 
-    # Firstly, try to install all require tools
-    if command -v apt &> /dev/null; then
-        sudo apt-get install -qq -y "${var_PackageName[@]}"
-        sudo apt clean autoclean
-        sudo apt autoremove -y
+    # Handle list action
+    if [[ "$var_Action" == "list" ]]; then
+        echo "  action 'list' ..."
+        echo ""
+        echo "  Available tools:"
+        echo "  ============"
+        local _tool
+        local _version
+        local _installed
+
+        # neovim
+        _tool="neovim"
+        if command -v nvim >/dev/null 2>&1; then
+            _version=$(nvim --version 2>/dev/null | head -1)
+            echo "  [installed] $_tool: $_version"
+        else
+            echo "  [missing  ] $_tool"
+        fi
+
+        # cscope
+        _tool="cscope"
+        if command -v cscope >/dev/null 2>&1; then
+            _version=$(cscope -V 2>&1 | head -1)
+            echo "  [installed] $_tool: $_version"
+        else
+            echo "  [missing  ] $_tool"
+        fi
+
+        # git
+        _tool="git"
+        if command -v git >/dev/null 2>&1; then
+            _version=$(git --version 2>/dev/null)
+            echo "  [installed] $_tool: $_version"
+        else
+            echo "  [missing  ] $_tool"
+        fi
+
+        # tmux
+        _tool="tmux"
+        if command -v tmux >/dev/null 2>&1; then
+            _version=$(tmux -V 2>/dev/null)
+            echo "  [installed] $_tool: $_version"
+        else
+            echo "  [missing  ] $_tool"
+        fi
+
+        # zsh
+        _tool="zsh"
+        if command -v zsh >/dev/null 2>&1; then
+            _version=$(zsh --version 2>/dev/null)
+            echo "  [installed] $_tool: $_version"
+        else
+            echo "  [missing  ] $_tool"
+        fi
+
+        # python3
+        _tool="python3"
+        if command -v python3 >/dev/null 2>&1; then
+            _version=$(python3 --version 2>/dev/null)
+            echo "  [installed] $_tool: $_version"
+        else
+            echo "  [missing  ] $_tool"
+        fi
+
+        # clangd
+        _tool="clangd"
+        if command -v clangd >/dev/null 2>&1; then
+            _version=$(clangd --version 2>/dev/null | head -1)
+            echo "  [installed] $_tool: $_version"
+        else
+            echo "  [missing  ] $_tool"
+        fi
+
+        # ripgrep
+        _tool="ripgrep"
+        if command -v rg >/dev/null 2>&1; then
+            _version=$(rg --version 2>/dev/null | head -1)
+            echo "  [installed] $_tool: $_version"
+        else
+            echo "  [missing  ] $_tool"
+        fi
+
+        # bat
+        _tool="bat"
+        if command -v bat >/dev/null 2>&1; then
+            _version=$(bat --version 2>/dev/null)
+            echo "  [installed] $_tool: $_version"
+        else
+            echo "  [missing  ] $_tool"
+        fi
+
+        # yadm
+        _tool="yadm"
+        if command -v yadm >/dev/null 2>&1; then
+            _version=$(yadm --version 2>/dev/null | head -1)
+            echo "  [installed] $_tool: $_version"
+        else
+            echo "  [missing  ] $_tool"
+        fi
+
+        echo ""
+        echo "  action 'list' done!"
     fi
 
+    # Handle update action
+    if [[ "$var_Action" == "update" ]]; then
+        echo "  action 'update' tools: '$var_UpdateTools' ..."
+
+        local IFS=','
+        for _tool in $var_UpdateTools; do
+            _tool=$(echo "$_tool" | xargs)  # trim whitespace
+            echo "    updating '$_tool' ..."
+
+            case "$_tool" in
+                nvim|vim)
+                    if ! command -v nix >/dev/null 2>&1; then
+                        echo "      nix not installed, cannot update via nix"
+                        continue
+                    fi
+                    if ! command -v nvim >/dev/null 2>&1; then
+                        echo "      nvim not installed, skipping"
+                        continue
+                    fi
+                    local _cur_ver=$(nvim --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+                    echo "      current: nvim $_cur_ver"
+                    echo "      installing latest via nix profile..."
+                    if [[ -n "$var_DRYRUN" ]]; then
+                        echo "      [dryrun] nix profile install nixpkgs#neovim"
+                    else
+                        nix profile install "nixpkgs#neovim" 2>/dev/null
+                    fi
+                    local _new_ver=$(nvim --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+                    echo "      installed nvim $_new_ver"
+                    # Update alternatives for vi/vim
+                    local _nvim_path=$(command -v nvim 2>/dev/null)
+                    if [[ -n "$_nvim_path" ]]; then
+                        if [[ -n "$var_DRYRUN" ]]; then
+                            echo "      [dryrun] sudo update-alternatives --install /usr/bin/vi vi $_nvim_path 60"
+                            echo "      [dryrun] sudo update-alternatives --install /usr/bin/vim vim $_nvim_path 60"
+                            echo "      [dryrun] sudo update-alternatives --set vi $_nvim_path"
+                            echo "      [dryrun] sudo update-alternatives --set vim $_nvim_path"
+                        else
+                            sudo update-alternatives --install /usr/bin/vi vi "$_nvim_path" 60 2>/dev/null
+                            sudo update-alternatives --install /usr/bin/vim vim "$_nvim_path" 60 2>/dev/null
+                            sudo update-alternatives --set vi "$_nvim_path" 2>/dev/null
+                            sudo update-alternatives --set vim "$_nvim_path" 2>/dev/null
+                        fi
+                        echo "      update-alternatives updated"
+                    fi
+                    ;;
+
+                cscope)
+                    if ! command -v nix >/dev/null 2>&1; then
+                        echo "      nix not installed, cannot update via nix"
+                        continue
+                    fi
+                    if ! command -v cscope >/dev/null 2>&1; then
+                        echo "      cscope not installed, skipping"
+                        continue
+                    fi
+                    local _cur_ver=$(cscope -V 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+                    echo "      current: cscope $_cur_ver"
+                    echo "      installing latest via nix profile..."
+                    if [[ -n "$var_DRYRUN" ]]; then
+                        echo "      [dryrun] nix profile install nixpkgs#cscope"
+                    else
+                        nix profile install "nixpkgs#cscope" 2>/dev/null
+                    fi
+                    local _new_ver=$(cscope -V 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+                    echo "      installed cscope $_new_ver"
+                    ;;
+
+                *)
+                    echo "      unknown tool '$_tool', skipping"
+                    ;;
+            esac
+        done
+
+        echo "  action 'update' done!"
+    fi
+
+    # Handle motd / motd-only actions
+    if [[ "$var_Action" == "motd" || "$var_Action" == "motd-only" ]]; then
+        echo "  action '$var_Action' ..."
+
+        local motd_src="$HOME/.config/yadm/alt/99-custom-welcome"
+        local motd_dst="/etc/update-motd.d/99-custom-welcome"
+
+        if [[ ! -f "$motd_src" ]]; then
+            echo "    source not found: $motd_src, skip"
+        else
+            # Ensure source is executable
+            if [[ -n "$var_DRYRUN" ]]; then
+                echo "    [dryrun] chmod 700 $motd_src"
+            else
+                chmod 700 "$motd_src"
+            fi
+
+            # Check if symlink already exists and points to correct source
+            if [[ -L "$motd_dst" && "$(readlink -f "$motd_dst")" == "$motd_src" ]]; then
+                echo "    symlink already correct: $motd_dst -> $motd_src"
+            else
+                # Remove old link/file and create new symlink
+                if [[ -L "$motd_dst" || -f "$motd_dst" ]]; then
+                    if [[ -n "$var_DRYRUN" ]]; then
+                        echo "    [dryrun] sudo rm -f $motd_dst"
+                    else
+                        sudo rm -f "$motd_dst"
+                    fi
+                fi
+                if [[ -n "$var_DRYRUN" ]]; then
+                    echo "    [dryrun] sudo ln -s $motd_src $motd_dst"
+                else
+                    sudo ln -s "$motd_src" "$motd_dst"
+                    echo "    linked: $motd_dst -> $motd_src"
+                fi
+            fi
+        fi
+
+        if [[ "$var_Action" == "motd-only" ]]; then
+            # Remove execute permission from other motd scripts (except our custom one)
+            if command -v shopt >/dev/null 2>&1; then
+                shopt -s nullglob
+                for f in /etc/update-motd.d/[0-8]*; do
+                    [[ -f "$f" ]] && {
+                        if [[ -n "$var_DRYRUN" ]]; then
+                            echo "    [dryrun] sudo chmod -x $f"
+                        else
+                            sudo chmod -x "$f" && echo "    disabled: $f"
+                        fi
+                    }
+                done
+            fi
+            echo "    other motd scripts disabled"
+        fi
+
+        if [[ "$var_Action" == "motd" ]]; then
+            # Restore execute permission on other motd scripts
+            if command -v shopt >/dev/null 2>&1; then
+                shopt -s nullglob
+                for f in /etc/update-motd.d/[0-8]*; do
+                    [[ -f "$f" ]] && {
+                        if [[ -n "$var_DRYRUN" ]]; then
+                            echo "    [dryrun] sudo chmod +x $f"
+                        else
+                            sudo chmod +x "$f" && echo "    enabled: $f"
+                        fi
+                    }
+                done
+            fi
+            echo "    other motd scripts enabled"
+        fi
+
+        echo "  action '$var_Action' done!"
+
+        # Check if 'motd' alias/function already exists
+        local motd_alias_line="alias motd='run-parts /etc/update-motd.d/'"
+        local motd_found=0
+
+        # Check if motd exists in PATH (e.g., /usr/bin/motd on Ubuntu)
+        if command -v motd >/dev/null 2>&1; then
+            motd_found=1
+        fi
+
+        # Check bash profile
+        if [[ "$motd_found" -eq 0 ]] && [[ -f "$HOME/.bashrc" ]] && grep -q "alias motd\|function motd" "$HOME/.bashrc" 2>/dev/null; then
+            motd_found=1
+        fi
+        # Check zsh config
+        if [[ "$motd_found" -eq 0 ]] && [[ -f "$HOME/.zshrc" ]] && grep -q "alias motd\|function motd" "$HOME/.zshrc" 2>/dev/null; then
+            motd_found=1
+        fi
+
+        if [[ "$motd_found" -eq 0 ]]; then
+            echo "  adding 'motd' alias ..."
+
+            # Determine shell profile from current shell
+            local shell_profile=""
+            if [[ "$SHELL" == *zsh ]]; then
+                shell_profile="$HOME/.zshrc"
+            else
+                shell_profile="$HOME/.bashrc"
+            fi
+
+            # Add alias to profile
+            if [[ -f "$shell_profile" ]]; then
+                if ! grep -q "alias motd=" "$shell_profile" 2>/dev/null; then
+                    if [[ -n "$var_DRYRUN" ]]; then
+                        echo "    [dryrun] echo '$motd_alias_line' >> $shell_profile"
+                    else
+                        echo "$motd_alias_line" >> "$shell_profile"
+                        echo "    added to $shell_profile"
+                    fi
+                fi
+            fi
+
+            echo "  motd alias added!"
+        else
+            echo "  'motd' already defined, skip"
+        fi
+    fi
+
+    # Skip init tasks for standalone actions (motd)
+    if [[ "$var_SKIP_INIT" != "1" ]]; then
+        echo "Running common task ..."
+
+        # Firstly, try to install all require tools
+        if command -v apt &> /dev/null; then
+            sudo apt-get install -qq -y "${var_PackageName[@]}"
+            sudo apt clean autoclean
+            sudo apt autoremove -y
+        fi
 
     if [[ "$var_FeatureList" =~ ":ftInfo:" ]]; then
         echo "  task 'info' ..."
@@ -541,6 +975,29 @@ do_task_common () {
         # Require interact, 'exit' for next step
         sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
+        # Install completion for bootstrap
+        local _completion_file="${var_ScriptDir}/../completion/_bootstrap"
+        mkdir -p "${var_ScriptDir}/../completion"
+        cat > "$_completion_file" << 'COMPLEOF'
+#compdef bootstrap
+# yadm bootstrap completion
+
+_bootstrap() {
+    local -a actions
+    actions=(
+        'motd-only:Symlink custom motd, disable others'
+        'motd:Symlink custom motd, enable others'
+    )
+    _describe 'action' actions
+
+    local -a modes features
+    modes=('none:Reset feature list' 'basic:Basic tools' 'editor:Editor tools' 'dev:Dev tools' 'all:All tools')
+    features=('update:Linux update' 'info:ssh-welcome' 'kvm:Virtual Machine' 'editor:neovim' 'python:python')
+    _describe 'mode' modes
+    _describe 'feature' features
+}
+COMPLEOF
+
         echo "  task 'zsh' done!"
     fi
 
@@ -548,6 +1005,41 @@ do_task_common () {
         echo "  task 'bash' ..."
 
         bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)"
+
+        # Install completion for bootstrap
+        local _completion_file="/etc/bash_completion.d/bootstrap"
+        sudo tee "$_completion_file" > /dev/null << 'COMPLEOF'
+# bash completion for bootstrap
+_bootstrap() {
+    local cur prev
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    case "$prev" in
+        -A|--action)
+            COMPREPLY=($(compgen -W "motd-only motd" -- "$cur"))
+            return 0
+            ;;
+        -m|--mode)
+            COMPREPLY=($(compgen -W "none basic editor dev all" -- "$cur"))
+            return 0
+            ;;
+        -s|--shell)
+            COMPREPLY=($(compgen -W "bash zsh" -- "$cur"))
+            return 0
+            ;;
+        -f|--feature)
+            COMPREPLY=($(compgen -W "update info kvm editor python" -- "$cur"))
+            return 0
+            ;;
+        *)
+            COMPREPLY=($(compgen -W "-h --help -n --dryrun -s --shell -m --mode -f --feature -A --action -o --output" -- "$cur"))
+            ;;
+    esac
+}
+complete -F _bootstrap bootstrap
+COMPLEOF
 
         echo "  task 'bash' done!"
     fi
@@ -567,6 +1059,7 @@ do_task_common () {
 
         echo "  task 'nix' done!"
     fi
+    fi  # end skip-init check
 }
 
 die () {
@@ -598,11 +1091,11 @@ cleanup() {
         echo "trap-cleanup(action=$var_Action time=$(($duration / 60))m:$(($duration % 60))s)"
     else
         if [ -n "$TEMPFILE" ]; then
-            rm -f "$TEMPFILE" 2> /dev/null
+            rm -f "$TEMPFILE" 2>/dev/null
         fi
 
         if [ -n "$TEMPFILE2" ]; then
-            rm -f "$TEMPFILE2" 2> /dev/null
+            rm -f "$TEMPFILE2" 2>/dev/null
         fi
     fi
 
@@ -612,8 +1105,17 @@ cleanup() {
 
 # wget -O $HOME/bin/getoptions https://github.com/ko1nksm/getoptions/releases/latest/download/getoptions
 trap "cleanup; exit 130" 1 2 3 15
+
+# Pre-validate -A/--action to give a cleaner error message
+# Only trigger if -A is at end OR followed by another flag (not a value)
+if [[ " $* " =~ \ -A$ ]] || [[ " $* " =~ \ --action$ ]] || \
+   [[ " $* " =~ \ -A\ +-[a-zA-Z] ]] || [[ " $* " =~ \ --action\ +-[a-zA-Z] ]]; then
+    echo "Option -A/--action requires an argument"
+    echo "$(show_help)"
+    exit 1
+fi
+
 parse_args "$@"
 
 main "$@"
 echo "Bootstrap complete!"
-

@@ -1,0 +1,32 @@
+// ==========================================
+// Zellij Screen Layout (Top Tab-Bar Only)
+// ==========================================
+layout {
+    tab name="work" {
+        pane {
+        }
+    }
+
+    tab name="mini" {
+        pane {
+        }
+    }
+
+    tab name="work-host" {
+        pane {
+        }
+    }
+
+    tab name="kvm-host" {
+        pane {
+        }
+    }
+
+    tab name="wsl" focus=true {
+        pane {
+            //command "ssh";
+            //args ["user@host"];
+        }
+    }
+}
+

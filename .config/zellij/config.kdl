@@ -1,0 +1,90 @@
+// =========================
+// Zellij minimal router config
+// =========================
+// Loads our local default.kdl file automatically
+default_layout "default"
+
+show_startup_tips false
+session_serialization false
+
+// Disable Zellij serialization to save RAM since tmux handles it
+scrollback_lines_to_serialize 0
+max_scrollback_lines 0
+
+// --- GLOBAL RENDERING POLICIES ---
+pane_frames false
+support_user_title_triggers false
+
+// --- KEYMAP (STRICT MINIMAL MODE) ---
+// clear-defaults=true nukes all native shortcuts like C-g, C-p, C-o
+keybinds clear-defaults=true {
+    normal {
+        // Pressing Ctrl + a switches Zellij into the command 'locked' prefix state
+        bind "Ctrl g" { SwitchToMode "Locked"; }
+
+        // TAB navigation (only real function you need)
+        bind "Alt n" { GoToNextTab; }
+        bind "Alt p" { GoToPreviousTab; }
+
+        // TAB management: similar like browser C-t/w
+        bind "Alt t" { NewTab; }
+        bind "Alt w" { CloseTab; }
+        bind "Alt a" { ToggleTab; }
+
+        // Cann't input if no status-bar
+        bind "Alt r" { SwitchToMode "RenameTab"; }
+
+        // --- DIRECT SWITCHING & WINDOWS TERMINAL TITLE SYNC ---
+        bind "Alt 6" { GoToTab 1; }
+        bind "Alt 7" { GoToTab 2; }
+        bind "Alt 8" { GoToTab 3; }
+        bind "Alt 9" { GoToTab 4; }
+        bind "Alt 0" { GoToTab 5; }
+
+        // session exit
+        bind "Alt q" { Quit; }
+    }
+
+    // 2. Define Tmux-like actions that happen AFTER you press your prefix (Ctrl + g)
+    locked {
+        // Press 'Esc' or 'Enter' to cancel the prefix state safely
+        bind "Esc" "Enter" { SwitchToMode "Normal"; }
+
+        // Split Panes after prefix
+        bind "\"" { NewPane "Down"; SwitchToMode "Normal"; }
+        bind "%"  { NewPane "Right"; SwitchToMode "Normal"; }
+
+        // Move focus between panes after prefix
+        bind "h"  { MoveFocus "Left"; SwitchToMode "Normal"; }
+        bind "l"  { MoveFocus "Right"; SwitchToMode "Normal"; }
+        bind "k"  { MoveFocus "Up"; SwitchToMode "Normal"; }
+        bind "j"  { MoveFocus "Down"; SwitchToMode "Normal"; }
+
+        bind "1" { GoToTab 1; SwitchToMode "Normal"; }
+        bind "2" { GoToTab 2; SwitchToMode "Normal"; }
+        bind "3" { GoToTab 3; SwitchToMode "Normal"; }
+        bind "4" { GoToTab 4; SwitchToMode "Normal"; }
+        bind "5" { GoToTab 5; SwitchToMode "Normal"; }
+        bind "6" { GoToTab 6; SwitchToMode "Normal"; }
+        bind "7" { GoToTab 7; SwitchToMode "Normal"; }
+        bind "8" { GoToTab 8; SwitchToMode "Normal"; }
+        bind "9" { GoToTab 9; SwitchToMode "Normal"; }
+        bind "0" { GoToTab 10; SwitchToMode "Normal"; }
+
+        // Close current pane after prefix
+        bind "x" { CloseFocus; SwitchToMode "Normal"; }
+
+        // Maximize current pane after prefix (like tmux zoom)
+        bind "m" { ToggleFocusFullscreen; SwitchToMode "Normal"; }
+    }
+
+    // --- NEW: EXPLICIT RENAMETAB MODE LOGIC ---
+    renametab {
+        // Pressing Enter saves the text and returns to normal operation
+        bind "Enter" { SwitchToMode "Normal"; }
+
+        // Pressing Escape cancels the mode and returns to normal operation
+        bind "Esc" { SwitchToMode "Normal"; }
+    }
+}
+
