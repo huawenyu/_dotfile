@@ -831,21 +831,16 @@ do_task_common () {
 
         echo "  action '$var_Action' done!"
 
-        # Check if 'motd' alias/function already exists
+        # Check if 'motd' alias/function already exists in shell configs
         local motd_alias_line="alias motd='run-parts /etc/update-motd.d/'"
         local motd_found=0
 
-        # Check if motd exists in PATH (e.g., /usr/bin/motd on Ubuntu)
-        if command -v motd >/dev/null 2>&1; then
-            motd_found=1
-        fi
-
         # Check bash profile
-        if [[ "$motd_found" -eq 0 ]] && [[ -f "$HOME/.bashrc" ]] && grep -q "alias motd\|function motd" "$HOME/.bashrc" 2>/dev/null; then
+        if [[ -f "$HOME/.bashrc" ]] && grep -q "alias motd\|function motd" "$HOME/.bashrc" 2>/dev/null; then
             motd_found=1
         fi
         # Check zsh config
-        if [[ "$motd_found" -eq 0 ]] && [[ -f "$HOME/.zshrc" ]] && grep -q "alias motd\|function motd" "$HOME/.zshrc" 2>/dev/null; then
+        if [[ -f "$HOME/.zshrc" ]] && grep -q "alias motd\|function motd" "$HOME/.zshrc" 2>/dev/null; then
             motd_found=1
         fi
 
