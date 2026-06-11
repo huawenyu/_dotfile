@@ -173,3 +173,4 @@ command -v atuin &> /dev/null && eval "$(atuin init bash --disable-up-arrow)"
 stty werase undef
 bind -x '"\C-l":clear'
 
+. "$HOME/.cargo/env"
