@@ -85,7 +85,7 @@ COMPLETION_WAITING_DOTS="true"
 #      ctrl-d, to delete selected matches.
 #plugins=(lighthouse history-search-multi-word zsh-directory-history history-substring-search zsh-completions zsh-autosuggestions)
 #plugins=(history-substring-search zsh-completions zsh-local fzf-marks)
-plugins=(history-substring-search zsh-completions zsh-local mini)
+plugins=(history-substring-search zsh-completions zsh-local mini zsh-pet)
 autoload -U compinit && compinit
 
 # Folder permission "Insecure completion-dependent directories detected" #6835
@@ -112,11 +112,7 @@ function git_prompt_info() {
 #
 
 if [ -e "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then . "$HOME/.nix-profile/etc/profile.d/nix.sh"; fi # added by Nix installer
-export LFTP_ATCMD="lftp --norc -c 'open -u ftpuser,ftpuser 172.16.80.139; set ftp:ssl-allow off; set xfer:clobber on; set ssl:verify-certificate no;'"
-
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
 # Don't do this, will make shell mess: Removes duplicate path
 #export PATH=$(echo $PATH | tr ':' '\n' | sort -u | tr '\n' ':')
 
-alias motd='run-parts /etc/update-motd.d/'

@@ -207,10 +207,11 @@ local plugins = {
   -- ============================================================
   -- Others tools/repo manage through plugin
   -- ============================================================
-  { "huawenyu/dotfiles", build = "git switch master", lazy = true, build = symlink_repo("~/dotfiles") },
-  { "huawenyu/zsh-local", build = "git switch master", lazy = true, build = symlink_repo("~/.oh-my-zsh/custom/plugins/zsh-local") },
-  { "zsh-users/zsh-completions", lazy = true, build = symlink_repo("~/.oh-my-zsh/custom/plugins/zsh-completions") },
-  { "dooblem/bsync", lazy = true, build = symlink_repo("~/bin/repo-bsync") },
+  { "huawenyu/dotfiles",          build = "git switch master", lazy = false, build = symlink_repo("~/dotfiles"), enabled = false, },
+  { "huawenyu/zsh-local",         build = "git switch master", lazy = false, build = symlink_repo("~/.oh-my-zsh/custom/plugins/zsh-local") },
+  { "huawenyu/zsh-pet",           build = "git switch master", lazy = false, build = symlink_repo("~/.oh-my-zsh/custom/plugins/zsh-pet") },
+  { "zsh-users/zsh-completions",  lazy = false, build = symlink_repo("~/.oh-my-zsh/custom/plugins/zsh-completions") },
+  { "dooblem/bsync",              lazy = false, build = symlink_repo("~/bin/repo-bsync") },
 
   -- ============================================================
   -- Basic / Core
@@ -928,6 +929,65 @@ local plugins = {
     init = function() vim.g.mw_no_mappings = 1 end,
     config = function() require("vim-mark").setup() end,
   },
+
+  {
+    "echasnovski/mini.hipatterns",
+    enabled = cond({ "editor" }),
+    event = "VeryLazy",
+    config = function()
+      local hipatterns = require("mini.hipatterns")
+
+      -- 🎨 highlight groups (stable, theme-safe)
+      vim.api.nvim_set_hl(0, "BigNumber1M", { fg = "#ffd166", bold = true }) -- yellow
+      vim.api.nvim_set_hl(0, "BigNumber10M", { fg = "#f8961e", bold = true }) -- orange
+      vim.api.nvim_set_hl(0, "BigNumber1B", { fg = "#ef476f", bold = true }) -- red
+      vim.api.nvim_set_hl(0, "BigNumber1T", { fg = "#9b5de5", bold = true }) -- purple
+
+      local enabled = true
+
+      hipatterns.setup({
+        highlighters = {
+          big_number = {
+            -- match ANY integer (safe + simple)
+            pattern = "%f[%d]%d+%f[^%d]",
+
+            group = function(_, match)
+              if not enabled then
+                return nil
+              end
+
+              local n = tonumber(match)
+              if not n then
+                return nil
+              end
+
+              -- 🚨 tiered classification
+              if n >= 1000000000000 then
+                return "BigNumber1T"
+              elseif n >= 1000000000 then
+                return "BigNumber1B"
+              elseif n >= 10000000 then
+                return "BigNumber10M"
+              elseif n >= 1000000 then
+                return "BigNumber1M"
+              end
+            end,
+          },
+        },
+      })
+
+      -- 🔁 toggle command
+      vim.api.nvim_create_user_command("BigNumberToggle", function()
+        enabled = not enabled
+        vim.notify("BigNumber highlight: " .. (enabled and "ON" or "OFF"))
+      end, {})
+
+      vim.keymap.set("n", "<leader>mn", "<cmd>BigNumberToggle<cr>", {
+        desc = "Toggle big number highlighting",
+      })
+    end,
+  },
+
   { "huawenyu/vim-signature", enabled = cond({ "editor" }), build = "git switch master", },
   {
     "lukas-reineke/indent-blankline.nvim",
