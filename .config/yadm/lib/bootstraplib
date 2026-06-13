@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Shared library for bootstrap subcommands
+# Sourced by all libexec/bootstrap-* scripts
+
+# ── Colors ────────────────────────────────────────────────────────────────────
+colorRed='\e[31m'
+colorGreen='\e[32m'
+colorYellow='\e[33m'
+colorReset='\e[0m'
+
+# ── Temp files ────────────────────────────────────────────────────────────────
+TEMPFILE=
+TEMPFILE2=
+
+maketemp() {
+    TEMPFILE="${TEMPFILE:-$(mktemp /tmp/bootstrap.XXXXXX)}" || die "mktemp failed"
+    TEMPFILE2="${TEMPFILE2:-$(mktemp /tmp/bootstrap.XXXXXX)}" || die "mktemp failed"
+}
+
+# ── Cleanup ───────────────────────────────────────────────────────────────────
+cleanup() {
+    trap - EXIT
+    [[ -n "$TEMPFILE" ]] && rm -f "$TEMPFILE" 2>/dev/null
+    [[ -n "$TEMPFILE2" ]] && rm -f "$TEMPFILE2" 2>/dev/null
+    cd "${OLDPWD:-.}" 2>/dev/null || true
+}
+
+# ── Error ─────────────────────────────────────────────────────────────────────
+die() {
+    [[ $# -gt 0 ]] && echo -e "${colorRed}  $0: $@  ${colorReset}" >&2
+    cleanup
+    exit 1
+}
+
+# ── Top-level command detection ───────────────────────────────────────────────
+# Usage: var_TopCmd=$( get_top_cmd "$0" )
+get_top_cmd() {
+    local script="${1:-$0}"
+    local dir base
+    # Resolve symlinks so we always get the real path
+    script=$(readlink -f "$script" 2>/dev/null || echo "$script")
+    dir=$(dirname "$script")
+    base=$(basename "$dir")
+    case "$base" in
+        bootstrap|boot|libexec)
+            base=$(basename "$(dirname "$dir")")
+            ;;
+    esac
+    echo "$base"
+}
+
+# ── Class detection ───────────────────────────────────────────────────────────
+# Usage: var_Class=$( get_class "$top_cmd" )
+get_class() {
+    local top_cmd="$1" class=""
+    if command -v "$top_cmd" &>/dev/null; then
+        class=$("$top_cmd" config local.class 2>/dev/null)
+    fi
+    if [[ -z "$class" && "$top_cmd" != "yadm" ]] && command -v yadm &>/dev/null; then
+        class=$(yadm config local.class 2>/dev/null)
+    fi
+    echo "${class:-default}"
+}
+
+# ── Script dir (resolves symlinks) ────────────────────────────────────────────
+get_script_dir() {
+    local src="${BASH_SOURCE[0]}"
+    cd "$(dirname "$(readlink -f "$src")")" &>/dev/null && pwd
+}
+
+# ── Package groups ─────────────────────────────────────────────────────────────
+ftBash=("bash-completion")
+ftZsh=("zsh")
+ftCommon=("software-properties-common" "apt-utils" "openssh-server" "sshpass"
+    "tree" "gawk" "autossh" "sudo")
+ftToolNet=("curl" "wget" "git" "git-lfs" "net-tools" "wireshark-common" "lftp")
+ftToolBasic=("unzip" "expect" "psmisc" "tmux" "fzf" "gem")
+ftToolTest=("parallel")
+ftIDE=("neovim" "universal-ctags" "bat" "xxd" "bc" "patchutils" "dos2unix" "clangd" "ripgrep" "sudo")
+ftVirt=("virt-manager" "qemu-kvm" "libvirt-daemon-system" "libvirt-clients"
+    "bridge-utils" "qemu-utils" "libguestfs-tools")
+ftBuild=("build-essential" "gdb" "bear" "clang" "valgrind" "cmake"
+    "ruby" "ruby-dev" "rubygems" "meson" "ninja-build" "libtool" "autoconf" "automake")
+ftLibdev=("openssl" "libssl-dev" "libpcre3" "libpcre3-dev" "zlib1g" "zlib1g-dev"
+    "libjemalloc-dev" "libatomic-ops-dev")
+ftLibdev2=("libboost-all-dev" "libjemalloc-dev" "libclang-dev" "llvm-dev"
+    "libedit-dev" "libcurl4-openssl-dev")
+ftPython=("python3" "python3-pip" "python3-dev")
+ftNix=()
+ftNixTool=("presenterm")
+
+# Resolve package group names from a feature list string (e.g. ":ftCommon:ftIDE:")
+resolve_packages() {
+    local feature_list="$1" pkg
+    local -a packages=()
+    for pkg in ftCommon ftToolNet ftToolBasic ftToolTest ftIDE ftVirt ftBuild ftLibdev ftLibdev2 ftPython ftZsh ftBash; do
+        [[ "$feature_list" =~ ":$pkg:" ]] && packages+=("${!pkg}")
+    done
+    printf '%s\n' "${packages[@]}"
+}
+
+# Detect physical PC (not running in a VM)
+is_physical_pc() {
+    ! lscpu 2>/dev/null | grep -q "Hypervisor"
+}
+
+# Build feature list from mode + extra features
+# Usage: var_FeatureList=$( build_feature_list "$mode" "$extra_features" "$shell" )
+build_feature_list() {
+    local mode="$1" features="$2" shell="$3"
+    local list=":"
+
+    # Shell
+    [[ "$shell" == "bash" ]] && list+="ftBash:"
+    [[ "$shell" == "zsh" ]]  && list+="ftZsh:"
+
+    case "$mode" in
+        none)   ;;
+        basic)  list+="ftCommon:ftToolBasic:ftToolNet:" ;;
+        editor) list+="ftCommon:ftToolBasic:ftToolNet:ftToolTest:ftIDE:ftPython:" ;;
+        dev)    list+="ftCommon:ftToolBasic:ftToolNet:ftToolTest:ftIDE:ftBuild:ftLibdev:ftLibdev2:ftPython:ftNix:ftNixTool:"
+                is_physical_pc && list+="ftVirt:" ;;
+        all)    list+="ftCommon:ftToolBasic:ftToolNet:ftToolTest:ftIDE:ftBuild:ftLibdev:ftLibdev2:ftPython:ftNix:ftNixTool:"
+                is_physical_pc && list+="ftVirt:" ;;
+    esac
+
+    # Explicit features
+    [[ "$features" =~ ",update," ]]  && list+="ftUpdate:"
+    [[ "$features" =~ ",info," ]]    && list+="ftInfo:"
+    [[ "$features" =~ ",python," ]]  && list+="ftPython:"
+    [[ "$features" =~ ",editor," ]]  && list+="ftPython:ftIDE:"
+    [[ "$features" =~ ",kvm," ]]     && list+="ftVirt:"
+    [[ "$features" =~ ",shell," ]]   && [[ "$shell" == "bash" ]] && list+="ftBash:"
+    [[ "$features" =~ ",shell," ]]   && [[ "$shell" == "zsh"  ]] && list+="ftZsh:"
+
+    list+=":"
+    echo "$list"
+}

@@ -210,6 +210,7 @@ local plugins = {
   { "huawenyu/dotfiles",          build = "git switch master", lazy = false, build = symlink_repo("~/dotfiles"), enabled = false, },
   { "huawenyu/zsh-local",         build = "git switch master", lazy = false, build = symlink_repo("~/.oh-my-zsh/custom/plugins/zsh-local") },
   { "huawenyu/zsh-pet",           build = "git switch master", lazy = false, build = symlink_repo("~/.oh-my-zsh/custom/plugins/zsh-pet") },
+  { "huawenyu/zsh-internal-compinit", build = "git switch master", lazy = false, build = symlink_repo("~/.oh-my-zsh/custom/plugins/zsh-internal-compinit") },
   { "zsh-users/zsh-completions",  lazy = false, build = symlink_repo("~/.oh-my-zsh/custom/plugins/zsh-completions") },
   { "dooblem/bsync",              lazy = false, build = symlink_repo("~/bin/repo-bsync") },
 

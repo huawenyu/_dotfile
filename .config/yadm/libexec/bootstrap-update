@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Usage: bootstrap update <tool>[,<tool>,...]
+# Summary: Update specific tools via nix
+# --dryrun    Show what would be updated without making changes
+#
+# Available tools: nvim, cscope
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../lib/bootstraplib"
+
+DRYRUN=
+
+show_help() {
+    grep -E '^# (Usage:|Summary:|Description[[:space:]]|--)' "$0" | sed 's/^# //'
+    echo ""
+    echo "Available tools: nvim, cscope"
+}
+
+# First non-option arg is the tool list
+TOOLS=
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -n|--dryrun) DRYRUN=1; shift ;;
+        -h|--help)   show_help; exit 0 ;;
+        --complete)  echo --dryrun -n -h --help nvim cscope; exit 0 ;;
+        -*)          echo "Unknown option: $1"; show_help; exit 1 ;;
+        *)           TOOLS="$1"; break ;;
+    esac
+done
+[[ -z "$TOOLS" ]] && { show_help; exit 1; }
+shift 2>/dev/null
+
+# Remaining args are options
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -n|--dryrun) DRYRUN=1; shift ;;
+        -h|--help)   show_help; exit 0 ;;
+        --complete)  echo --dryrun -n -h --help nvim cscope; exit 0 ;;
+        -*)          echo "Unknown option: $1"; show_help; exit 1 ;;
+        *)           echo "Unknown argument: $1"; show_help; exit 1 ;;
+    esac
+done
+
+IFS=',' read -ra TOOL_LIST <<< "$TOOLS"
+
+do_update_nvim() {
+    command -v nix >/dev/null || { echo "    nix not installed, skipping"; return; }
+    command -v nvim >/dev/null || { echo "    nvim not installed, skipping"; return; }
+    local cur_ver=$(nvim --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+    echo "    current: nvim $cur_ver"
+    if [[ -n "$DRYRUN" ]]; then
+        echo "    [dryrun] nix profile install nixpkgs#neovim"
+    else
+        nix profile install "nixpkgs#neovim" 2>/dev/null
+        local new_ver=$(nvim --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+        echo "    installed nvim $new_ver"
+    fi
+    local nvim_path=$(command -v nvim)
+    if [[ -n "$nvim_path" ]]; then
+        if [[ -n "$DRYRUN" ]]; then
+            echo "    [dryrun] sudo update-alternatives --install /usr/bin/vi vi $nvim_path"
+            echo "    [dryrun] sudo update-alternatives --install /usr/bin/vim vim $nvim_path"
+        else
+            sudo update-alternatives --install /usr/bin/vi vi "$nvim_path" 60 2>/dev/null
+            sudo update-alternatives --install /usr/bin/vim vim "$nvim_path" 60 2>/dev/null
+            sudo update-alternatives --set vi "$nvim_path" 2>/dev/null
+            sudo update-alternatives --set vim "$nvim_path" 2>/dev/null
+        fi
+        echo "    update-alternatives updated"
+    fi
+}
+
+do_update_cscope() {
+    command -v nix >/dev/null || { echo "    nix not installed, skipping"; return; }
+    command -v cscope >/dev/null || { echo "    cscope not installed, skipping"; return; }
+    local cur_ver=$(cscope -V 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+    echo "    current: cscope $cur_ver"
+    if [[ -n "$DRYRUN" ]]; then
+        echo "    [dryrun] nix profile install nixpkgs#cscope"
+    else
+        nix profile install "nixpkgs#cscope" 2>/dev/null
+        local new_ver=$(cscope -V 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+        echo "    installed cscope $new_ver"
+    fi
+}
+
+for tool in "${TOOL_LIST[@]}"; do
+    tool=$(echo "$tool" | xargs)
+    echo "  updating '$tool' ..."
+
+    case "$tool" in
+        nvim|vim) do_update_nvim ;;
+        cscope)   do_update_cscope ;;
+        *)        echo "    unknown tool '$tool', skipping" ;;
+    esac
+done
+
+echo "  update done."

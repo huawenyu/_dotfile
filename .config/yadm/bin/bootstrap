@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Dispatcher for bootstrap subcommands
+# Usage: bootstrap <subcommand> [args...]
+
+set -e
+
+SUBCOMMAND="${1:-help}"
+# Resolve BASH_SOURCE through symlinks so SUBDIR is always the real script dir
+REAL_SOURCE="$(readlink -f "${BASH_SOURCE[0]}")"
+SUBDIR="$(cd "$(dirname "$REAL_SOURCE")" && pwd)"
+LIBEXEC="$SUBDIR/../libexec"
+SHARE="$SUBDIR/../share"
+COMPLETIONS="$SUBDIR/../completions"
+
+# Handle -h/--help globally
+if [[ "$SUBCOMMAND" == "-h" || "$SUBCOMMAND" == "--help" ]]; then
+    exec "$LIBEXEC/bootstrap-help" "${@:2}"
+fi
+
+# Allow bootstrap help / bootstrap (no subcommand)
+if [[ "$SUBCOMMAND" == "help" ]] || [[ -z "$SUBCOMMAND" ]]; then
+    # Strip "help" from args so bootstrap-help gets the target subcommand in $1
+    if [[ "$1" == "help" ]]; then shift; fi
+    exec "$LIBEXEC/bootstrap-help" "$@"
+fi
+
+SUBCMD_PATH="$LIBEXEC/bootstrap-$SUBCOMMAND"
+
+if [[ ! -x "$SUBCMD_PATH" ]]; then
+    echo "bootstrap: unknown subcommand '$SUBCOMMAND'" >&2
+    echo "Run 'bootstrap help' for usage." >&2
+    exit 1
+fi
+
+shift
+exec "$SUBCMD_PATH" "$@"

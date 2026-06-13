@@ -85,7 +85,7 @@ COMPLETION_WAITING_DOTS="true"
 #      ctrl-d, to delete selected matches.
 #plugins=(lighthouse history-search-multi-word zsh-directory-history history-substring-search zsh-completions zsh-autosuggestions)
 #plugins=(history-substring-search zsh-completions zsh-local fzf-marks)
-plugins=(history-substring-search zsh-completions zsh-local mini zsh-pet)
+plugins=(history-substring-search zsh-completions zsh-local mini zsh-pet zsh-internal-compinit)
 autoload -U compinit && compinit
 
 # Folder permission "Insecure completion-dependent directories detected" #6835

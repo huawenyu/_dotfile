@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# Usage: bootstrap motd [--only] [--enable] [--disable]
+# Summary: Manage custom MOTD symlink
+# --only      Show only custom MOTD, disable others
+# --enable    Enable custom MOTD, restore others
+# --disable   Remove custom MOTD symlink
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../lib/bootstraplib"
+
+ONLY=
+ENABLE=
+DISABLE=
+DRYRUN=
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --complete)
+            echo --only --enable --disable -h --help --dryrun -n
+            exit 0
+            ;;
+        -h|--help)   grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
+        --dryrun|-n) DRYRUN=1; shift ;;
+        --only)      ONLY=1; shift ;;
+        --enable)    ENABLE=1; shift ;;
+        --disable)   DISABLE=1; shift ;;
+        -*)          echo "Unknown option: $1"; exit 1 ;;
+        *)           echo "Unknown argument: $1"; exit 1 ;;
+    esac
+done
+
+SUBDIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+MOTD_SRC="$SUBDIR/alt/99-custom-welcome"
+MOTD_DST="/etc/update-motd.d/99-custom-welcome"
+
+action_link() {
+    if [[ ! -f "$MOTD_SRC" ]]; then
+        echo "  source not found: $MOTD_SRC, skip"
+        return
+    fi
+    [[ -z "$DRYRUN" ]] && chmod 700 "$MOTD_SRC" 2>/dev/null
+    if [[ -L "$MOTD_DST" && "$(readlink -f "$MOTD_DST")" == "$MOTD_SRC" ]]; then
+        echo "  symlink already correct: $MOTD_DST -> $MOTD_SRC"
+    else
+        [[ -n "$DRYRUN" ]] && echo "  [DRYRUN] sudo rm -f $MOTD_DST" && echo "  [DRYRUN] sudo ln -s $MOTD_SRC $MOTD_DST" && return
+        sudo rm -f "$MOTD_DST" 2>/dev/null
+        sudo ln -s "$MOTD_SRC" "$MOTD_DST"
+        echo "  linked: $MOTD_DST -> $MOTD_SRC"
+    fi
+}
+
+action_disable_others() {
+    shopt -s nullglob
+    for f in /etc/update-motd.d/[0-8]*; do
+        [[ -f "$f" ]] || continue
+        [[ -n "$DRYRUN" ]] && echo "  [DRYRUN] sudo chmod -x $f" && continue
+        sudo chmod -x "$f" && echo "  disabled: $f"
+    done
+}
+
+action_enable_others() {
+    shopt -s nullglob
+    for f in /etc/update-motd.d/[0-8]*; do
+        [[ -f "$f" ]] || continue
+        [[ -n "$DRYRUN" ]] && echo "  [DRYRUN] sudo chmod +x $f" && continue
+        sudo chmod +x "$f" && echo "  enabled: $f"
+    done
+}
+
+if [[ -n "$ONLY" ]]; then
+    [[ -n "$DRYRUN" ]] && echo "  [DRYRUN] action 'motd-only' ..."
+    action_link
+    action_disable_others
+    echo "  custom motd active, others disabled"
+elif [[ -n "$ENABLE" ]]; then
+    [[ -n "$DRYRUN" ]] && echo "  [DRYRUN] action 'motd' ..."
+    action_link
+    action_enable_others
+    echo "  custom motd active, all motd scripts enabled"
+elif [[ -n "$DISABLE" ]]; then
+    [[ -n "$DRYRUN" ]] && echo "  [DRYRUN] action 'motd-disable' ..."
+    [[ -n "$DRYRUN" ]] && echo "  [DRYRUN] sudo rm -f $MOTD_DST" && echo "  symlink removed" && exit 0
+    sudo rm -f "$MOTD_DST"
+    echo "  symlink removed"
+else
+    # Default: same as --enable
+    [[ -n "$DRYRUN" ]] && echo "  [DRYRUN] action 'motd' ..."
+    action_link
+    action_enable_others
+    echo "  custom motd active"
+fi

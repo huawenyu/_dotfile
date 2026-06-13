@@ -1,0 +1,304 @@
+#!/usr/bin/env bash
+# Usage: bootstrap init [options]
+# Summary: Install tools and setup system
+# --mode      OS mode: none|basic|editor|dev|all (default: all)
+# --shell     Shell: bash|zsh (default: zsh, or bash on Forticlient)
+# --feature   Extra features: update,info,kvm,editor,python (comma-separated)
+# --class     Override yadm class (default: detected)
+# --dryrun    Show what would be done without doing it
+
+# Note: deliberately no 'set -e' — commands like sudo/nix-env return non-zero
+# in non-interactive environments and we handle errors explicitly.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../lib/bootstraplib"
+
+MODE="all"
+SHELL="zsh"
+FEATURES=","
+CLASS=
+DRYRUN=
+var_OS="$(uname -s)"
+
+# ── Argument parsing ───────────────────────────────────────────────────────────
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --complete)
+            echo --mode --shell --feature --class --dryrun -n -h --help
+            exit 0
+            ;;
+        -h|--help)
+            grep '^# ' "$0" | sed 's/^# //'
+            exit 0
+            ;;
+        --mode)      MODE="$2"; shift 2 ;;
+        --shell)     SHELL="$2"; shift 2 ;;
+        --feature)   FEATURES+="$2"; shift 2 ;;
+        --class)     CLASS="$2"; shift 2 ;;
+        --dryrun|-n) DRYRUN=1; shift ;;
+        -*)          echo "Unknown option: $1"; exit 1 ;;
+        *)           echo "Unknown argument: $1"; exit 1 ;;
+    esac
+done
+
+FEATURES+=","
+TOP_CMD=$(get_top_cmd "$0")
+CLASS="${CLASS:-$(get_class "$TOP_CMD")}"
+FEATURE_LIST=$(build_feature_list "$MODE" "$FEATURES" "$SHELL")
+
+echo "  top-cmd: '$TOP_CMD', class: '$CLASS'"
+
+# ── Dryrun ─────────────────────────────────────────────────────────────────────
+if [[ -n "$DRYRUN" ]]; then
+    echo "[dryrun mode - actions will be shown but not executed]"
+    echo "  MODE=$MODE SHELL=$SHELL FEATURES=$FEATURES"
+    echo "  FEATURE_LIST=$FEATURE_LIST"
+fi
+
+# ── OS-specific init ───────────────────────────────────────────────────────────
+do_linux() {
+    echo "Running Linux setup..."
+
+    [[ -z "$DRYRUN" ]] && sudo locale-gen en_US.UTF-8 && sudo dpkg-reconfigure --frontend=noninteractive locales
+
+    if [[ "$FEATURE_LIST" =~ ":ftUpdate:" ]]; then
+        echo "  apt update + upgrade ..."
+        [[ -z "$DRYRUN" ]] && sudo apt-get update -qq && sudo apt-get upgrade -qq -y
+        [[ -z "$DRYRUN" ]] && sudo apt clean autoclean && sudo apt autoremove -y
+    fi
+
+    if ! command -v apt >/dev/null; then
+        echo "Linux not properly configured: can't find apt"
+        exit 1
+    fi
+
+    # Install base deps first
+    [[ -z "$DRYRUN" ]] && sudo apt-get install -qq -y git curl
+
+    # Install nix
+    if ! command -v nix-env >/dev/null; then
+        echo "  installing nix ..."
+        [[ -z "$DRYRUN" ]] && sh <(curl -L https://nixos.org/nix/install) --daemon
+    fi
+
+    # Install yadm via nix if nix is available
+    command -v nix-env >/dev/null && nix-env -iA nixpkgs.yadm
+
+    # Clone yadm repo if not already done
+    if command -v yadm >/dev/null; then
+        if [[ ! -d "$HOME/.local/share/yadm/repo.git" ]]; then
+            echo "  cloning yadm repo ..."
+            [[ -z "$DRYRUN" ]] && yadm clone https://github.com/huawenyu/_dotfile.git
+        else
+            echo "  yadm repo already exists, skipping clone"
+        fi
+    fi
+
+    # Install packages
+    local -a packages
+    mapfile -t packages < <(resolve_packages "$FEATURE_LIST")
+    if [[ ${#packages[@]} -gt 0 ]]; then
+        echo "  installing ${#packages[@]} packages ..."
+        [[ -z "$DRYRUN" ]] && sudo apt-get install -qq -y "${packages[@]}"
+        [[ -z "$DRYRUN" ]] && sudo apt clean autoclean && sudo apt autoremove -y
+    fi
+}
+
+do_macos() {
+    echo "Running macOS setup..."
+    if ! command -v brew >/dev/null; then
+        echo "Homebrew not installed. Please install Homebrew first."
+        exit 1
+    fi
+    [[ -z "$DRYRUN" ]] && brew update && brew install git vim tmux
+}
+
+do_wsl() {
+    echo "Running WSL setup..."
+
+    [[ -z "$DRYRUN" ]] && sudo locale-gen en_US.UTF-8 && sudo dpkg-reconfigure --frontend=noninteractive locales
+
+    if [[ "$FEATURE_LIST" =~ ":ftUpdate:" ]]; then
+        echo "  apt update + upgrade ..."
+        [[ -z "$DRYRUN" ]] && sudo apt-get update -qq && sudo apt-get upgrade -qq -y
+        [[ -z "$DRYRUN" ]] && sudo apt clean autoclean && sudo apt autoremove -y
+    fi
+
+    if ! command -v apt >/dev/null; then
+        echo "WSL not properly configured: can't find apt"
+        exit 1
+    fi
+
+    [[ -z "$DRYRUN" ]] && sudo apt-get install -qq -y git curl
+
+    if ! command -v nix-env >/dev/null; then
+        echo "  installing nix ..."
+        [[ -z "$DRYRUN" ]] && sh <(curl -L https://nixos.org/nix/install) --daemon
+    fi
+    command -v nix-env >/dev/null && nix-env -iA nixpkgs.yadm
+
+    if command -v yadm >/dev/null; then
+        if [[ ! -d "$HOME/.local/share/yadm/repo.git" ]]; then
+            echo "  cloning yadm repo ..."
+            [[ -z "$DRYRUN" ]] && yadm clone https://github.com/huawenyu/_dotfile.git
+        else
+            echo "  yadm repo already exists, skipping clone"
+        fi
+    fi
+}
+
+# ── Common tasks ───────────────────────────────────────────────────────────────
+do_common() {
+    # Python
+    if [[ "$FEATURE_LIST" =~ ":ftPython:" ]]; then
+        echo "  task 'python' ..."
+        if [[ -z "$DRYRUN" ]]; then
+            command -v python3 >/dev/null || sudo apt-get install -y python3
+            if [[ ! -f /usr/bin/python ]]; then
+                command -v python3 >/dev/null && sudo ln -s /usr/bin/python3 /usr/bin/python
+            fi
+            command -v pip3 >/dev/null || sudo apt-get install -y python3-pip
+        fi
+        echo "  task 'python' done!"
+    fi
+
+    # IDE (neovim setup)
+    if [[ "$FEATURE_LIST" =~ ":ftIDE:" ]]; then
+        echo "  task 'ide' ..."
+        if [[ -z "$DRYRUN" ]]; then
+            command -v pip3 >/dev/null || sudo apt-get install -y python3-pip
+            pip3 show pip >/dev/null && echo "pip ok" || sudo pip3 install -U pip
+            pip3 show meson >/dev/null && echo "meson ok" || sudo pip3 install meson
+            pip3 show pynvim >/dev/null && echo "pynvim ok" || sudo pip3 install pynvim
+        fi
+
+        if [[ ! -f ~/.config/nvim/autoload/plug.vim ]]; then
+            echo "  installing vim-plug ..."
+            [[ -z "$DRYRUN" ]] && curl -fLo ~/.config/nvim/autoload/plug.vim --create-dirs \
+                https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/autoload/plug.vim
+        fi
+        if [[ ! -f ~/.config/nvim/init.vim ]]; then
+            [[ -z "$DRYRUN" ]] && curl -fLo ~/.config/nvim/init.vim --create-dirs \
+                https://raw.githubusercontent.com/huawenyu/_dotfile/ubuntu/.config/nvim/init.vim
+        fi
+
+        if command -v nvim >/dev/null; then
+            local nvim_path=$(command -v nvim)
+            [[ -z "$DRYRUN" ]] && sudo update-alternatives --install /usr/bin/vi vi "$nvim_path" 60 2>/dev/null
+            [[ -z "$DRYRUN" ]] && sudo update-alternatives --install /usr/bin/vim vim "$nvim_path" 60 2>/dev/null
+            [[ -z "$DRYRUN" ]] && sudo update-alternatives --set vi "$nvim_path" 2>/dev/null
+            [[ -z "$DRYRUN" ]] && sudo update-alternatives --set vim "$nvim_path" 2>/dev/null
+        fi
+        echo "  task 'ide' done!"
+    fi
+
+    # KVM/libvirt
+    if [[ "$FEATURE_LIST" =~ ":ftVirt:" ]]; then
+        echo "  task 'virt' ..."
+        [[ -z "$DRYRUN" ]] && sudo usermod -aG libvirt "$USER"
+        [[ -z "$DRYRUN" ]] && sudo usermod -aG kvm "$USER"
+        echo "  task 'virt' done!"
+    fi
+
+    # tmux TPM
+    if command -v tmux >/dev/null; then
+        if [[ ! -d ~/.tmux/plugins/tpm ]]; then
+            echo "  installing tmux TPM ..."
+            [[ -z "$DRYRUN" ]] && git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+        fi
+    fi
+
+    # fgt2eth.pl helper
+    if command -v fgt2eth.pl >/dev/null && command -v text2pcap >/dev/null; then
+        [[ -z "$DRYRUN" ]] && sudo ln -sf /usr/bin/text2pcap /usr/sbin/text2pcap
+    fi
+
+    # bash
+    if [[ "$FEATURE_LIST" =~ ":ftBash:" ]]; then
+        echo "  task 'bash' ..."
+        if [[ -z "$DRYRUN" ]] && [[ ! -d ~/.oh-my-bash ]]; then
+            echo "  installing oh-my-bash ..."
+            bash -c "$(curl -fsSL https://raw.githubusercontent.com/ohmybash/oh-my-bash/master/tools/install.sh)"
+        fi
+        # Install bash/zsh completions for bootstrap and yadm bootstrap
+        local bash_comp="/etc/bash_completion.d/bootstrap"
+        local bash_comp_src="$SCRIPT_DIR/../completions/bash/bootstrap"
+        if [[ -f "$bash_comp_src" ]]; then
+            if [[ -z "$DRYRUN" ]]; then
+                sudo tee "$bash_comp" < "$bash_comp_src" > /dev/null
+                echo "  bash completion installed: $bash_comp"
+            else
+                echo "  [dryrun] install bash completion to $bash_comp"
+            fi
+        fi
+        echo "  task 'bash' done!"
+    fi
+
+    # zsh
+    if [[ "$FEATURE_LIST" =~ ":ftZsh:" ]]; then
+        echo "  task 'zsh' ..."
+        mkdir -p ~/.oh-my-zsh/custom/plugins
+        [[ -z "$DRYRUN" ]] && git clone https://github.com/huawenyu/zsh-local.git \
+            ~/.oh-my-zsh/custom/plugins/zsh-local 2>/dev/null || echo "  zsh-local already exists"
+        [[ -z "$DRYRUN" ]] && git clone https://github.com/zsh-users/zsh-completions \
+            ~/.oh-my-zsh/custom/plugins/zsh-completions 2>/dev/null || echo "  zsh-completions already exists"
+        [[ -z "$DRYRUN" ]] && git clone https://github.com/jeffreytse/zsh-vi-mode \
+            ~/.oh-my-zsh/custom/plugins/zsh-vi-mode 2>/dev/null || echo "  zsh-vi-mode already exists"
+        # Install oh-my-zsh (requires interaction — skip in dryrun)
+        if [[ -z "$DRYRUN" ]] && [[ ! -d ~/.oh-my-zsh ]]; then
+            echo "  installing oh-my-zsh (will prompt for shell change)..."
+            sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+        fi
+        # Install zsh completion for bootstrap and yadm bootstrap
+        local zsh_comp_src="$SCRIPT_DIR/../completions/zsh/_bootstrap"
+        local zsh_comp_dst="$HOME/.oh-my-zsh/completions/_bootstrap"
+        if [[ -f "$zsh_comp_src" ]]; then
+            if [[ -z "$DRYRUN" ]]; then
+                mkdir -p "$(dirname "$zsh_comp_dst")"
+                cp "$zsh_comp_src" "$zsh_comp_dst"
+                echo "  zsh completion installed: $zsh_comp_dst"
+            else
+                echo "  [dryrun] install zsh completion to $zsh_comp_dst"
+            fi
+        fi
+        echo "  task 'zsh' done!"
+    fi
+
+    # nix
+    if [[ "$FEATURE_LIST" =~ ":ftNix:" ]]; then
+        echo "  task 'nix' ..."
+        if ! command -v nix-env >/dev/null; then
+            echo "  installing nix (will prompt) ..."
+            [[ -z "$DRYRUN" ]] && sh <(curl -L https://nixos.org/nix/install) --daemon
+        fi
+        if [[ "$FEATURE_LIST" =~ ":ftNixTool:" ]]; then
+            [[ -z "$DRYRUN" ]] && nix-env -iA nixpkgs.presenterm
+            [[ -z "$DRYRUN" ]] && nix-env -iA nixpkgs.clang-format
+            [[ -z "$DRYRUN" ]] && nix-env -iA nixpkgs.clang-tools
+        fi
+        echo "  task 'nix' done!"
+    fi
+
+    # Custom MOTD
+    if [[ "$FEATURE_LIST" =~ ":ftInfo:" ]]; then
+        echo "  task 'info' ..."
+        local motd_src="$SCRIPT_DIR/../alt/99-custom-welcome"
+        local motd_dst="/etc/update-motd.d/99-custom-welcome"
+        if [[ -f "$motd_src" ]]; then
+            [[ -z "$DRYRUN" ]] && sudo cp "$motd_src" "$motd_dst" && sudo chmod +x "$motd_dst"
+            echo "  custom motd installed"
+        fi
+        echo "  task 'info' done!"
+    fi
+}
+
+# ── Main ───────────────────────────────────────────────────────────────────────
+case "$var_OS" in
+    Linux)     do_linux ;;
+    Darwin)    do_macos ;;
+    MINGW*|CYGWIN*|MSYS*) do_wsl ;;
+    *)         echo "Unsupported OS: $var_OS"; exit 1 ;;
+esac
+
+do_common
+echo "Bootstrap complete!"

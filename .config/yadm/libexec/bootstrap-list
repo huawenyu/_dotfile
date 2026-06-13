@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Usage: bootstrap list
+# Summary: List available tools and their install status
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../lib/bootstraplib"
+
+if [[ "$1" == "--complete" ]]; then
+    exit 0
+fi
+
+show_tool() {
+    local tool="$1" version=""
+    if command -v "$tool" >/dev/null 2>&1; then
+        version=$("$tool" --version 2>/dev/null | head -1 || "$tool" -V 2>&1 | head -1 || echo "ok")
+        echo "  [installed] $tool: $version"
+    else
+        echo "  [missing  ] $tool"
+    fi
+}
+
+echo ""
+echo "  Available tools:"
+echo "  ==============="
+
+show_tool nvim
+show_tool cscope
+show_tool git
+show_tool tmux
+show_tool zsh
+show_tool python3
+show_tool clangd
+show_tool rg       # ripgrep
+show_tool bat
+show_tool yadm
+
+echo ""
+echo "  Done."
