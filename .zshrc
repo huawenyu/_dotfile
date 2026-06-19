@@ -116,3 +116,6 @@ if [ -e "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then . "$HOME/.nix-profile/
 # Don't do this, will make shell mess: Removes duplicate path
 #export PATH=$(echo $PATH | tr ':' '\n' | sort -u | tr '\n' ':')
 
+
+# opencode
+export PATH=/home/hyu/.opencode/bin:$PATH
