@@ -6,6 +6,8 @@ default_layout "default"
 
 show_startup_tips false
 session_serialization false
+stylized_underlines false
+osc8_hyperlinks false
 
 // Disable Zellij serialization to save RAM since tmux handles it
 scrollback_lines_to_serialize 0
