@@ -51,3 +51,7 @@ snippet:
           # - ["g++", "-std=c++20", "snippet.cpp", "-o", "snippet"]
           # Now run it mermaid-ascii -f ./test.mermaid
           - ["mermaid-ascii", "-f", "$pwd/snippet.mermaid"]
+      c:
+        filename: "snippet.c"
+        commands:
+          - ["gcc", "-E", "-P", "-std=gnu11", "$pwd/snippet.c"]

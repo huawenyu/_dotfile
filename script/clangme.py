@@ -1,242 +1,207 @@
 #!/usr/bin/env python3
 """
 Usage:
-    clangme.py -a macro filename
+    clangme.py -a macro --file filename.c
     clangme.py --file stats_def.c
 
+If compile_commands.json exists in cwd (or a parent), uses jq to find the
+exact compile command for the target file, then replaces -c/-o with -E -P
+for preprocessing. Otherwise, runs clang with minimal flags (no -I paths).
 """
 
 import os
+import sys
 import json
+import shlex
 import shutil
 import argparse
 import subprocess
 from pathlib import Path
 
-__version__ = "0.1.1.dev0"
-
-class ScriptError(Exception):
-    pass
-
-
-def find_file_position_in_json(json_file, target_file):
-    """Uses grep to find the line number where the file entry starts."""
-    target_filename = Path(target_file).name
-    # Use grep to find the line containing '"file": ".*target_filename"'
-    cmd = [
-        "grep",
-        "-n",  # Show line numbers
-        f'"file": ".*{target_filename}"',
-        json_file
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        return None  # Not found
-
-    # Extract the line number (e.g., "42: ...")
-    line_num = int(result.stdout.split(":")[0])
-    return line_num
-
-def extract_json_block(json_file, start_line, out_file):
-    """Extracts a single JSON block starting near `start_line`."""
-    with open(json_file, 'r') as f:
-        lines = f.readlines()
-
-    # Find the start of the block (look for '{' before start_line)
-    block_start = None
-    for i in range(start_line - 1, max(0, start_line - 300), -1):
-        if "{" in lines[i]:
-            block_start = i
-            break
-
-    if block_start is None:
-        return None
-
-    # Find the end of the block (look for '}' after start_line)
-    block_end = None
-    skipline = 0
-    jsonLines = []
-    for i in range(block_start, min(len(lines), block_start + 300)):
-        if i == skipline:
-            continue
-
-        #  oneline = lines[i]
-        #  print(f"Lines {i}: {oneline}")
-        if '"-c"' in lines[i]:
-            jsonLines.append('"-v",')
-            jsonLines.append('"-std=c11",')
-            jsonLines.append('"-ferror-limit=4",')
-            #  jsonLines.append('"-include",')
-            #  jsonLines.append('"stdint.h",')
-            jsonLines.append('"-Wno-microsoft-anon-tag",')
-        elif ('"-g"' in lines[i] or
-              '"-fno-reorder-functions"' in lines[i] or
-              '"-fno-unit-at-a-time"' in lines[i] or
-              '"-Wno-unused-but-set-variable"' in lines[i] or
-              '"-Werror"' in lines[i] or
-              '"-Wall"' in lines[i]):
-            continue
-        elif '"-o"' in lines[i]:
-            jsonLines.append('"-o",')
-            jsonLines.append(f'"{out_file}",')
-            jsonLines.append('"-E",')
-            jsonLines.append('"-P",')
-            jsonLines.append('"-CC",')
-            jsonLines.append('"-dD",')
-            skipline = i + 1
-        elif "}" in lines[i]:
-            block_end = i
-            jsonLines.append('}')
-            break
-        else:
-            jsonLines.append(lines[i])
-
-    if block_end is None:
-        return None
-
-    # Parse just this block as JSON: lines[block_start:block_end + 1]
-    block = "".join(jsonLines)
-    try:
-        print(f"Json: {block}")
-        return json.loads(block)
-    except json.JSONDecodeError as e:
-        print(f"Failed to decode JSON: {e}")
-        return None
-
-def run_clang_for_file(json_file, target_file, out_file, clang_path="clang"):
-    if os.path.exists(json_file):
-        """
-        1. Uses grep to find the file’s position.
-        2. Extracts only its JSON block.
-        3. Runs the clang command.
-        """
-        line_num = find_file_position_in_json(json_file, target_file)
-        if not line_num:
-            print(f"Error: {target_file} not found in the existed {json_file}")
-            return
-
-        entry = extract_json_block(json_file, line_num, out_file)
-        if not entry:
-            print(f"Error: Could not parse entry for {target_file}")
-            return
-
-        # Build the command (supports both "command" and "arguments")
-        if "arguments" in entry:
-            args = entry["arguments"].copy()
-            args[0] = clang_path
-            command = args
-        else:
-            command = entry["command"].split()
-            command[0] = clang_path
-
-        print(f"Running in {entry['directory']}:")
-        print(" ".join(command))
-
-        subprocess.run(command, cwd=entry["directory"], check=True)
-    else:
-        subprocess.run([f"{clang_path}", "-Wall", '-Wno-unused-command-line-argument', "-O0", "-g", "-std=c11",
-                        "-I.", "-I./include",
-                        "-I./migbase", "-I./migbase/include", "-I./migbase/include/wad",
-                        "-I./include/kernel/include",
-                        "-I./fgtutil",
-                        '-lstdc++', '-lm', '-msse3',
-                        '-o', f"{out_file}",
-                        '-E', '-P', '-CC', '-dD',
-                        target_file],
-                       check=True)
-
-
-def clang_safe_format(file_path, config_path):
-    try:
-        # clang-format -style=file:~/workref/.clang-format --assume-filename=log.c -i log.i
-
-        if os.path.exists(config_path):
-            subprocess.run(["clang-format", "-i", f"--style=file:{config_path}", "--assume-filename=log.c", file_path],
-                    check=True)
-        else:
-            subprocess.run(["clang-format", "-i", f"--style=file", "--assume-filename=log.c", file_path],
-                    check=True)
-    except FileNotFoundError:
-        print("clang-format executable not found")
-        print(f"Install clang tools:")
-        print(f"  nix-env -iA nixpkgs.clang-format")
-        print(f"  nix-env -iA nixpkgs.clang-tools")
-    except subprocess.CalledProcessError as e:
-        print(f"clang-format failed with exit code {e.returncode}")
-        if e.stderr:
-            print(f"Error: {e.stderr}")
+__version__ = "0.2.0.dev0"
 
 
 def is_tool_available(name):
     return shutil.which(name) is not None
 
 
-def main():
-    parser = argparse.ArgumentParser()
+# ==================== compile_commands.json path ====================
 
+def find_compile_db(start_dir="."):
+    """Search for compile_commands.json in cwd and parent directories."""
+    current = Path(start_dir).resolve()
+    while True:
+        candidate = current / "compile_commands.json"
+        if candidate.exists():
+            return str(candidate)
+        if current.parent == current:
+            break
+        current = current.parent
+    return None
+
+
+# ==================== jq-based entry lookup ====================
+
+def find_compile_entry_via_jq(json_file, target_file):
+    """Use jq to find the first compile entry matching target_file by basename.
+
+    Returns the JSON entry dict or None.
+    """
+    target_basename = Path(target_file).name
+
+    # Get the first matching entry as compact JSON
+    jq_filter = f'[.[] | select(.file | endswith("{target_basename}"))][0]'
+    cmd = ["jq", "-c", jq_filter, json_file]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        return None
+
+    output = result.stdout.strip()
+    if not output or output == "null":
+        return None
+
+    try:
+        return json.loads(output)
+    except json.JSONDecodeError:
+        return None
+
+
+# ==================== command transformation ====================
+
+def transform_command_for_macro(args, out_file, clang_path="clang"):
+    """Transform compile args into preprocess args.
+
+    - Replace compiler with clang_path
+    - Remove -c (implied by -E)
+    - Remove -o <old_output> (replaced with -o <out_file>)
+    - Keep all -I, -D, -U, -std= flags and the source file
+    - Add -E -P -CC -dD at the end
+    """
+    result = [clang_path]
+    skip_next = False
+
+    for i in range(1, len(args)):
+        if skip_next:
+            skip_next = False
+            continue
+
+        arg = args[i]
+
+        if arg == "-c":
+            continue
+        elif arg == "-o":
+            skip_next = True
+            continue
+        else:
+            result.append(arg)
+
+    result.extend(["-E", "-P", "-CC", "-dD", "-o", out_file])
+    return result
+
+
+# ==================== main runner ====================
+
+def run_clang_for_file(compile_db, target_file, out_file, clang_path="clang"):
+    """Run clang to preprocess target_file.
+
+    If compile_db exists and contains the target file, uses the compile
+    command from it (with -c/-o replaced by -E -P).
+    Otherwise, runs clang with minimal flags.
+    """
+    if compile_db and os.path.exists(compile_db):
+        entry = find_compile_entry_via_jq(compile_db, target_file)
+        if entry:
+            # Get args from command string or arguments array
+            if "command" in entry:
+                args = shlex.split(entry["command"])
+            elif "arguments" in entry:
+                args = list(entry["arguments"])
+            else:
+                print(f"Warning: entry has no command or arguments, using fallback")
+                args = None
+
+            if args:
+                command = transform_command_for_macro(args, out_file, clang_path)
+                directory = entry.get("directory", ".")
+                print(f"Using compile_commands.json: {compile_db}")
+                print(f"  cwd: {directory}")
+                print(f"  cmd: {' '.join(command)}")
+                subprocess.run(command, cwd=directory, check=True)
+                return
+        else:
+            print(f"Warning: {Path(target_file).name} not found in {compile_db}, using fallback")
+
+    # Fallback: minimal flags, no -I paths
+    command = [clang_path, "-E", "-P", "-std=gnu11", "-o", out_file, target_file]
+    print("Running (no compile_commands.json):")
+    print(f"  cmd: {' '.join(command)}")
+    subprocess.run(command, check=True)
+
+
+# ==================== formatting ====================
+
+def clang_safe_format(file_path, config_path):
+    """Format file with clang-format."""
+    try:
+        if os.path.exists(config_path):
+            subprocess.run(
+                ["clang-format", "-i", f"--style=file:{config_path}",
+                 "--assume-filename=log.c", file_path],
+                check=True,
+            )
+        else:
+            subprocess.run(
+                ["clang-format", "-i", "--style=file",
+                 "--assume-filename=log.c", file_path],
+                check=True,
+            )
+    except FileNotFoundError:
+        print("clang-format executable not found")
+        print("Install clang tools:")
+        print("  nix-env -iA nixpkgs.clang-format")
+    except subprocess.CalledProcessError as e:
+        print(f"clang-format failed with exit code {e.returncode}")
+        if e.stderr:
+            print(f"Error: {e.stderr}")
+
+
+# ==================== CLI ====================
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Preprocess C files using clang via compile_commands.json"
+    )
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--file', required=True, help='Input file (required)')
     parser.add_argument('--config', default='.clang-format',
-                        help='Configuration file')
-    parser.add_argument('--action', default='macro', choices=['macro', 'compile', 'default'],
-                        help='The action of clang')
+                        help='Configuration file for clang-format')
+    parser.add_argument('--action', '-a', default='macro',
+                        choices=['macro', 'compile', 'default'],
+                        help='The action of clang (default: macro)')
     parser.add_argument('--out', default='log.i',
-                        help='Output file (required)')
+                        help='Output file (default: log.i)')
+    parser.add_argument('--compile-db', default=None,
+                        help='Path to compile_commands.json (auto-detected if omitted)')
     args = parser.parse_args()
 
-    try:
-        validate_args(args)
-    except argparse.ArgumentError as e:
-        parser.error(str(e))
+    # Find compile_commands.json
+    compile_db = args.compile_db
+    if compile_db is None:
+        compile_db = find_compile_db()
 
-    #  if args.out == '-':
-    #      output = sys.stdout
-    #  else:
-    #      output = open(args.out, 'wb')
-
-    compile_db = "compile_commands.json"  # Large JSON file
-    custom_clang = "clang"  # Specific clang version
+    clang_path = "clang"
 
     try:
-        run_clang_for_file(compile_db, args.file, args.out, custom_clang)
+        run_clang_for_file(compile_db, args.file, args.out, clang_path)
 
         if os.path.exists(args.out):
             print(f"===\nFormatting '{args.out}', please wait ...\n")
             clang_safe_format(args.out, args.config)
-
-    finally:
-        pass
-
-    #  output.flush()
-    #  output.close()
-
-
-def validate_args(args):
-    if not all([args.file, args.out]):
-        raise argparse.ArgumentError(None, "Both --file and --out are required")
-
-
-def print_warning(e):
-    print("WARNING: %s" % str(e), file=sys.stderr)
-
-
-def print_error(e):
-    print("ERROR: %s" % str(e), file=sys.stderr)
-
-def cli_main():
-    try:
-        main()
-    except IOError as e:
-        import errno
-        if e.errno == errno.EPIPE:
-            # Exit saying we got SIGPIPE.
-            sys.exit(141)
-        raise
-    except ScriptError as e:
-        print("ERROR: %s" % str(e), file=sys.stderr)
+    except subprocess.CalledProcessError as e:
+        print(f"Error: command failed with exit code {e.returncode}")
         sys.exit(1)
 
-# Example Usage
-if __name__ == "__main__":
-    cli_main()
 
+if __name__ == "__main__":
+    main()
