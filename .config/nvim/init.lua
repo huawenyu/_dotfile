@@ -886,6 +886,26 @@ local plugins = {
         return string.format("%d:%d/%d", current, column, total)
       end
 
+      local function zellij_tab()
+        local f = io.popen("zellij action current-tab-info 2>/dev/null")
+        if not f then return "" end
+
+        local out = f:read("*a")
+        f:close()
+
+        -- clean control characters
+        out = out:gsub("%z", ""):gsub("\r", "")
+
+        -- extract only name line
+        local name = out:match("name:%s*([^\n]+)")
+        if not name then return "" end
+
+        -- trim spaces
+        name = name:gsub("%s+", "")
+
+        return " " .. name
+      end
+
       -- 2. Setup lualine with the function in lualine_z
       require('lualine').setup({
         options = {
@@ -899,10 +919,11 @@ local plugins = {
           globalstatus = true,
         },
         sections = {
+          lualine_a = { zellij_tab },
           lualine_z = { line_info }
         },
         inactive_sections = {
-          lualine_a = {}, lualine_b = {}, lualine_c = { 'filename' },
+          lualine_a = { zellij_tab }, lualine_b = {}, lualine_c = { 'filename' },
           lualine_x = { 'location' }, lualine_y = {}, lualine_z = {}
         },
         extensions = { 'fugitive' }

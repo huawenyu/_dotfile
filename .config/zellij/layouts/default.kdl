@@ -1,5 +1,5 @@
 // ==========================================
-// Zellij Screen Layout (Top Tab-Bar Only)
+// Zellij Screen Layout: default
 // ==========================================
 layout {
     tab name="work" {
@@ -24,8 +24,6 @@ layout {
 
     tab name="wsl" focus=true {
         pane {
-            //command "ssh";
-            //args ["user@host"];
         }
     }
 }
