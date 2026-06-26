@@ -887,23 +887,35 @@ local plugins = {
       end
 
       local function zellij_tab()
-        local f = io.popen("zellij action current-tab-info 2>/dev/null")
-        if not f then return "" end
+        local function has_zellij()
+          return vim.fn.executable("zellij") == 1
+        end
 
-        local out = f:read("*a")
-        f:close()
+        local name = nil
 
-        -- clean control characters
-        out = out:gsub("%z", ""):gsub("\r", "")
+        if has_zellij() then
+          local f = io.popen("zellij action current-tab-info 2>/dev/null")
+          if f then
+            local out = f:read("*a") or ""
+            f:close()
+            name = out:match("name:%s*([^\n\r]+)")
+          end
+        else
+          local f = io.open("/etc/info", "r")
+          if not f then return nil end
 
-        -- extract only name line
-        local name = out:match("name:%s*([^\n]+)")
-        if not name then return "" end
+          local content = f:read("*a")
+          f:close()
 
-        -- trim spaces
-        name = name:gsub("%s+", "")
+          -- extract [name:work]
+          name = content:match("%[name:(.-)%]")
+        end
 
-        return " " .. name
+        if not name or name == "" then
+          return ""
+        end
+
+        return " " .. name:gsub("%s+", "")
       end
 
       -- 2. Setup lualine with the function in lualine_z
