@@ -210,28 +210,28 @@ if command -v zellij >/dev/null 2>&1; then
     Zellij_Tab=$(zellij action list-tabs 2>/dev/null | tail -n +2 | wc -l)
 fi
 
-Zellij_info="Zellij=no"
+Zellij_info="Zellij:"
 if [ -n "$ZELLIJ" ]; then
     Zellij_focus=$(zellij action current-tab-info 2>/dev/null | awk -F': ' '/name:/ {print $2}')
-    Zellij_info="Zellij Session=[$ZELLIJ:$Zellij_focus] with $Zellij_Tab tabs open"
+    Zellij_info+="sess=[$Zellij_focus:*$ZELLIJ*:$Zellij_Tab]"
 fi
 
 
-Yadm_info="yadm=no"
+Yadm_info="yadm:"
 if command -v yadm >/dev/null 2>&1; then
-    Yadm_class=$(yadm config local.class 2>/dev/null)
+    Yadm_info+="class=$(yadm config local.class 2>/dev/null)"
 fi
 
-Nvim_info="nvim:no"
+Nvim_info="nvim:"
 if command -v nvim >/dev/null 2>&1; then
-    Nvim_info=$(nvim --version | sed -n 's/^NVIM \(v[0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
+    Nvim_info+=$(nvim --version | sed -n 's/^NVIM \(v[0-9]\+\.[0-9]\+\.[0-9]\+\).*/\1/p')
 fi
 
 
-Tmux_info="tmux=no"
+Tmux_info="tmux:"
 if command -v tmux >/dev/null 2>&1; then
-    Tmux_info="'$(tmux -V)'"
-    Tmux_info+=",session=$(tmux list-sessions | awk '/\(attached\)/ {print $1}' | sed 's/:$//'):$(tmux list-sessions 2>/dev/null | wc -l)"
+    Tmux_info+="'$(tmux -V)'"
+    Tmux_info+=",sess=$(tmux list-sessions | awk '/\(attached\)/ {print $1}' | sed 's/:$//'):$(tmux list-sessions 2>/dev/null | wc -l)"
 fi
 
 
@@ -257,7 +257,7 @@ $mem_top_processes${C0}
 ${C1} ++++++++++++++++++++++++: ${C3}User Data${C1} :+++++++++++++++++++++++++++++
 ${C1} + ${C3}Username       ${C1}=  ${C4}$USER ${C0}($USERGROUP) ${C4}who=$(who | grep -c "$USER")
 ${C1} + ${C3}Last Login     ${C1}=  ${C4}$last_login_user from $last_login_ip
-${C1} + ${C3}Env${C1}: ${C4}${Zellij_info} "tmux=$Tmux_info" "yadm.class=$Yadm_class" "nvim=$Nvim_info"
+${C1} + ${C3}Env${C1}  ${C4}${Zellij_info} $Tmux_info $Yadm_info $Nvim_info
 ${C1} ++++++++++++++++++++: ${C3}Helpful Information${C1} :+++++++++++++++++++++++
 ${C1} + ${C3}Administrators ${C1}=  ${C4}$ADMINSLIST
 ${C1} + ${C3}OpenPorts IPv4 ${C1}=  ${C4}$OPEN_PORTS_IPV4
