@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# vim: setlocal autoindent cindent et ts=4 sw=4 sts=4:
+# vim: autoindent cindent et ts=4 sw=4 sts=4:
 #
 ########################################################################
 # Color esthetics
