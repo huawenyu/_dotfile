@@ -4,8 +4,13 @@
 
 set -e
 
+if [[ "${1:-}" == "--summary" ]]; then
+    echo "List available/installed tools"
+    exit 0
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../lib/bootstraplib"
+source "${SCRIPT_DIR}/lib/bootstraplib"
 
 if [[ "$1" == "--complete" ]]; then
     exit 0

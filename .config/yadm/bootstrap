@@ -1,1 +1,82 @@
-bin/bootstrap
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Dispatcher for bootstrap subcommands
+# Usage: bootstrap <command> [args...]
+
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SELF="$(basename "${BASH_SOURCE[0]}")"
+
+cmd="${1:-help}"
+
+case "$cmd" in
+    __commands)
+        for f in "$DIR/${SELF}-"*; do
+            [ -x "$f" ] || continue
+            echo "${f##*/}" | sed "s/^${SELF}-//"
+        done | sort
+        exit 0 ;;
+    __complete)
+        shift 2>/dev/null || true; p="$DIR/${SELF}-${1:-}"; [[ -x "$p" ]] && "$p" --complete 2>/dev/null; exit 0 ;;
+    __help)
+        shift 2>/dev/null || true; p="$DIR/${SELF}-${1:-}"; [[ -x "$p" ]] && "$p" --summary 2>/dev/null; exit 0 ;;
+    completion)
+        shift 2>/dev/null || true; s="${1:-bash}"
+        case "$s" in
+            bash) sed "s/%CMD%/${SELF}/g" <<'COMPEOF'
+_%CMD%() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    if [[ $COMP_CWORD -eq 1 ]]; then
+        COMPREPLY=($(compgen -W "$(%CMD% __commands)" -- "$cur"))
+    else
+        local cmd="${COMP_WORDS[1]}"
+        COMPREPLY=($(compgen -W "$(%CMD% __complete "$cmd")" -- "$cur"))
+    fi
+}
+complete -F _%CMD% %CMD%
+COMPEOF
+                ;;
+            zsh) sed "s/%CMD%/${SELF}/g" <<'COMPEOF'
+_%CMD%() {
+    local -a results
+    if [[ $CURRENT -eq 2 ]]; then
+        results=("${(@f)$(%CMD% __commands)}")
+    else
+        results=("${(@f)$(%CMD% __complete "${words[2]}")}")
+    fi
+    _describe values results
+}
+compdef _%CMD% %CMD%
+COMPEOF
+                ;;
+            *)
+                echo "$SELF: unknown shell '$s'" >&2
+                echo "Usage: $SELF completion bash|zsh" >&2
+                exit 1 ;;
+        esac
+        exit 0 ;;
+    help|-h|--help)
+        sub="${2:-}"
+        if [[ -n "$sub" && "$sub" != "help" ]]; then
+            p="$DIR/${SELF}-$sub"; [[ -x "$p" ]] && exec "$p" --help
+            echo "$SELF: unknown command '$sub'" >&2; exit 1
+        fi
+        echo "Usage: $SELF <command> [options]"; echo; echo "Commands:"; echo
+        for f in "$DIR/${SELF}-"*; do
+            [[ -x "$f" ]] || continue
+            n="${f##*/}"; n="${n#${SELF}-}"
+            s="$("$f" --summary 2>/dev/null || true)"
+            printf "  %-15s %s\n" "$n" "$s"
+        done | sort
+        echo; echo "Run '$SELF help <command>' for details."; exit 0 ;;
+esac
+
+shift || true
+p="$DIR/${SELF}-${cmd}"
+if [[ -x "$p" ]]; then
+    exec "$p" "$@"
+fi
+echo "$SELF: unknown command '$cmd'" >&2
+echo "Run '$SELF --help' for usage." >&2
+exit 1

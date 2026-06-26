@@ -7,8 +7,13 @@
 
 set -e
 
+if [[ "${1:-}" == "--summary" ]]; then
+    echo "Manage custom MOTD (message of the day)"
+    exit 0
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../lib/bootstraplib"
+source "${SCRIPT_DIR}/lib/bootstraplib"
 
 ONLY=
 ENABLE=
@@ -31,8 +36,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-SUBDIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-MOTD_SRC="$SUBDIR/alt/99-custom-welcome"
+MOTD_SRC="$SCRIPT_DIR/alt/99-custom-welcome"
 MOTD_DST="/etc/update-motd.d/99-custom-welcome"
 
 action_link() {

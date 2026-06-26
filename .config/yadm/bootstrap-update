@@ -5,8 +5,13 @@
 #
 # Available tools: nvim, cscope
 
+if [[ "${1:-}" == "--summary" ]]; then
+    echo "Update specific tools via nix"
+    exit 0
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../lib/bootstraplib"
+source "${SCRIPT_DIR}/lib/bootstraplib"
 
 DRYRUN=
 
