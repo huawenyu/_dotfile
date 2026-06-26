@@ -116,7 +116,7 @@ mem_top_processes="$(printf "%s\\n" "${ps_output}" | awk '{print "\033[1;37m"$2,
 cpu_top_processes="$(printf "%s\\n" "${ps_output}" | awk '{print "\033[1;37m"$2, $3"%", "\033[1;32m"$11}' | sort -k2rn | head -3 | awk '{print " \033[0;35m+\t\033[1;32mID: "$1, $3, $2}')"
 
 # Get local user define info
-local_info="$( [ -f /etc/info ] && cat /etc/info || echo 'Customer info /etc/info' )"
+local_info="$( [ -f /etc/info ] && echo "(/etc/info)$(cat /etc/info)" || echo 'Customer info /etc/info' )"
 
 # Get your remote IP address using external resource ipinfo.io (prefer curl with timeout, fallback to wget)
 if command -v curl >/dev/null 2>&1; then
