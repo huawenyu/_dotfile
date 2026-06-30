@@ -1,17 +1,14 @@
 #!/usr/bin/env bash
-# vim: setlocal autoindent cindent et ts=4 sw=4 sts=4:
-#
-# Get the script's directory, resolving symlinks
-var_ScriptDir="$( cd "$( dirname "$(readlink -f "${BASH_SOURCE[0]}")" )" &> /dev/null && pwd )"
-var_ScriptName=$(basename "$0")
-var_ScriptName="${var_ScriptName%.*}"
-var_WorkDir=$(pwd)
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/me-lib.sh"
+
+ME_SUMMARY="Generate tags and cscope database"
+ME_COMPLETE="--help --summary --complete --version -v -n -d -F -a -t -s -f"
+me_init "$@"
 
 var_FmtIndent=""
 var_IsContainer="false"
 var_tmpDir='/tmp/tagme'
 ClangdFile="compile_commands.json"
-SECONDS=0
 
 var_TAG_FILES=( \
     ".tags" \
@@ -84,12 +81,6 @@ FIND_FLAG=( \
     "-not" "-path" './kernel/*' \
 )
 
-die () {
-    [ "$#" -gt 0 ] && echo "$0: $@" >&2
-    cleanup
-    exit 1
-}
-
 do_args () {
     # Handle extra args
     case "$#" in
@@ -126,18 +117,7 @@ do_args () {
         exit 1
     fi
 
-    if [[ -n "$var_DRYRUN" ]]; then
-        ( set -o posix ; set ) | grep -e '^var_'
-        exit 1
-    fi
-
-    if [[ "$var_VERBOSE" -ge 3 ]]; then
-        set -x                              ### Print each command before eval
-    fi
-
-    if [[ "$var_VERBOSE" -ge 4 ]]; then
-        set -v                              ### Print each line of the script before eval
-    fi
+    me_check_debug
 }
 
 
@@ -702,14 +682,7 @@ cleanup() {
 }
 
 
-trap "cleanup; exit 130" 1 2 3 15
-if command -v getoptions &>/dev/null; then
-    eval "$(getoptions parse_define) exit 1"
-else
-    echo "Please install getoptions:"
-    echo "  wget -O $HOME/bin/getoptions https://github.com/ko1nksm/getoptions/releases/latest/download/getoptions"
-    exit 1
-fi
+me_dispatch_getoptions
 
 main "$@"
 

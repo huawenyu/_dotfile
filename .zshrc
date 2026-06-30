@@ -94,6 +94,9 @@ ZSH_DISABLE_COMPFIX=true
 
 source $ZSH/oh-my-zsh.sh
 
+# Customize completion
+source <(me completion zsh)
+
 # Change prompt: 'user@hostname ~ '
 #PROMPT="%F{yellow}%n%f"  # Magenta user name
 #PROMPT+="@"

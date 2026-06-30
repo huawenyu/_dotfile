@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SELF="$(basename "${BASH_SOURCE[0]}")"
+
+# Find subcommand path: check PATH first, then local dir
+find_subcmd() {
+    local cmd="$1"
+    # Check PATH for executable file
+    command -v "${SELF}-${cmd}" 2>/dev/null && return 0
+    # Check PATH for directory with _main_ (IFS=: to handle paths with spaces)
+    local IFS=':'
+    for dir in $PATH; do
+        local dir_path="$dir/${SELF}-${cmd}"
+        if [[ -d "$dir_path" && -x "$dir_path/_main_" ]]; then
+            echo "$dir_path/_main_"
+            return 0
+        fi
+    done
+    # Fallback to local dir (file)
+    local local_path="$DIR/${SELF}-${cmd}"
+    if [[ -x "$local_path" ]]; then
+        echo "$local_path"
+        return 0
+    elif [[ -d "$local_path" && -x "$local_path/_main_" ]]; then
+        echo "$local_path/_main_"
+        return 0
+    fi
+    return 1
+}
+
+# List all subcommands (from PATH and local dir, deduped)
+list_subcmds() {
+    # Deduplicate PATH directories
+    local -A seen_dirs=()
+    local IFS=':'
+    {
+        for dir in $PATH; do
+            [[ -n "${seen_dirs[$dir]:-}" ]] && continue
+            seen_dirs[$dir]=1
+            for f in "$dir/${SELF}-"*; do
+                if [[ -x "$f" ]]; then
+                    basename "$f" | sed "s/^${SELF}-//"
+                elif [[ -d "$f" && -x "$f/_main_" ]]; then
+                    basename "$f" | sed "s/^${SELF}-//"
+                fi
+            done 2>/dev/null
+        done
+        for f in "$DIR/${SELF}-"*; do
+            if [[ -x "$f" ]]; then
+                echo "${f##*/}" | sed "s/^${SELF}-//"
+            elif [[ -d "$f" && -x "$f/_main_" ]]; then
+                echo "${f##*/}" | sed "s/^${SELF}-//"
+            fi
+        done
+    } | sort -u | grep -v '-'  # Filter child subcommands: me-X-Y becomes X-Y (has hyphen), keep me-X (no hyphen)
+}
+
+cmd="${1:-help}"
+
+case "$cmd" in
+    __commands)
+        list_subcmds
+        exit 0 ;;
+    __complete)
+        shift || true
+        p="$(find_subcmd "${1:-}")" && "$p" __complete "" 2>/dev/null
+        [[ -z "${1:-}" ]] && list_subcmds
+        exit 0 ;;
+    __help)
+        shift || true
+        p="$(find_subcmd "${1:-}")" && "$p" --summary 2>/dev/null
+        exit 0 ;;
+    completion)
+        shift 2>/dev/null || true; s="${1:-bash}"
+        case "$s" in
+            bash) sed "s/%CMD%/${SELF}/g" <<'COMPEOF'
+_%CMD%() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    if [[ $COMP_CWORD -eq 1 ]]; then
+        COMPREPLY=($(compgen -W "$(%CMD% __commands)" -- "$cur"))
+    else
+        local subcmd="${COMP_WORDS[*]:1:COMP_CWORD-1}"
+        subcmd="${subcmd// /-}"
+        COMPREPLY=($(compgen -W "$(%CMD% __complete "$subcmd")" -- "$cur"))
+    fi
+}
+complete -F _%CMD% %CMD%
+COMPEOF
+                ;;
+            zsh) sed "s/%CMD%/${SELF}/g" <<'COMPEOF'
+_%CMD%() {
+    local -a results
+    if [[ $CURRENT -eq 2 ]]; then
+        results=("${(@f)$(%CMD% __commands)}")
+    else
+        local subcmd="${words[2,CURRENT-1]}"
+        subcmd="${subcmd// /-}"
+        results=("${(@f)$(%CMD% __complete "$subcmd")}")
+    fi
+    _describe values results
+}
+compdef _%CMD% %CMD%
+COMPEOF
+                ;;
+            *) echo "$SELF: unknown shell '$s'" >&2
+               echo "Usage: $SELF completion bash|zsh" >&2
+               exit 1 ;;
+        esac
+        exit 0 ;;
+    help|-h|--help)
+        sub="${2:-}"
+        if [[ -n "$sub" && "$sub" != "help" ]]; then
+            p="$(find_subcmd "$sub")" && exec "$p" --help
+            echo "$SELF: unknown command '$sub'" >&2; exit 1
+        fi
+        echo "Usage: $SELF <command> [options]"; echo
+        echo "Commands:"
+        echo "  ai              AI helpers (log)"
+        echo "  clang           Clang-related helpers"
+        echo "  config          Configuration (dut, gitvan)"
+        echo "  fgt             FortiGate tools (addr2line, craddr, eco, pcap)"
+        echo "  ssh             Mount remote directory via SSHFS"
+    echo "  sync            Sync files"
+        echo "  tag             Tag management"
+        echo "  tmux            Tmux helpers"
+        echo "  tool            Miscellaneous tools (addr2line, craddr)"
+        echo "  trace           Trace utilities"
+        echo "  update          Update utilities (dot, nvim, repo, wiki)"
+        echo
+        echo "Run '$SELF help <command>' for details."; echo
+        echo "Script: ${BASH_SOURCE[0]}"; exit 0 ;;
+esac
+
+shift || true
+p="$(find_subcmd "$cmd")"
+if [[ -n "$p" ]]; then
+    exec "$p" "$@"
+fi
+echo "$SELF: unknown command '$cmd'" >&2
+echo "Run '$SELF --help' for usage." >&2
+exit 1

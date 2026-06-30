@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SELF="$(basename "${BASH_SOURCE[0]}")"
+
+find_tool_subcmd() {
+    local cmd="$1"
+    local local_path="$DIR/${SELF}-${cmd}"
+    # Check directory with _main_ first (Flat+Dir layout)
+    if [[ -d "$local_path" && -x "$local_path/_main_" ]]; then
+        echo "$local_path/_main_"; return 0
+    elif [[ -x "$local_path" ]]; then
+        echo "$local_path"; return 0
+    fi
+    local IFS=':'
+    for dir in $PATH; do
+        local p="$dir/${SELF}-${cmd}"
+        # Check directory with _main_ first
+        if [[ -d "$p" && -x "$p/_main_" ]]; then
+            echo "$p/_main_"; return 0
+        elif [[ -x "$p" ]]; then
+            echo "$p"; return 0
+        fi
+    done
+    return 1
+}
+
+list_tool_subcmds() {
+    local -A seen_dirs=()
+    local IFS=':'
+    {
+        for dir in $PATH; do
+            [[ -n "${seen_dirs[$dir]:-}" ]] && continue
+            seen_dirs[$dir]=1
+            for f in "$dir/${SELF}-"*; do
+                if [[ -x "$f" ]]; then
+                    basename "$f" | sed "s/^${SELF}-//"
+                elif [[ -d "$f" && -x "$f/_main_" ]]; then
+                    basename "$f" | sed "s/^${SELF}-//"
+                fi
+            done 2>/dev/null
+        done
+        for f in "$DIR/${SELF}-"*; do
+            if [[ -x "$f" ]]; then
+                echo "${f##*/}" | sed "s/^${SELF}-//"
+            elif [[ -d "$f" && -x "$f/_main_" ]]; then
+                echo "${f##*/}" | sed "s/^${SELF}-//"
+            fi
+        done
+    } | sort -u
+}
+
+cmd="${1:-help}"
+
+case "$cmd" in
+    --summary)
+        echo "Tool subcommands"
+        exit 0 ;;
+    __commands)
+        list_tool_subcmds
+        exit 0 ;;
+    __complete)
+        shift || true
+        p="$(find_tool_subcmd "${1:-}")" && "$p" __complete "" 2>/dev/null
+        [[ -z "${1:-}" ]] && list_tool_subcmds
+        exit 0 ;;
+    __help)
+        shift || true
+        p="$(find_tool_subcmd "${1:-}")" && "$p" --summary 2>/dev/null
+        exit 0 ;;
+    help|-h|--help)
+        sub="${2:-}"
+        if [[ -n "$sub" && "$sub" != "help" ]]; then
+            p="$(find_tool_subcmd "$sub")" && exec "$p" --help
+            echo "$SELF: unknown command '$sub'" >&2; exit 1
+        fi
+        echo "Usage: $SELF <subcommand> [options]"; echo; echo "Subcommands:"; echo
+        for sub in $(list_tool_subcmds); do
+            p="$(find_tool_subcmd "$sub")"
+            s="$("$p" --summary 2>/dev/null || true)"
+            printf "  %-15s %s\n" "$sub" "$s"
+        done | sort
+        echo; echo "Run '$SELF help <subcommand>' for details."; echo
+        echo "Script: ${BASH_SOURCE[0]}"; exit 0 ;;
+esac
+
+shift || true
+p="$(find_tool_subcmd "$cmd")"
+if [[ -n "$p" ]]; then
+    exec "$p" "$@"
+fi
+echo "$SELF: unknown command '$cmd'" >&2
+echo "Run '$SELF --help' for usage." >&2
+exit 1

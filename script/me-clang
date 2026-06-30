@@ -169,8 +169,17 @@ def clang_safe_format(file_path, config_path):
 # ==================== CLI ====================
 
 def main():
+    if '--summary' in sys.argv:
+        print("Preprocess C files using clang via compile_commands.json")
+        sys.exit(0)
+    if '--complete' in sys.argv or '__complete' in sys.argv:
+        for c in ['--help', '--summary', '--complete', '__complete', '--verbose', '--file', '--config', '--action', '--out', '--compile-db']:
+            print(c)
+        sys.exit(0)
+
     parser = argparse.ArgumentParser(
-        description="Preprocess C files using clang via compile_commands.json"
+        description="Preprocess C files using clang via compile_commands.json",
+        epilog="Script: /home/hyu/script/me-clang"
     )
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--file', required=True, help='Input file (required)')

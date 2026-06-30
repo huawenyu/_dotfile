@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/me-lib.sh"
 
-set -euo pipefail
+ME_SUMMARY="Update Neovim to latest nightly AppImage"
+ME_COMPLETE="--help --summary --complete --version -v -n"
+me_init "$@"
+
+parse_define() {
+  setup   REST help:usage -- "Usage: $var_ScriptName [options] ..." ''
+  msg -- 'Options:'
+  flag  var_VERBOSE    -v --verbose  counter:true init:=0    -- "Verbose level"
+  flag  var_DRYRUN     -n --dryrun                           -- "Dryrun mode"
+  disp  :usage         -h --help
+}
+
+me_dispatch_getoptions
 
 APPIMAGE_URL="https://github.com/neovim/neovim/releases/download/nightly/nvim-linux-x86_64.appimage"
 
@@ -22,7 +35,7 @@ curl -fL --retry 3 -o "$APPIMAGE" "$APPIMAGE_URL"
 echo "==> Validating download..."
 
 if ! file "$APPIMAGE" | grep -q "ELF"; then
-    echo "❌ Invalid AppImage (likely HTML download)"
+    echo "Invalid AppImage (likely HTML download)"
     file "$APPIMAGE"
     exit 1
 fi
@@ -31,14 +44,11 @@ chmod +x "$APPIMAGE"
 
 echo "==> Installing Neovim..."
 
-# -------------------------
-# FUSE or extract fallback
-# -------------------------
 if command -v fusermount3 >/dev/null 2>&1 && [ -e /dev/fuse ]; then
-    echo "==> FUSE available → using AppImage directly"
+    echo "==> FUSE available using AppImage directly"
     ln -sf "$APPIMAGE" "$USER_NVM"
 else
-    echo "==> No FUSE → extracting AppImage"
+    echo "==> No FUSE extracting AppImage"
 
     cd "$BASE_DIR"
     rm -rf squashfs-root
@@ -53,14 +63,10 @@ chmod +x "$USER_NVM"
 echo "==> Neovim installed:"
 "$USER_NVM" --version | head -n 1
 
-# -------------------------
-# update-alternatives setup
-# -------------------------
 echo ""
 echo "==> Configuring system vi/vim via update-alternatives..."
 
 if command -v sudo >/dev/null 2>&1; then
-
     sudo update-alternatives --install /usr/bin/vi vi "$USER_NVM" 100
     sudo update-alternatives --install /usr/bin/vim vim "$USER_NVM" 100
     sudo update-alternatives --install /usr/bin/vimdiff vimdiff "$USER_NVM" 100
@@ -70,14 +76,10 @@ if command -v sudo >/dev/null 2>&1; then
     sudo update-alternatives --set vimdiff "$USER_NVM" || true
 
     echo "==> update-alternatives configured"
-
 else
-    echo "⚠️ sudo not available, skipping system-wide vi/vim setup"
+    echo "sudo not available, skipping system-wide vi/vim setup"
 fi
 
-# -------------------------
-# verify
-# -------------------------
 echo ""
 echo "==> Final versions:"
 nvim --version | head -n 1 || true
@@ -89,5 +91,3 @@ echo "==> Active paths:"
 which nvim || true
 which vi || true
 which vim || true
-
-

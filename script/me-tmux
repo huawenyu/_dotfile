@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+# merged from txctl + tx-share
+
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/me-lib.sh"
+
+ME_SUMMARY="Tmux helper: mode, share, window/pane control"
+ME_COMPLETE="--help --summary --complete --version -v -n -d -a -t -l"
+me_init "$@"
+
+parse_define() {
+  setup   REST help:usage -- "Usage: $var_ScriptName [options] ..." ''
+
+  msg -- 'Options:'
+  flag  var_VERBOSE    -v --verbose  counter:true init:=0    -- "e.g. -vvv is verbose level 3"
+  flag  var_DRYRUN     -n --dryrun                           -- "Dryrun mode"
+  flag  var_DEBUG      -d --debug                            -- "Debug mode"
+  param var_Action     -a --action   init:="mode"  pattern:"mode|share|unshare|update|kill|select|zoom|cmd"     -- "Action: mode|share|unshare|update|kill|select|zoom|cmd"
+  param var_Title      -t --title    init:=""                -- "The title of window/pane/session"
+  param var_Layout     -l --layout   init:="0"               -- "Layout: 0|4|6|h|v|eh|ev|t|c"
+
+  disp  VERSION        --version
+  disp  :usage         -h --help
+}
+
+me_dispatch_getoptions
+
+me_check_debug
+
+var_User="$var_Title"
+
+do_share() {
+    set -e
+    : ${TMUX:?Error: This must be run from within tmux}
+
+    socket_path=$(tmux display-message -p -F '#{socket_path}')
+    session_name=$(tmux display-message -p -F '#{session_name}')
+    : ${socket_path:?Cannot determine tmux socket path}
+
+    if [[ -z "$var_User" ]]; then
+        read -p "Are you sure DISABLE tmux-share? (y/n): " answer
+        case "$answer" in
+            y|Y ) echo "Confirmed!";;
+            n|N ) echo "Cancelled."; exit 1;;
+            * ) echo "Invalid input"; exit 1;;
+        esac
+
+        sudo setfacl --remove-all "${socket_path}"
+        sudo setfacl --remove-all "${socket_path%/*}"
+        tmux detach-client -a
+        echo >&2 "Unshared"
+    else
+        id "$var_User" > /dev/null
+        sudo setfacl -m u:"$var_User":rw "${socket_path}"
+        sudo setfacl -m u:"$var_User":rX "${socket_path%/*}"
+        tmux server-access -a "$var_User" || true
+
+        attach_cmd="tmux -S $(printf %s "$socket_path") attach -t $(printf %s "$session_name")"
+
+        cat <<-EOF
+Now, $var_User can attach your session by running:
+
+    $attach_cmd
+
+Append "-r" for read-only access.
+
+EOF
+
+        write "$var_User" <<-EOF || :
+You can attach $USER's session by running:
+    $attach_cmd
+  Append "-r" for read-only access.
+
+EOF
+    fi
+}
+
+do_title() {
+    if [[ -n "$var_Title" ]]; then
+        win_index=$(tmux list-windows -F '#I:#W' | grep -i "$var_Title" | cut -d':' -f1)
+    fi
+
+    if [[ -n "$var_Title" ]]; then
+        pane_id=$(tmux list-panes -a -F '#S:#I.#P:#T' | grep -i "$var_Title" | cut -d':' -f2)
+    fi
+
+    for i in $(seq 1); do
+        if [[ "$var_Action" == "kill" ]]; then
+            [ -n "$win_index" ] && tmux kill-window -t "$win_index"
+            [ -n "$pane_id" ] && tmux kill-pane -t "$pane_id"
+            break
+        fi
+
+        if [[ "$var_Action" == "select" ]]; then
+            [ -n "$win_index" ] && tmux select-window -t "$win_index"
+            [ -n "$pane_id" ] && tmux select-pane -t "$pane_id"
+            break
+        fi
+
+        if [[ "$var_Action" == "zoom" ]]; then
+            [ -n "$pane_id" ] && tmux resize-pane -Z -t "$pane_id"
+            break
+        fi
+
+        if [[ "$var_Action" == "cmd" ]]; then
+            [ -n "$pane_id" ] && tmux resize-pane -Z -t "$pane_id"
+            break
+        fi
+
+        break
+    done
+}
+
+do_mode() {
+    if [[ "$var_Layout" == "0" ]]; then
+        tmux killp -a; tmex -w $(tmux display-message -p '#W') -t -l {16}31 "cd $var_WorkDir; reset" "cd $var_WorkDir; reset" "cd $var_WorkDir; reset" "cd $var_WorkDir; reset"
+    elif [[ "$var_Layout" == "4" ]]; then
+        tmux killp -a; tmex -w $(tmux display-message -p '#W') -t -l 22 "cd $var_WorkDir; reset" "cd $var_WorkDir; reset" "cd $var_WorkDir; reset" "cd $var_WorkDir; reset"
+    elif [[ "$var_Layout" == "6" ]]; then
+        tmux killp -a; tmex -w $(tmux display-message -p '#W') -t -l 222 "cd $var_WorkDir; reset" "cd $var_WorkDir; reset" "cd $var_WorkDir; reset" "cd $var_WorkDir; reset"
+    elif [[ "$var_Layout" == "h" ]]; then
+        tmux select-layout "main-horizontal"
+    elif [[ "$var_Layout" == "v" ]]; then
+        tmux select-layout "main-vertical"
+    elif [[ "$var_Layout" == "eh" ]]; then
+        tmux select-layout "even-horizontal"
+    elif [[ "$var_Layout" == "ev" ]]; then
+        tmux select-layout "even-vertical"
+    elif [[ "$var_Layout" == "t" ]]; then
+        tmux select-layout "titled"
+    elif [[ "$var_Layout" == "c" ]]; then
+        tmux select-layout "columns"
+    fi
+}
+
+case "$var_Action" in
+    mode)
+        do_mode
+        ;;
+    update)
+        curl -L -o "${var_ScriptDir}/tmex" https://raw.githubusercontent.com/evnp/tmex/refs/heads/main/tmex
+        ;;
+    share|unshare)
+        do_share
+        ;;
+    kill|select|zoom|cmd)
+        do_title
+        ;;
+    *)
+        die "Invalid action: $var_Action"
+        ;;
+esac
+
+cleanup
