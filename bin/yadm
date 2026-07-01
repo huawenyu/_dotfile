@@ -729,16 +729,17 @@ function alt_linking() {
       "$template_cmd" "$src" "$tgt"
     elif [ -n "$src" ]; then
       # a link source is defined, create symlink
-      debug "Linking $src to $tgt"
-      [ -n "$loud" ] && echo "Linking $src to $tgt"
       # ensure the destination path exists
       assert_parent "$tgt"
       if [ "$do_copy" -eq 1 ]; then
+        debug "Copying $src to $tgt"
+        [ -n "$loud" ] && echo "Copying $src to $tgt"
         # remove any existing symlink before copying
         [ -L "$tgt" ] && rm -f "$tgt"
         cp -f "$src" "$tgt"
+        alt_linked+=("$src")
       else
-        ln_relative "$src" "$tgt"
+        ln_relative "$src" "$tgt" "$loud"
       fi
     fi
   done
@@ -746,15 +747,31 @@ function alt_linking() {
 }
 
 function ln_relative() {
-  local full_source full_target target_dir
+  local full_source full_target target_dir loud
   local full_source="$1"
   local full_target="$2"
+  loud="${3:-}"
   local target_dir="${full_target%/*}"
   if [ "$target_dir" == "" ]; then
     target_dir="/"
   fi
   local rel_source
   rel_source=$(relative_path "$target_dir" "$full_source")
+
+  # If target is already a symlink pointing to the correct source, skip recreation.
+  # Still record in alt_linked so remove_stale_links() does not remove a valid link.
+  if [ -L "$full_target" ]; then
+    local current_link
+    current_link=$(readlink "$full_target" 2>/dev/null)
+    if [ "$current_link" = "$rel_source" ]; then
+      debug "Already linked $full_target -> $rel_source"
+      alt_linked+=("$rel_source")
+      return
+    fi
+  fi
+
+  debug "Linking $full_source to $full_target"
+  [ -n "$loud" ] && echo "Linking $full_source to $full_target"
   if [ ! -L "$full_target" ] && [ -e "$full_target" ]; then
     rm -rf "$full_target" 2>/dev/null \
       || sudo_run "Removing $full_target to replace with symlink" rm -rf "$full_target"
