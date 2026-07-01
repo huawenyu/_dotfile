@@ -174,6 +174,13 @@ function score_file() {
     tgt="${YADM_BASE}/${tgt#"$YADM_ALT/"}"
   fi
 
+  # resolve thehome/ → YADM_BASE, theroot/ → /
+  if [[ "$tgt" == "${YADM_BASE}/thehome/"* ]]; then
+    tgt="${YADM_BASE}/${tgt#${YADM_BASE}/thehome/}"
+  elif [[ "$tgt" == "${YADM_BASE}/theroot/"* ]]; then
+    tgt="/${tgt#${YADM_BASE}/theroot/}"
+  fi
+
   score=0
   IFS=',' read -ra fields <<< "$conditions"
   for field in "${fields[@]}"; do
@@ -587,7 +594,13 @@ function alt() {
       if [ "${yadm_alt#"$YADM_ALT/"}" != "${yadm_alt}" ]; then
         base_alt="${yadm_alt#"$YADM_ALT/"}"
       fi
-      possible_alts+=("$YADM_BASE/${base_alt}")
+      resolved="$YADM_BASE/${base_alt}"
+      if [[ "$resolved" == "${YADM_BASE}/thehome/"* ]]; then
+        resolved="${YADM_BASE}/${resolved#${YADM_BASE}/thehome/}"
+      elif [[ "$resolved" == "${YADM_BASE}/theroot/"* ]]; then
+        resolved="/${resolved#${YADM_BASE}/theroot/}"
+      fi
+      possible_alts+=("$resolved")
     fi
   done
   local alt_linked=()
@@ -743,9 +756,11 @@ function ln_relative() {
   local rel_source
   rel_source=$(relative_path "$target_dir" "$full_source")
   if [ ! -L "$full_target" ] && [ -e "$full_target" ]; then
-    rm -rf "$full_target"
+    rm -rf "$full_target" 2>/dev/null \
+      || sudo_run "Removing $full_target to replace with symlink" rm -rf "$full_target"
   fi
-  ln -nfs "$rel_source" "$full_target"
+  ln -nfs "$rel_source" "$full_target" 2>/dev/null \
+    || sudo_run "Creating symlink $full_target -> $rel_source" ln -nfs "$rel_source" "$full_target"
   alt_linked+=("$rel_source")
 }
 
@@ -1884,10 +1899,19 @@ function assert_private_dirs() {
   done
 }
 
+function sudo_run() {
+  echo "[sudo] yadm: $1"
+  shift
+  sudo "$@"
+}
+
 function assert_parent() {
   basedir=${1%/*}
   if [ -n "$basedir" ]; then
-    [ -e "$basedir" ] || mkdir -p "$basedir"
+    if [ ! -e "$basedir" ]; then
+      mkdir -p "$basedir" 2>/dev/null \
+        || sudo_run "Creating parent directory $basedir" mkdir -p "$basedir"
+    fi
   fi
 }
 
