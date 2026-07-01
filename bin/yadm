@@ -742,6 +742,9 @@ function ln_relative() {
   fi
   local rel_source
   rel_source=$(relative_path "$target_dir" "$full_source")
+  if [ ! -L "$full_target" ] && [ -e "$full_target" ]; then
+    rm -rf "$full_target"
+  fi
   ln -nfs "$rel_source" "$full_target"
   alt_linked+=("$rel_source")
 }
