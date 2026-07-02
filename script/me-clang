@@ -69,7 +69,7 @@ def find_compile_entry_via_jq(json_file, target_file):
 
 # ==================== command transformation ====================
 
-def transform_command_for_macro(args, out_file, clang_path="clang"):
+def transform_command_for_macro(args, out_file, clang_path="clang", dump_defines=False):
     """Transform compile args into preprocess args.
 
     - Replace compiler with clang_path
@@ -77,7 +77,7 @@ def transform_command_for_macro(args, out_file, clang_path="clang"):
     - Remove -o <old_output> (replaced with -o <out_file>)
     - Drop GCC-specific flags clang doesn't understand
     - Keep all -I, -D, -U, -std= flags and the source file
-    - Add -E -P -CC -dD at the end
+    - Add -E -CC at the end (no -P: keep line markers for filtering)
     """
     # Flags clang doesn't support (from GCC-only compile_commands.json)
     DROP_FLAGS = {
@@ -106,7 +106,11 @@ def transform_command_for_macro(args, out_file, clang_path="clang"):
         else:
             result.append(arg)
 
-    result.extend(["-E", "-P", "-CC", "-dD", "-Wno-error=macro-redefined", "-o", out_file])
+    flags = ["-E", "-CC", "-Wno-error=macro-redefined"]
+    if dump_defines:
+        flags.append("-dD")
+    flags.extend(["-o", out_file])
+    result.extend(flags)
     return result
 
 
@@ -162,9 +166,168 @@ def remap_entry_paths(args, old_dir, new_base, target_file):
     return result
 
 
+# ==================== output filtering ====================
+
+import re
+
+_MARKER_RE = re.compile(r'^# \d+ "([^"]+)"')
+
+
+def filter_preprocessor_output(out_file, keep_patterns):
+    """Filter preprocessed output using line markers.
+
+    Keeps only lines from files whose basename contains any of keep_patterns.
+    Strips line markers, replaces with section comments for readability.
+    Collapses consecutive blank lines.
+    """
+    with open(out_file, 'r') as f:
+        lines = f.readlines()
+
+    result = []
+    keep = False
+    prev_blank = False
+    last_file = None
+
+    for line in lines:
+        m = _MARKER_RE.match(line)
+        if m:
+            current_file = m.group(1)
+            basename = os.path.basename(current_file)
+            new_keep = any(p in basename for p in keep_patterns)
+
+            if new_keep and current_file != last_file:
+                if result and not prev_blank:
+                    result.append('\n')
+                result.append(f'// === {basename} ===\n')
+                prev_blank = False
+
+            keep = new_keep
+            last_file = current_file
+            continue
+
+        if not keep:
+            continue
+
+        is_blank = line.strip() == ''
+        if is_blank and prev_blank:
+            continue
+        prev_blank = is_blank
+
+        result.append(line)
+
+    with open(out_file, 'w') as f:
+        f.writelines(result)
+
+    return len(lines), len(result)
+
+
+def split_long_lines(out_file, threshold=200):
+    """Break long lines at ; { } with brace-depth indentation.
+
+    Splits at each brace and semicolon (not inside strings), tracks nesting
+    to indent each piece correctly.
+    """
+    with open(out_file, 'r') as f:
+        lines = f.readlines()
+
+    result = []
+    for line in lines:
+        if len(line) <= threshold:
+            result.append(line)
+            continue
+
+        depth = 0
+        in_string = False
+        escape = False
+        current = []
+        init_depths = set()  # depths that are initializers (= { ... })
+
+        for ch in line.rstrip('\n'):
+            if escape:
+                escape = False
+                current.append(ch)
+                continue
+            if ch == '\\':
+                escape = True
+                current.append(ch)
+                continue
+            if ch == '"':
+                in_string = not in_string
+                current.append(ch)
+                continue
+            if in_string:
+                current.append(ch)
+                continue
+
+            if ch == '{':
+                frag = ''.join(current).strip()
+                # Don't split initializers like "= { 0 }" — keep on one line
+                if frag.endswith('='):
+                    current.append(ch)
+                    depth += 1
+                    init_depths.add(depth)
+                    continue
+                if frag:
+                    # K&R style: put { on same line as preceding code when short
+                    if len(frag) <= 120:
+                        result.append('    ' * depth + frag + ' {\n')
+                    else:
+                        result.append('    ' * depth + frag + '\n')
+                        result.append('    ' * depth + '{\n')
+                else:
+                    result.append('    ' * depth + '{\n')
+                depth += 1
+                current = []
+            elif ch == '}':
+                frag = ''.join(current).strip()
+                if depth in init_depths:
+                    # Initializer close: merge content onto one line
+                    result.append('    ' * (depth - 1) + frag + ' }\n')
+                    init_depths.discard(depth)
+                    depth -= 1
+                    current = []
+                else:
+                    if frag:
+                        result.append('    ' * depth + frag + ';\n')
+                    depth = max(0, depth - 1)
+                    result.append('    ' * depth + '}\n')
+                current = []
+            elif ch == ';':
+                frag = ''.join(current).strip()
+                if frag:
+                    if depth in init_depths:
+                        # Inside initializer: no semicolon (will be added at })
+                        result.append('    ' * depth + frag + '\n')
+                    else:
+                        result.append('    ' * depth + frag + ';\n')
+                current = []
+            else:
+                current.append(ch)
+
+        if current:
+            tail = ''.join(current).strip()
+            if tail:
+                # If still very long with commas (array initializers), split at commas
+                if len(tail) > threshold and ',' in tail:
+                    comma_parts = tail.split(',')
+                    for i, cp in enumerate(comma_parts):
+                        cp = cp.strip().rstrip(';')
+                        if not cp:
+                            continue
+                        suffix = ',' if i < len(comma_parts) - 1 else ';'
+                        result.append('    ' * depth + cp + suffix + '\n')
+                else:
+                    result.append('    ' * depth + tail + ';\n')
+
+    with open(out_file, 'w') as f:
+        f.writelines(result)
+
+    return len(lines), len(result)
+
+
 # ==================== main runner ====================
 
-def run_clang_for_file(compile_db, target_file, out_file, clang_path="clang"):
+def run_clang_for_file(compile_db, target_file, out_file, clang_path="clang", dump_defines=False):
     """Run clang to preprocess target_file.
 
     If compile_db exists and contains the target file, uses the compile
@@ -194,7 +357,8 @@ def run_clang_for_file(compile_db, target_file, out_file, clang_path="clang"):
                 else:
                     directory = old_dir
 
-                command = transform_command_for_macro(args, out_file, clang_path)
+                command = transform_command_for_macro(args, out_file, clang_path,
+                                                       dump_defines)
                 print(f"Using compile_commands.json: {compile_db}")
                 print(f"  cwd: {directory}")
                 print(f"  cmd: {' '.join(command)}")
@@ -204,7 +368,7 @@ def run_clang_for_file(compile_db, target_file, out_file, clang_path="clang"):
             print(f"Warning: {Path(target_file).name} not found in {compile_db}, using fallback")
 
     # Fallback: minimal flags, no -I paths
-    command = [clang_path, "-E", "-P", "-std=gnu11", "-I.", "-o", out_file, target_file]
+    command = [clang_path, "-E", "-CC", "-std=gnu11", "-I.", "-o", out_file, target_file]
     print("Running (no compile_commands.json):")
     print(f"  cmd: {' '.join(command)}")
     subprocess.run(command, check=True)
@@ -250,11 +414,14 @@ def main():
 
     parser = argparse.ArgumentParser(
         description="Preprocess C files using clang via compile_commands.json",
-        epilog="Example:\n  me clang --action macro --file ./migbase/sysapi/wad/wad_stats_def.c\n\nScript: /home/hyu/script/me-clang",
+        epilog="Example:\n  me clang ./migbase/sysapi/wad/wad_stats_def.c\n  me clang --action macro --file ./migbase/sysapi/wad/wad_stats_def.c\n\nScript: /home/hyu/script/me-clang",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument('--verbose', action='store_true')
-    parser.add_argument('--file', required=True, help='Input file (required)')
+    parser.add_argument('positional_file', nargs='?', default=None,
+                        help='Input file (shorthand for --file)')
+    parser.add_argument('--file', dest='file', default=None,
+                        help='Input file (alternative to positional argument)')
     parser.add_argument('--config', default='.clang-format',
                         help='Configuration file for clang-format')
     parser.add_argument('--action', '-a', default='macro',
@@ -264,7 +431,20 @@ def main():
                         help='Output file (default: log.i)')
     parser.add_argument('--compile-db', default=None,
                         help='Path to compile_commands.json (auto-detected if omitted)')
+    parser.add_argument('--no-filter', action='store_true',
+                        help='Disable output filtering (keep all included headers)')
+    parser.add_argument('--clang-format', action='store_true',
+                        help='Use clang-format instead of fast line-splitter (slow on generated code)')
+    parser.add_argument('--dump-defines', action='store_true',
+                        help='Preserve #define directives (-dD flag)')
+    parser.add_argument('--keep-pattern', default=None,
+                        help='Comma-separated basename patterns to keep (default: wad_stats,shm_stats)')
     args = parser.parse_args()
+
+    # Resolve file: positional arg takes priority, then --file
+    args.file = args.positional_file or args.file
+    if not args.file:
+        parser.error("the following arguments are required: file (positional or --file)")
 
     # Find compile_commands.json
     compile_db = args.compile_db
@@ -274,11 +454,40 @@ def main():
     clang_path = "clang"
 
     try:
-        run_clang_for_file(compile_db, args.file, args.out, clang_path)
+        run_clang_for_file(compile_db, args.file, args.out, clang_path,
+                           dump_defines=args.dump_defines)
+
+        if args.verbose and os.path.exists(args.out):
+            import subprocess as _sp
+            r = _sp.run(['wc', '-l', args.out], capture_output=True, text=True)
+            print(f"  [debug] After clang: {r.stdout.strip()}")
+
+        if os.path.exists(args.out) and not args.no_filter:
+            patterns = args.keep_pattern.split(',') if args.keep_pattern else ['wad_stats', 'shm_stats']
+            total, kept = filter_preprocessor_output(args.out, patterns)
+            print(f"Filtered: {total} -> {kept} lines (keeping: {', '.join(patterns)})")
+
+        if args.verbose and os.path.exists(args.out):
+            import subprocess as _sp
+            r = _sp.run(['wc', '-l', args.out], capture_output=True, text=True)
+            print(f"  [debug] After filter: {r.stdout.strip()}")
 
         if os.path.exists(args.out):
-            print(f"===\nFormatting '{args.out}', please wait ...\n")
-            clang_safe_format(args.out, args.config)
+            if args.clang_format:
+                print(f"===\nFormatting '{args.out}' with clang-format, please wait ...\n")
+                clang_safe_format(args.out, args.config)
+            else:
+                total, kept = split_long_lines(args.out)
+                print(f"Split long lines: {total} -> {kept} lines")
+
+            # Append vim modeline for filetype detection
+            with open(args.out, 'a') as f:
+                f.write('\n/* vim: set ft=c : */\n')
+
+        if args.verbose and os.path.exists(args.out):
+            import subprocess as _sp
+            r = _sp.run(['wc', '-l', args.out], capture_output=True, text=True)
+            print(f"  [debug] Final: {r.stdout.strip()}")
     except subprocess.CalledProcessError as e:
         print(f"Error: command failed with exit code {e.returncode}")
         sys.exit(1)
