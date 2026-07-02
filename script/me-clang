@@ -75,10 +75,18 @@ def transform_command_for_macro(args, out_file, clang_path="clang"):
     - Replace compiler with clang_path
     - Remove -c (implied by -E)
     - Remove -o <old_output> (replaced with -o <out_file>)
+    - Drop GCC-specific flags clang doesn't understand
     - Keep all -I, -D, -U, -std= flags and the source file
     - Add -E -P -CC -dD at the end
     """
-    result = [clang_path]
+    # Flags clang doesn't support (from GCC-only compile_commands.json)
+    DROP_FLAGS = {
+        "-fno-reorder-functions",
+        "-fno-unit-at-a-time",
+        "-Wtrampolines",
+    }
+
+    result = [clang_path, "-I."]
     skip_next = False
 
     for i in range(1, len(args)):
@@ -93,10 +101,64 @@ def transform_command_for_macro(args, out_file, clang_path="clang"):
         elif arg == "-o":
             skip_next = True
             continue
+        elif arg in DROP_FLAGS:
+            continue
         else:
             result.append(arg)
 
-    result.extend(["-E", "-P", "-CC", "-dD", "-o", out_file])
+    result.extend(["-E", "-P", "-CC", "-dD", "-Wno-error=macro-redefined", "-o", out_file])
+    return result
+
+
+def remap_entry_paths(args, old_dir, new_base, target_file):
+    """Remap absolute paths from old_dir to new_base, and replace source file.
+
+    - Absolute paths starting with old_dir get rebased to new_base.
+    - -I<old_dir>/... (concatenated form) also gets rebased.
+    - /src/... paths also get rebased to new_base.
+    - Relative paths (e.g. -I./foo) are left as-is (resolve against new cwd).
+    - The source file arg is replaced with the user's --file absolute path.
+    - Flags consuming a value (-o, -MF, -MT, -MQ, -include) preserve next arg.
+    """
+    old_dir = str(Path(old_dir).resolve())
+    new_base = str(Path(new_base).resolve())
+    abs_target = str(Path(target_file).resolve())
+
+    def remap_path(p):
+        """Rebase absolute path from old_dir or /src to new_base."""
+        if p.startswith(old_dir + "/"):
+            return new_base + p[len(old_dir):]
+        if p.startswith("/src/"):
+            return new_base + p[len("/src"):]
+        return p
+
+    result = []
+    skip_next = False
+    for i in range(1, len(args)):
+        if skip_next:
+            val = args[i]
+            if result and result[-1] == "-include" and val.startswith("/"):
+                val = remap_path(val)
+            result.append(val)
+            skip_next = False
+            continue
+        arg = args[i]
+        if arg in ("-o", "-MF", "-MT", "-MQ", "-include"):
+            skip_next = True
+            result.append(arg)
+            continue
+        # -I<abs_path> (concatenated form)
+        if arg.startswith("-I") and not arg.startswith("-I" + "."):
+            remapped = remap_path(arg[2:])
+            if remapped != arg[2:]:
+                arg = "-I" + remapped
+        # standalone absolute path
+        elif arg.startswith(old_dir + "/"):
+            arg = remap_path(arg)
+        # source file arg (not a flag, has .c/.cc/.cpp/.cxx suffix) -> user's --file
+        elif not arg.startswith("-") and Path(arg).suffix in (".c", ".cc", ".cpp", ".cxx"):
+            arg = abs_target
+        result.append(arg)
     return result
 
 
@@ -122,8 +184,17 @@ def run_clang_for_file(compile_db, target_file, out_file, clang_path="clang"):
                 args = None
 
             if args:
+                old_dir = entry.get("directory", ".")
+                new_base = str(Path(compile_db).resolve().parent)
+
+                if Path(old_dir).resolve() != Path(new_base).resolve():
+                    print(f"Remapping paths: {old_dir} -> {new_base}")
+                    args = remap_entry_paths(args, old_dir, new_base, target_file)
+                    directory = new_base
+                else:
+                    directory = old_dir
+
                 command = transform_command_for_macro(args, out_file, clang_path)
-                directory = entry.get("directory", ".")
                 print(f"Using compile_commands.json: {compile_db}")
                 print(f"  cwd: {directory}")
                 print(f"  cmd: {' '.join(command)}")
@@ -133,7 +204,7 @@ def run_clang_for_file(compile_db, target_file, out_file, clang_path="clang"):
             print(f"Warning: {Path(target_file).name} not found in {compile_db}, using fallback")
 
     # Fallback: minimal flags, no -I paths
-    command = [clang_path, "-E", "-P", "-std=gnu11", "-o", out_file, target_file]
+    command = [clang_path, "-E", "-P", "-std=gnu11", "-I.", "-o", out_file, target_file]
     print("Running (no compile_commands.json):")
     print(f"  cmd: {' '.join(command)}")
     subprocess.run(command, check=True)
@@ -179,7 +250,8 @@ def main():
 
     parser = argparse.ArgumentParser(
         description="Preprocess C files using clang via compile_commands.json",
-        epilog="Script: /home/hyu/script/me-clang"
+        epilog="Example:\n  me clang --action macro --file ./migbase/sysapi/wad/wad_stats_def.c\n\nScript: /home/hyu/script/me-clang",
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument('--verbose', action='store_true')
     parser.add_argument('--file', required=True, help='Input file (required)')
