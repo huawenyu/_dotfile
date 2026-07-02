@@ -43,28 +43,48 @@ def find_compile_db(start_dir="."):
 # ==================== jq-based entry lookup ====================
 
 def find_compile_entry_via_jq(json_file, target_file):
-    """Use jq to find the first compile entry matching target_file by basename.
+    """Use jq to find a compile entry matching target_file.
 
+    For .c files: matches by basename.
+    For .h files: no compile_commands.json entry exists, so find a .c file
+    in the same directory and use its compile flags.
     Returns the JSON entry dict or None.
     """
-    target_basename = Path(target_file).name
+    target_path = Path(target_file)
+    target_basename = target_path.name
 
-    # Get the first matching entry as compact JSON
+    # Direct match by basename (works for .c files)
     jq_filter = f'[.[] | select(.file | endswith("{target_basename}"))][0]'
     cmd = ["jq", "-c", jq_filter, json_file]
     result = subprocess.run(cmd, capture_output=True, text=True)
 
-    if result.returncode != 0:
-        return None
+    if result.returncode == 0:
+        output = result.stdout.strip()
+        if output and output != "null":
+            try:
+                return json.loads(output)
+            except json.JSONDecodeError:
+                pass
 
-    output = result.stdout.strip()
-    if not output or output == "null":
-        return None
+    # For .h files: find a .c file with the same basename (wad_stats_def.h → wad_stats_def.c)
+    if target_path.suffix in ('.h', '.hpp'):
+        stem = target_path.stem  # e.g. "wad_stats_def"
+        jq_filter_h = f'[.[] | select(.file | endswith("/{stem}.c"))][0]'
+        cmd = ["jq", "-c", jq_filter_h, json_file]
+        result = subprocess.run(cmd, capture_output=True, text=True)
 
-    try:
-        return json.loads(output)
-    except json.JSONDecodeError:
-        return None
+        if result.returncode == 0:
+            output = result.stdout.strip()
+            if output and output != "null":
+                try:
+                    entry = json.loads(output)
+                    print(f"  [info] Header {target_basename} not in compile_commands.json, "
+                          f"using sibling: {Path(entry.get('file', '')).name}")
+                    return entry
+                except json.JSONDecodeError:
+                    pass
+
+    return None
 
 
 # ==================== command transformation ====================
