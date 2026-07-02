@@ -35,7 +35,8 @@ parse_define() {
   disp  :usage         -h --help
 }
 
-me_dispatch_getoptions
+me_dispatch_getoptions parse_define "$@"
+eval set -- ${var_REST:-}
 
 action=$var_Action
 commitmsg=$var_Message

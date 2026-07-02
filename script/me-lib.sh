@@ -33,8 +33,11 @@ me_check_debug() {
 
 me_dispatch_getoptions() {
     local parser="${1:-parse_define}"
+    shift 2>/dev/null || true
     if command -v getoptions &>/dev/null; then
         eval "$(getoptions "$parser") exit 1"
+        # REST is set by getoptions; propagate to caller's positional params
+        var_REST="${REST:-}"
         if [ "${var_RequestHelp:-0}" = "1" ]; then
             (eval "getoptions_parse -h --help") 2>&1
             echo ""

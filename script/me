@@ -65,8 +65,20 @@ case "$cmd" in
         exit 0 ;;
     __complete)
         shift || true
-        p="$(find_subcmd "${1:-}")" && "$p" __complete "" 2>/dev/null
-        [[ -z "${1:-}" ]] && list_subcmds
+        arg="${1:-}"
+        if [[ -z "$arg" ]]; then
+            list_subcmds
+            exit 0
+        fi
+        # Split on first "--" (space→dash separator from completion)
+        # e.g. "tag--a" → subcmd="tag", ctx="a"
+        subcmd="${arg%%--*}"
+        if [[ "$subcmd" == "$arg" ]]; then
+            p="$(find_subcmd "$arg")" && "$p" __complete "" 2>/dev/null
+        else
+            ctx="${arg#*--}"
+            p="$(find_subcmd "$subcmd")" && "$p" __complete "$ctx" 2>/dev/null
+        fi
         exit 0 ;;
     __help)
         shift || true
