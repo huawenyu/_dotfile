@@ -66,9 +66,11 @@ def find_compile_entry_via_jq(json_file, target_file):
             except json.JSONDecodeError:
                 pass
 
-    # For .h files: find a .c file with the same basename (wad_stats_def.h → wad_stats_def.c)
+    # For .h files: find a .c file that includes it
     if target_path.suffix in ('.h', '.hpp'):
         stem = target_path.stem  # e.g. "wad_stats_def"
+
+        # 1. Try exact stem match: wad_stats_def.h → wad_stats_def.c
         jq_filter_h = f'[.[] | select(.file | endswith("/{stem}.c"))][0]'
         cmd = ["jq", "-c", jq_filter_h, json_file]
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -80,6 +82,41 @@ def find_compile_entry_via_jq(json_file, target_file):
                     entry = json.loads(output)
                     print(f"  [info] Header {target_basename} not in compile_commands.json, "
                           f"using sibling: {Path(entry.get('file', '')).name}")
+                    return entry
+                except json.JSONDecodeError:
+                    pass
+
+        # 2. Try prefix match: wad_stats_impl.h → wad_stats_def.c (common prefix "wad_stats")
+        #    This handles headers included by a .c file with a shared prefix
+        prefix = stem.split('_')[0]  # e.g. "wad"
+        if len(prefix) >= 3:
+            jq_filter_pfx = f'[.[] | select(.file | endswith("/{prefix}_stats_def.c"))][0]'
+            cmd = ["jq", "-c", jq_filter_pfx, json_file]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+
+            if result.returncode == 0:
+                output = result.stdout.strip()
+                if output and output != "null":
+                    try:
+                        entry = json.loads(output)
+                        print(f"  [info] Header {target_basename} not in compile_commands.json, "
+                              f"using related: {Path(entry.get('file', '')).name}")
+                        return entry
+                    except json.JSONDecodeError:
+                        pass
+
+        # 3. Fallback: find any .c file in a "wad" directory under migbase/
+        jq_filter_dir = '[.[] | select(.file | test("migbase/.*wad.*/[^/]+\\.c$"))][0]'
+        cmd = ["jq", "-c", jq_filter_dir, json_file]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.returncode == 0:
+            output = result.stdout.strip()
+            if output and output != "null":
+                try:
+                    entry = json.loads(output)
+                    print(f"  [info] Header {target_basename} not in compile_commands.json, "
+                          f"using nearby: {Path(entry.get('file', '')).name}")
                     return entry
                 except json.JSONDecodeError:
                     pass
