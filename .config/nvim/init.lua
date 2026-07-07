@@ -918,8 +918,7 @@ local plugins = {
           return vim.fn.executable("zellij") == 1
         end
 
-        local name = nil
-
+        local name = ""
         if has_zellij() then
           local f = io.popen("zellij action current-tab-info 2>/dev/null")
           if f then
@@ -927,22 +926,22 @@ local plugins = {
             f:close()
             name = out:match("name:%s*([^\n\r]+)")
           end
-        else
-          local f = io.open("/etc/info", "r")
-          if not f then return nil end
+        end
 
+        local f = io.open("/etc/info", "r")
+        if f then
           local content = f:read("*a")
           f:close()
 
           -- extract [name:work]
-          name = content:match("%[name:(.-)%]")
+          name = name .. ":" .. content:match("%[name:(.-)%]")
         end
 
-        if not name or name == "" then
+        if name == "" then
           return ""
+        else
+          return " " .. name:gsub("%s+", "")
         end
-
-        return " " .. name:gsub("%s+", "")
       end
 
       -- 2. Setup lualine with the function in lualine_z
