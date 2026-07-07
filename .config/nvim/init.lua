@@ -919,12 +919,14 @@ local plugins = {
         end
 
         local name = ""
+        local id = ""
         if has_zellij() then
           local f = io.popen("zellij action current-tab-info 2>/dev/null")
           if f then
             local out = f:read("*a") or ""
             f:close()
             name = out:match("name:%s*([^\n\r]+)")
+            id = out:match("id:%s*([^\n\r]+)")
           end
         end
 
@@ -934,7 +936,7 @@ local plugins = {
           f:close()
 
           -- extract [name:work]
-          name = name .. ":" .. content:match("%[name:(.-)%]")
+          name = name .. id .. content:match("%[name:(.-)%]")
         end
 
         if name == "" then
