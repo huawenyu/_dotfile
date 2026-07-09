@@ -6,48 +6,54 @@ SELF="$(basename "${BASH_SOURCE[0]}")"
 
 find_tool_subcmd() {
     local cmd="$1"
+
+    # 1. Check for Flat+Dir layout: me-tool-<cmd>/_main_ in local dir
     local local_path="$DIR/${SELF}-${cmd}"
-    # Check directory with _main_ first (Flat+Dir layout)
     if [[ -d "$local_path" && -x "$local_path/_main_" ]]; then
         echo "$local_path/_main_"; return 0
     elif [[ -x "$local_path" ]]; then
         echo "$local_path"; return 0
     fi
-    local IFS=':'
-    for dir in $PATH; do
-        local p="$dir/${SELF}-${cmd}"
-        # Check directory with _main_ first
-        if [[ -d "$p" && -x "$p/_main_" ]]; then
-            echo "$p/_main_"; return 0
-        elif [[ -x "$p" ]]; then
-            echo "$p"; return 0
+
+    # 2. Check tool/ directory for me-<cmd> files
+    local tool_dir="/home/hyu/dotwiki/tool"
+    if [[ -d "$tool_dir" ]]; then
+        # Flat+Dir: tool/me-<cmd>/_main_ or tool/me-<cmd>
+        local me_file="$tool_dir/me-${cmd}"
+        if [[ -d "$me_file" && -x "$me_file/_main_" ]]; then
+            echo "$me_file/_main_"; return 0
+        elif [[ -x "$me_file" ]]; then
+            echo "$me_file"; return 0
         fi
-    done
+    fi
     return 1
 }
 
 list_tool_subcmds() {
-    local -A seen_dirs=()
-    local IFS=':'
+    local tool_dir="/home/hyu/dotwiki/tool"
+    [[ ! -d "$tool_dir" ]] && return
+
+    # Subcommands already available via other me subcommands - skip these
+    local skip_cmds="ai-log config-dut config-gitvan fgt-addr2line fgt-craddr fgt-eco fgt-pcap sshfs sync trace update-repo update-wiki"
+
     {
-        for dir in $PATH; do
-            [[ -n "${seen_dirs[$dir]:-}" ]] && continue
-            seen_dirs[$dir]=1
-            for f in "$dir/${SELF}-"*; do
-                if [[ -x "$f" ]]; then
-                    basename "$f" | sed "s/^${SELF}-//"
-                elif [[ -d "$f" && -x "$f/_main_" ]]; then
-                    basename "$f" | sed "s/^${SELF}-//"
+        # Scan tool/ for me-<name> files (Flat layout: me-sync, me-sshfs)
+        for f in "$tool_dir/me-"*; do
+            if [[ -x "$f" && ! -d "$f" ]]; then
+                local name="$(basename "$f" | sed 's/^me-//')"
+                # Skip if already a me subcommand or has a parent me subcommand
+                if [[ " $skip_cmds " == *" $name "* ]]; then
+                    continue
                 fi
-            done 2>/dev/null
-        done
-        for f in "$DIR/${SELF}-"*; do
-            if [[ -x "$f" ]]; then
-                echo "${f##*/}" | sed "s/^${SELF}-//"
+                echo "$name"
             elif [[ -d "$f" && -x "$f/_main_" ]]; then
-                echo "${f##*/}" | sed "s/^${SELF}-//"
+                local name="$(basename "$f" | sed 's/^me-//')"
+                if [[ " $skip_cmds " == *" $name "* ]]; then
+                    continue
+                fi
+                echo "$name"
             fi
-        done
+        done 2>/dev/null
     } | sort -u
 }
 
