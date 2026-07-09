@@ -586,7 +586,36 @@ RemapClangdJson () {
     local cur_dir
     cur_dir=$(realpath .)
 
-    # Replace /src with cwd:
+    # Extract the project name from the current path (e.g., "fix-8.0_waps_build_perf" from /mnt/ssd/work/bf-top3/fix-8.0_waps_build_perf)
+    local cur_proj
+    cur_proj=$(basename "$cur_dir")
+
+    # Find what project name is actually in the compile_commands.json
+    local old_proj
+    old_proj=$(python3 -c "
+import json, sys
+with open('$ClangdFile') as f:
+    data = json.load(f)
+dirs = set()
+for entry in data[:50]:
+    d = entry.get('directory', '')
+    if '/mnt/ssd/work/bf-top3/' in d:
+        sub = d.replace('/mnt/ssd/work/bf-top3/', '')
+        parts = sub.split('/')
+        if parts:
+            dirs.add(parts[0])
+print('|'.join(sorted(dirs)))
+" 2>/dev/null || echo "")
+
+    # If we found an old project name different from current, remap it
+    if [[ -n "$old_proj" && "$old_proj" != "$cur_proj" ]]; then
+        # old_proj might contain multiple separated by |, take the first one
+        old_proj="${old_proj%%|*}"
+        echo "Remapping project: '$old_proj' -> '$cur_proj' in $ClangdFile"
+        sed -i "s|$old_proj|$cur_proj|g" "$ClangdFile"
+    fi
+
+    # Also replace /src with cwd:
     # - "/src" (bare, in directory field) → "/mnt/ssd/..."
     # - /src/ (with slash, in -I flags and file paths) → /mnt/ssd/.../
     sed -i "s|\"/src\"|\"$cur_dir\"|g; s|/src/|$cur_dir/|g" "$ClangdFile"
