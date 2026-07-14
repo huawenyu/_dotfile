@@ -25,16 +25,16 @@ keybinds clear-defaults=true {
         bind "Ctrl g" { SwitchToMode "Locked"; }
 
         // TAB navigation (only real function you need)
-        bind "Alt n" { GoToNextTab; }
-        bind "Alt p" { GoToPreviousTab; }
+        bind "Alt N" { GoToNextTab; }
+        bind "Alt P" { GoToPreviousTab; }
 
         // TAB management: similar like browser C-t/w
-        bind "Alt t" { NewTab; }
-        bind "Alt w" { CloseTab; }
+        bind "Alt T" { NewTab; }
+        bind "Alt W" { CloseTab; }
         bind "Alt a" { ToggleTab; }
 
         // Cann't input if no status-bar
-        bind "Alt r" { SwitchToMode "RenameTab"; }
+        bind "Alt R" { SwitchToMode "RenameTab"; }
 
         // --- DIRECT SWITCHING & WINDOWS TERMINAL TITLE SYNC ---
         bind "Alt 6" { GoToTab 1; }
@@ -44,7 +44,7 @@ keybinds clear-defaults=true {
         bind "Alt 0" { GoToTab 5; }
 
         // session exit
-        bind "Alt q" { Quit; }
+        bind "Alt Q" { Quit; }
     }
 
     // 2. Define Tmux-like actions that happen AFTER you press your prefix (Ctrl + g)
