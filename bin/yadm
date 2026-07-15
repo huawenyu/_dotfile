@@ -174,11 +174,13 @@ function score_file() {
     tgt="${YADM_BASE}/${tgt#"$YADM_ALT/"}"
   fi
 
-  # resolve thehome/ → YADM_BASE, theroot/ → /
+  # resolve thehome/ → YADM_BASE, theroot/ → /, themntc/ → /mnt/c/
   if [[ "$tgt" == "${YADM_BASE}/thehome/"* ]]; then
     tgt="${YADM_BASE}/${tgt#${YADM_BASE}/thehome/}"
   elif [[ "$tgt" == "${YADM_BASE}/theroot/"* ]]; then
     tgt="/${tgt#${YADM_BASE}/theroot/}"
+  elif [[ "$tgt" == "${YADM_BASE}/themntc/"* ]]; then
+    tgt="/mnt/c/${tgt#${YADM_BASE}/themntc/}"
   fi
 
   score=0
@@ -599,6 +601,8 @@ function alt() {
         resolved="${YADM_BASE}/${resolved#${YADM_BASE}/thehome/}"
       elif [[ "$resolved" == "${YADM_BASE}/theroot/"* ]]; then
         resolved="/${resolved#${YADM_BASE}/theroot/}"
+      elif [[ "$resolved" == "${YADM_BASE}/themntc/"* ]]; then
+        resolved="/mnt/c/${resolved#${YADM_BASE}/themntc/}"
       fi
       possible_alts+=("$resolved")
     fi
