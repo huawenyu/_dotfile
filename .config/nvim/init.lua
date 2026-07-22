@@ -1235,7 +1235,7 @@ local plugins = {
   -- ============================================================
   -- Search / Jump / Motion
   -- ============================================================
-  { "huawenyu/vim-grepper", enabled = cond({ "editor" }), build = "git switch master && git pull --rebase", lazy = false },
+  { "huawenyu/vim-grepper", enabled = cond({ "editor" }), build = "git switch master && git pull --rebase", lazy = true, cmd = { "Grepper", "GrepperRg" } },
   {
     "dhananjaylatkar/cscope_maps.nvim",
     enabled = cond({ "coder" }),
@@ -1883,8 +1883,8 @@ local plugins = {
     "huawenyu/diffview.nvim",
     enabled = cond({ "editor" }),
     build = "git switch main && git pull --rebase",
-    lazy = false,
-    cmd = { "DiffviewOpen", "DiffviewLog" },
+    lazy = true,
+    cmd = { "DiffviewOpen", "DiffviewLog", "DiffviewClose", "DiffviewToggle", "DiffviewRefresh", "DiffviewFileHistory" },
     dependencies = { "nvim-lua/plenary.nvim" },
     keys = {
       { "<leader>vg", "<cmd>DiffviewToggle<cr>", desc = "[view,git] Diffview Toggle *", },
@@ -1902,6 +1902,97 @@ local plugins = {
       vim.api.nvim_create_user_command("DiffYadme", function(opts)
         require("diffview").setup({ git_cmd = { "yadme" } }); vim.cmd("DiffviewOpen " .. opts.args)
       end, { nargs = "*" })
+    end,
+  },
+  {
+    "lewis6991/gitsigns.nvim",
+    enabled = cond({ "editor", "git" }),
+    event = { "BufReadPre", "BufNewFile" },
+    config = function()
+      require("gitsigns").setup({
+        current_line_blame = false,
+        preview_config = { delay = 500, border = "rounded" },
+        attach_to_untracked = false,
+        update_debounce = 250,
+        show_deleted = false,
+      })
+    end,
+  },
+  {
+    "huawenyu/reader.nvim",
+    dir = vim.fn.stdpath("data") .. "/lazy/reader.nvim",
+    lazy = true,
+    enabled = cond({ "editor" }),
+    keys = {
+      -- { "J", "Lzz", desc = "[view] Half page down" },
+      -- { "K", "Hzz", desc = "[view] Half page up" },
+      {
+        ";j",
+        function()
+          require("reader").next_paragraph()
+        end,
+        desc = "[read] Next paragraph/chapter",
+      },
+
+      {
+        ";k",
+        function()
+          require("reader").previous_paragraph()
+        end,
+        desc = "[read] Previous paragraph/chapter",
+      },
+    },
+    config = function()
+      require("reader").setup()
+    end,
+  },
+  {
+    "folke/zen-mode.nvim",
+    enabled = cond({ "editor" }),
+    event = "VeryLazy",
+    cmd = { "ZenMode" },
+    dependencies = { "reader.nvim" }, -- loads reader.nvim before zen-mode config
+
+    keys = {
+      { "<leader>vz", "<cmd>ZenMode<cr>", desc = "[view,read] ZenMode Read *" },
+    },
+
+    opts = {
+      window = {
+        width = .85,
+        options = {
+          signcolumn = "no",
+          number = false,
+          relativenumber = false,
+          foldcolumn = "0",
+
+          wrap = true,
+          linebreak = true,
+          breakindent = true,
+          breakindentopt = "shift:2,min:20",
+
+          list = false,          -- don't show listchars
+          showbreak = "",        -- no ↪, ↩, etc.
+
+          cursorline = false,
+          cursorcolumn = false,
+          colorcolumn = "",
+        },
+      },
+    },
+
+    config = function(_, opts)
+      opts.on_open = function(_win)
+        vim.schedule(function()
+          require("reader").restore()
+        end)
+      end
+
+      opts.on_close = function()
+        require("reader").save()
+      end
+
+      require("zen-mode").setup(opts)
     end,
   },
   { -- will hide some importance output message, don't use it
@@ -2135,6 +2226,21 @@ vim.api.nvim_create_autocmd('ColorScheme', {
     vim.api.nvim_set_hl(0, 'Visual', { reverse = true })
   end,
 })
+
+-- Detach gitsigns for non-code buffers to skip per-buffer `git` calls.
+-- gitsigns attaches via BufReadPost; detach in the same callback to skip
+-- subsequent refresh work. Saves a small amount per-buffer.
+if vim.g.vim_confi_option.mode and vim.tbl_contains(vim.g.vim_confi_option.mode, "editor") then
+  vim.api.nvim_create_autocmd("BufReadPost", {
+    pattern = { "*.md", "*.txt", "*.wiki", "*.help", "MAN://*" },
+    callback = function(args)
+      pcall(function()
+        local gs = require("gitsigns")
+        if gs and gs.detach then gs.detach(args.buf) end
+      end)
+    end,
+  })
+end
 
 
 local function load_vimscript_config()
