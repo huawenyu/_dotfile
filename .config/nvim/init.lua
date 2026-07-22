@@ -812,7 +812,7 @@ local plugins = {
   -- { "OXY2DEV/markview.nvim", lazy = false, enabled = cond({ "editor", "markdown" }), ft = "markdown" },
   {
     'MeanderingProgrammer/render-markdown.nvim',
-    enabled = false and cond({ "editor", "markdown" }),
+    enabled = cond({ "editor", "markdown" }),
     dependencies = {
       'nvim-treesitter/nvim-treesitter',
       'nvim-tree/nvim-web-devicons' -- or 'mini.icons'
@@ -820,22 +820,79 @@ local plugins = {
     ---@module 'render-markdown'
     ---@type render.md.UserConfig
     opts = {
+      enabled = true,
+
       file_types = { "markdown", "vimwiki" },
-      heading = { position = 'inline' },
-      code = {
-        style = 'normal',
-        border = 'thick',
+      heading = {
+        enabled = true,
+        sign = false,
+        icons = {},
+        width = "full",
+        left_pad = 0,
+        right_pad = 0,
+
+        -- important:
+        backgrounds = false,
       },
-      -- Better checkboxes
+
+      code = {
+        enabled = true,
+        style = "normal",
+        width = "none",
+        left_pad = 0,
+        right_pad = 0,
+      },
+
+      -- keep terminal clean
+      render_modes = { "n", "c", "t" },
+
+      bullet = {
+        enabled = true,
+        icons = { "•", "◦", "▪" },
+      },
+
       checkbox = {
         enabled = true,
-        unchecked = { icon = '   ' },
-        checked = { icon = ' ' },
+        unchecked = {
+          icon = "☐",
+        },
+        checked = {
+          icon = "☑",
+        },
+      },
+
+      quote = {
+        enabled = false,
+      },
+
+      pipe_table = {
+        enabled = true,
+        preset = "round",
+      },
+
+      link = {
+        enabled = false,
+      },
+
+      sign = {
+        enabled = false,
+      },
+
+      win_options = {
+        conceallevel = {
+          default = 2,
+        },
+        concealcursor = {
+          default = "",
+        },
       },
     },
+
+
     ft = { "markdown", "vimwiki" }, -- Lazy load on these filetypes
     config = function(_, opts)
       require('render-markdown').setup(opts)
+
       -- Required for the icons/styling to "render" properly
       vim.opt.conceallevel = 2
     end,
