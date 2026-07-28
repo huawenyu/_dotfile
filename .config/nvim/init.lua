@@ -303,10 +303,20 @@ local plugins = {
       if prefer_dir == nil or prefer_dir == "" then prefer_dir = "daemon/wad" end
       local dir_arg = " " .. prefer_dir
 
+      -- Ensure g:grepper is a Vim *dictionary* (not a list) before setting
+      -- flags on it. An empty Lua {} becomes a Vim list, which makes
+      -- vim-grepper's extend() fail with E712. vim.empty_dict() yields a dict.
+      local function set_grepper_flag(key, val)
+        if type(vim.g.grepper) ~= "table" then
+          vim.g.grepper = vim.empty_dict()
+        end
+        vim.g.grepper[key] = val
+      end
+
       vim.keymap.set("n", "<leader>gg", function()
         local word = vim.fn.expand("<cword>")
         if word == "" then return end
-        vim.g["grepper"].quickfix = 1
+        set_grepper_flag("quickfix", 1)
         local cmd = grepper_cmd .. " -w " .. vim.fn.shellescape(word) .. dir_arg
         vim.fn.feedkeys(":" .. cmd, "n")
       end, { silent = true, desc = "[find] Search to-quickfix *" })
@@ -320,7 +330,7 @@ local plugins = {
         lines[#lines] = lines[#lines]:sub(1, ec)
         local text = table.concat(lines, " ")
         if #text < 2 then return end
-        vim.g["grepper"].quickfix = 1
+        set_grepper_flag("quickfix", 1)
         local cmd = grepper_cmd .. " -F -e " .. vim.fn.shellescape(text) .. dir_arg
         vim.fn.feedkeys(":" .. cmd, "n")
       end, { silent = true, desc = "[find] Search to-quickfix *" })
@@ -328,7 +338,7 @@ local plugins = {
       vim.keymap.set("n", ";gg", function()
         local word = vim.fn.expand("<cword>")
         if word == "" then return end
-        vim.g["grepper"].quickfix = 0
+        set_grepper_flag("quickfix", 0)
         local cmd = grepper_cmd .. " -w " .. vim.fn.shellescape(word)
         vim.fn.feedkeys(":" .. cmd, "n")
       end, { silent = true, desc = "[find] Search to-loclist *" })
@@ -336,7 +346,7 @@ local plugins = {
       vim.keymap.set("n", ";vv", function()
         local word = vim.fn.expand("<cword>")
         if word == "" then return end
-        vim.g["grepper"].quickfix = 0
+        set_grepper_flag("quickfix", 0)
         local cmd = grepper_cmd .. "Buffers -w " .. vim.fn.shellescape(word)
         vim.fn.feedkeys(":" .. cmd, "n")
       end, { silent = true, desc = "[find] Search to-loclist *" })
@@ -350,7 +360,7 @@ local plugins = {
         lines[#lines] = lines[#lines]:sub(1, ec)
         local text = table.concat(lines, " ")
         if #text < 2 then return end
-        vim.g["grepper"].quickfix = 0
+        set_grepper_flag("quickfix", 0)
         local cmd = grepper_cmd .. " -F -e " .. vim.fn.shellescape(text)
         vim.fn.feedkeys(":" .. cmd, "n")
       end, { silent = true, desc = "[find] Search to-loclist *" })
@@ -364,7 +374,7 @@ local plugins = {
         lines[#lines] = lines[#lines]:sub(1, ec)
         local text = table.concat(lines, " ")
         if #text < 2 then return end
-        vim.g["grepper"].quickfix = 0
+        set_grepper_flag("quickfix", 0)
         local cmd = grepper_cmd .. "Buffers -F -e " .. vim.fn.shellescape(text)
         vim.fn.feedkeys(":" .. cmd, "n")
       end, { silent = true, desc = "[find] Search to-loclist *" })
