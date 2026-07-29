@@ -3,7 +3,7 @@
 -- ~/.config/nvim/init.lua
 -- Performance-optimized Neovim configuration with lazy.nvim
 --
--- KEYMAPS  (LEADER = <Space>)
+-- KEYMAPS  (LEADER = <Space>, Help: <leader>?)
 --   Navigation   h/j/k/l=windows  c-n/p=quickfix  a-n/p=loclist  gf=open-file  ;1-9=tabs
 --   Find         ff=cscope→git→rg  ;ff=git-ls-files  fd/fs=LSP def/ref  fq=find-word
 --                fc/C/w=LSP callers/callees/assign  fl=fuzzy-buf  fL=live-grep
@@ -490,7 +490,7 @@ local plugins = {
       vim.keymap.set('n', ';vF', '<cmd>Telescope find_files<cr>', { silent = true, desc = "[picker] All files *" })
       vim.keymap.set('n', ';vd', '<cmd>Telescope diagnostics<cr>', { silent = true, desc = "Diagnostics" })
 
-      vim.keymap.set('n', '<leader>vk', function()
+      vim.keymap.set('n', '<leader>?', function()
         require('telescope.builtin').keymaps({
           default_text = " *$",
           attach_mappings = function(_, map)
@@ -500,7 +500,7 @@ local plugins = {
             return true
           end,
         })
-      end, { silent = true, desc = "Key maps (Filtered by endwith-*)" })
+      end, { silent = true, desc = "Help/Man/Key maps (Filtered by endwith-*) *" })
 
       vim.keymap.set('n', '<leader>vv', '<cmd>Telescope resume<cr>', { silent = true, desc = "[picker] Resume *" })
       vim.keymap.set('n', '<leader>vp', '<cmd>Telescope pickers<cr>', { silent = true, desc = "[picker] Picker" })
