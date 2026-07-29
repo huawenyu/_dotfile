@@ -174,3 +174,6 @@ stty werase undef
 bind -x '"\C-l":clear'
 
 . "$HOME/.cargo/env"
+
+# FOS AI
+source "$HOME/.fos-ai/bin/env.sh"
