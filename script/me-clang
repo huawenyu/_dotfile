@@ -510,6 +510,27 @@ def main():
 
     clang_path = "clang"
 
+    # Auto-disable output filter when it would drop 100% of the output.
+    # If the source has no #include directives, every preprocessed line is
+    # tagged with the source basename (or <built-in>/<command line>), none
+    # of which match the default keep-pattern (wad_stats,shm_stats). Result
+    # is a silent empty log.i — confusing for tutorial/demo files like
+    # 02_if_else.c. Detect this proactively and skip the filter.
+    if not args.no_filter:
+        try:
+            src = Path(args.file).resolve()
+            with open(src, 'r', errors='replace') as _f:
+                _has_inc = any(
+                    ln.lstrip().startswith('#include') for ln in _f
+                )
+            if not _has_inc:
+                patterns = args.keep_pattern or 'wad_stats,shm_stats'
+                print(f"  [info] {src.name} has no #include directives; "
+                      f"auto-disabling output filter (was keeping only: {patterns})")
+                args.no_filter = True
+        except (OSError, IOError):
+            pass
+
     try:
         run_clang_for_file(compile_db, args.file, args.out, clang_path,
                            dump_defines=args.dump_defines)
