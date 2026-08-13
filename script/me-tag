@@ -657,7 +657,22 @@ GenClangdJsonV2 () {
     # ~/.oh-my-zsh/custom/plugins/zsh-local/zsh-local.plugin.zsh
     #  alias compdb='compiledb -S -n make -j$(grep -c ^processor /proc/cpuinfo) -C sysinit'
     if command -v compiledb >/dev/null 2>&1; then
+        # FortiOS recursively includes ~556 Rules.mk files; GNU make 4.3
+        # segfaults (SIGSEGV) during rule parsing under the default 8MB stack,
+        # which compiledb surfaces as "dry-run make failed: signal: segmentation
+        # fault" and then writes NO compile_commands.json. Raise the stack so
+        # make's dry-run completes and compiledb can capture the commands.
+        if [[ "$(ulimit -s 2>/dev/null)" -lt 65536 ]]; then
+            ulimit -s 65536 2>/dev/null || true
+        fi
         compiledb -S -n make -j$(grep -c ^processor /proc/cpuinfo) -C sysinit
+        local _rc=$?
+        if [[ $_rc -ne 0 || ! -f "${var_dstDir}/${ClangdFile}" ]]; then
+            echo "compiledb failed (rc=$_rc) and '${ClangdFile}' not produced."
+            echo "  common causes: 'Configure' not run, or make still stack-overflowing;"
+            echo "  try: ulimit -s 65536 && compiledb -S -n make -C sysinit"
+            return 1
+        fi
     else
         echo "compiledb does not exist, please install from https://github.com/fcying/compiledb-go"
     fi
