@@ -24,17 +24,17 @@ keybinds clear-defaults=true {
         // Pressing Ctrl + a switches Zellij into the command 'locked' prefix state
         bind "Ctrl g" { SwitchToMode "Locked"; }
 
-        // TAB navigation (only real function you need)
-        bind "Alt N" { GoToNextTab; }
-        bind "Alt P" { GoToPreviousTab; }
+        //// TAB navigation (only real function you need)
+        //bind "Alt N" { GoToNextTab; }
+        //bind "Alt P" { GoToPreviousTab; }
 
-        // TAB management: similar like browser C-t/w
-        bind "Alt T" { NewTab; }
-        bind "Alt W" { CloseTab; }
-        bind "Alt a" { ToggleTab; }
+        //// TAB management: similar like browser C-t/w
+        //bind "Alt T" { NewTab; }
+        //bind "Alt W" { CloseTab; }
+        //bind "Alt a" { ToggleTab; }
 
-        // Cann't input if no status-bar
-        bind "Alt R" { SwitchToMode "RenameTab"; }
+        //// Cann't input if no status-bar
+        //bind "Alt R" { SwitchToMode "RenameTab"; }
 
         // --- DIRECT SWITCHING & WINDOWS TERMINAL TITLE SYNC ---
         bind "Alt 6" { GoToTab 1; }
@@ -43,8 +43,8 @@ keybinds clear-defaults=true {
         bind "Alt 9" { GoToTab 4; }
         bind "Alt 0" { GoToTab 5; }
 
-        // session exit
-        bind "Alt Q" { Quit; }
+        //// session exit
+        //bind "Alt Q" { Quit; }
     }
 
     // 2. Define Tmux-like actions that happen AFTER you press your prefix (Ctrl + g)
@@ -73,11 +73,11 @@ keybinds clear-defaults=true {
         bind "9" { GoToTab 9; SwitchToMode "Normal"; }
         bind "0" { GoToTab 10; SwitchToMode "Normal"; }
 
-        // Close current pane after prefix
-        bind "x" { CloseFocus; SwitchToMode "Normal"; }
+        //// Close current pane after prefix
+        //bind "x" { CloseFocus; SwitchToMode "Normal"; }
 
-        // Maximize current pane after prefix (like tmux zoom)
-        bind "m" { ToggleFocusFullscreen; SwitchToMode "Normal"; }
+        //// Maximize current pane after prefix (like tmux zoom)
+        //bind "m" { ToggleFocusFullscreen; SwitchToMode "Normal"; }
     }
 
     // --- NEW: EXPLICIT RENAMETAB MODE LOGIC ---
