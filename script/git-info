@@ -109,6 +109,12 @@ color?when show colored output (always|never|auto)
 
     git_info "$1"
 
+    ## List executable files
+    if check_exec; then
+        echo "found executable"
+    fi
+
+
     if [[ $showStatus -ge 2 ]] || [[ $showStatus == 1 ]] && [[ $verbose -ge 1 ]] ; then
         echo "Ignored:"
         git ls-files . --ignored --exclude-standard --others | grep -v "/obj/debug" | grep -v "node_modules" | sed 's/^/    /'
@@ -119,7 +125,23 @@ color?when show colored output (always|never|auto)
         git ls-files . --exclude-standard --others | grep -v ".cache/clangd" | sed 's/^/    /'
     fi
 
+
     git count-objects -vH
+
+}
+
+
+check_exec() {
+    echo "Executable:"
+    while read -r status file; do
+        mode=$(git ls-files --stage -- "$file" | awk '{print $1}')
+        if [[ "$mode" == 100755 ]]; then
+            echo "executable: $file"
+            return 0
+        fi
+    done < <(git status --short)
+
+    return 1
 }
 
 initialize_colors () {
@@ -227,6 +249,7 @@ git_info () {
 
     do_git_info "$@"
 }
+
 
 do_git_info () {
     local git_dir="$1" relpath="$2" root line field color reset
