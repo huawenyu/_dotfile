@@ -176,4 +176,4 @@ bind -x '"\C-l":clear'
 . "$HOME/.cargo/env"
 
 # FOS AI
-source "$HOME/.fos-ai/bin/env.sh"
+source "$HOME/.fos-exp-ai/bin/env.sh"
