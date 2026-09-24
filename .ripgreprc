@@ -20,8 +20,33 @@ c:c,h
 wiki:wiki,md,sh
 
 # Using glob patterns to include/exclude files or folders
+## Python ignore
+--glob=!__pycache__/*
+--glob=!*.pyc
+
+## C/C++ ignore
+--glob=!*.o
+--glob=!*.a
+--glob=!*.so
+--glob=!*.d
+--glob=!*.gcda
+--glob=!*.gcno
+
+# Build Dependencies
+--glob=!build/
+--glob=!builddir/
+--glob=!_build/
+--glob=!dist/
+--glob=!node_modules/**
+--glob=!doxygen/
+--glob=!node_modules/
+--glob=!vendor/
+
+# my ignore
 --glob=!fpx-sync/*
 --glob=!git/*
+--glob=!daemon/wad/test/**
+--glob=!**/unittest/**
 --glob=!.ccls-cache/*
 --glob=!patch.*
 --glob=!*.patch
@@ -40,9 +65,6 @@ wiki:wiki,md,sh
 --glob=!compile_commands.json
 --glob=!init.map
 
-# Python ignore
---glob=!__pycache__/*
---glob=!*.pyc
 
 # Set the colors.
 --colors=line:none
