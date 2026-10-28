@@ -308,6 +308,7 @@
 	vimdiff = "!f() { vim -p $(git diff --name-only) +\"tabdo Gvdiff $@\" +tabfirst; }; f"
 
 	stat2 = status --untracked-files=all .
+    dft = -c diff.external=difft diff
 
 	export = "!f() {                                                                                      \
 		[ -z \"$1\" ] && { echo \"Usage: git export <start-sha/summary> [end-sha/summary]\"; return 1; }; \
