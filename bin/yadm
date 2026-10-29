@@ -1188,6 +1188,21 @@ function git_command() {
 
 function help() {
 
+  # derive the Files: paths from the resolved paths, so that --yadm-dir,
+  # --yadm-data and --yadm-repo (e.g. via the 'yadme' wrapper) are reflected
+  readonly help_dir="${YADM_DIR/$HOME/\$HOME}"
+  readonly help_data="${YADM_DATA/$HOME/\$HOME}"
+  readonly help_config="${YADM_CONFIG/$HOME/\$HOME}"
+  readonly help_encrypt="${YADM_ENCRYPT/$HOME/\$HOME}"
+  readonly help_bootstrap="${YADM_BOOTSTRAP/$HOME/\$HOME}"
+  readonly help_alt="${YADM_ALT/$HOME/\$HOME}"
+  readonly help_hooks="${YADM_HOOKS/$HOME/\$HOME}"
+  readonly help_repo="${YADM_REPO/$HOME/\$HOME}"
+  readonly help_archive="${YADM_ARCHIVE/$HOME/\$HOME}"
+
+  # wide enough for the longest path ($HOME/.local/share/me-yadm/repo.git = 37)
+  readonly padding="                                     "
+
   local msg
   IFS='' read -r -d '' msg << EOF
 Usage: yadm <command> [options...]
@@ -1204,6 +1219,7 @@ Commands:
   yadm clone <url> [-f]      - Clone an existing repository
   yadm config <name> <value> - Configure a setting
   yadm list [-a]             - List tracked files
+                               (cwd-relative; -a lists all)
   yadm alt                   - Create links for alternates
   yadm bootstrap             - Execute \$HOME/.config/yadm/bootstrap
   yadm encrypt               - Encrypt files
@@ -1214,11 +1230,15 @@ Commands:
   yadm transcrypt [OPTIONS]  - Run transcrypt commands for the yadm repo
 
 Files:
-  \$HOME/.config/yadm/config        - yadm's configuration file
-  \$HOME/.config/yadm/encrypt       - List of globs to encrypt/decrypt
-  \$HOME/.config/yadm/bootstrap     - Script run via: yadm bootstrap
-  \$HOME/.local/share/yadm/repo.git - yadm's Git repository
-  \$HOME/.local/share/yadm/archive  - Encrypted data stored here
+  $help_dir${padding:${#help_dir}} - yadm directory (configs)
+  $help_data${padding:${#help_data}} - yadm data directory
+  $help_config${padding:${#help_config}} - yadm's configuration file
+  $help_encrypt${padding:${#help_encrypt}} - List of globs to encrypt/decrypt
+  $help_bootstrap${padding:${#help_bootstrap}} - Script run via: yadm bootstrap
+  $help_alt${padding:${#help_alt}} - Alternate files (linked into \$HOME)
+  $help_hooks${padding:${#help_hooks}} - pre_/post_ hook scripts
+  $help_repo${padding:${#help_repo}} - yadm's Git repository
+  $help_archive${padding:${#help_archive}} - Encrypted data stored here
 
 Use "man yadm" for complete documentation.
 EOF

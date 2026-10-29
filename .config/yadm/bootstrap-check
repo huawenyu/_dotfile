@@ -1,0 +1,547 @@
+#!/usr/bin/env bash
+# Usage: bootstrap check <command> [options]
+# Summary: Check/install required tools
+#
+# Commands:
+#   help      Show this help (same as running 'check' with no command)
+#   list      List every tool and its category, apt/nix package and purpose
+#   status    Check the tools and print the table; exits 1 if any required tool is missing
+#   install   Skip the table and prompt for each missing tool (y=install / s=skip / e=exit)
+#
+# Options:
+#   --dev         Include the optional 'devtools' category (default: excluded)
+#   --category    Limit to one category (shell|search|editor|build|quality|vcs|net|doc|base|devtools)
+#   --flat        One unsectioned table, keeping the CATEGORY column
+#   --check       In 'status', also probe each installed tool's version
+#   --apt         Only offer apt; tools with no apt package are skipped
+#   --nix         Only offer nix
+#   --yes         Non-interactive: install every missing tool with the preferred manager
+#   --dryrun, -n  Print the commands that would run; make no changes
+
+# Note: deliberately no 'set -e' — 'read' returns non-zero on EOF/non-tty and
+# would abort the install loop (same reason as bootstrap-init).
+
+if [[ "${1:-}" == "--summary" ]]; then
+    echo "Check/install required tools"
+    exit 0
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/lib/bootstraplib"
+
+# ── Tool table ────────────────────────────────────────────────────────────────
+# fields: bins | apt pkg | nix attr | category | why | notes
+#   bins    comma-separated binary candidates, probed with 'command -v'
+#   apt/nix "-" means that manager cannot provide the tool
+#   notes   "nix only" / "optional" etc.; free text shown in the table
+TOOLS=(
+    # shell & session
+    'zsh|zsh|zsh|shell|shell; bootstraplib:ftZsh|'
+    'tmux|tmux|tmux|shell|multiplexer; ftToolBasic, MOTD|'
+    'zellij|-|zellij|shell|MOTD session status|nix only'
+    # search & navigate
+    'fzf|fzf|fzf|search|picker; ftToolBasic|'
+    'rg|ripgrep|ripgrep|search|code search; ftIDE, script/tag4one|'
+    'fd,fdfind|fd-find|fd|search|file finder|'
+    'bat,batcat|bat|bat|search|viewer; ftIDE|'
+    'jq|jq|jq|search|JSON; script/me-clang|'
+    # editor & tooling
+    'nvim|neovim|neovim|editor|editor; bootstrap-init/update, ftIDE|'
+    'cscope|cscope|cscope|editor|C symbol DB; script/me-tag|'
+    'ctags|universal-ctags|universal-ctags|editor|tag DB; ftIDE|'
+    # build toolchain
+    'cmake|cmake|cmake|build|build; ftBuild|'
+    'meson|meson|meson|build|build; ftBuild|'
+    'ninja|ninja-build|ninja|build|build; ftBuild|'
+    # lint & format
+    'shellcheck|shellcheck|shellcheck|quality|lint; script/tmex|'
+    # version control
+    'yadm|yadm|yadm|vcs|dotfiles; bin/yadm|apt 3.2.2, nix 3.5.0'
+    'difft|-|difftastic|vcs|structural diff|nix only'
+    # network & remote
+    'autossh|autossh|autossh|net|ftCommon|'
+    'sshpass|sshpass|sshpass|net|ftCommon, script/lib/connect.exp|'
+    'sshfs|sshfs|sshfs|net|script/me-tool|'
+    'w3m|w3m|w3m|net|script/me-update-dot|'
+    # documents & slides
+    'presenterm|-|presenterm|doc|slides; ftNixTool|nix only'
+    # base utilities
+    'tree|tree|tree|base|ftCommon|'
+    'unzip|unzip|unzip|base|ftToolBasic|'
+    '7z|p7zip-full|p7zip|base|archives|'
+    'rsync|rsync|rsync|base|file sync|'
+    'dos2unix|dos2unix|dos2unix|base|ftIDE|'
+    'mutagen|-|mutagen|base|file sync|nix only'
+    # DevTools — optional, install depends on the env/server
+    'gdb|gdb|gdb|devtools|debug; ftBuild|optional'
+    'valgrind|valgrind|valgrind|devtools|memcheck; ftBuild|optional'
+    'clangd|clangd|clang-tools|devtools|LSP; script/me-tag|optional'
+    'clang-format|clang-format|clang-tools|devtools|formatter; bootstrap-init|optional'
+    'cargo,rustc|cargo,rustc|cargo,rustc|devtools|rust toolchain|optional'
+)
+
+# category order + display titles
+CATS=(shell search editor build quality vcs net doc base devtools)
+cat_title() {
+    case "$1" in
+        shell)    echo "shell & session" ;;
+        search)   echo "search & navigate" ;;
+        editor)   echo "editor & tooling" ;;
+        build)    echo "build toolchain" ;;
+        quality)  echo "lint & format" ;;
+        vcs)      echo "version control" ;;
+        net)      echo "network & remote" ;;
+        doc)      echo "documents & slides" ;;
+        base)     echo "base utilities" ;;
+        devtools) echo "DevTools — optional" ;;
+        *)        echo "$1" ;;
+    esac
+}
+
+# ── Options ───────────────────────────────────────────────────────────────────
+# MODE is one of: help | list | status | install
+WITH_DEV=
+ONLY_CAT=
+MODE=
+ALLOW_APT=1
+ALLOW_NIX=1
+ASSUME_YES=
+DRYRUN=
+
+is_mode() {
+    case "$1" in
+        help|list|status|install) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --complete)
+            echo help list status install --dev --category --check --apt --nix --yes --flat --dryrun -n -h --help
+            exit 0 ;;
+        -h|--help)    MODE=help; shift ;;
+        --dev)        WITH_DEV=1; shift ;;
+        --category)   ONLY_CAT="$2"; shift 2 ;;
+        --check)      WITH_VERSIONS=1; shift ;;
+        --flat)       FLAT=1; shift ;;
+        --apt)        ALLOW_NIX=; shift ;;
+        --nix)        ALLOW_APT=; shift ;;
+        --yes)        ASSUME_YES=1; shift ;;
+        --dryrun|-n)  DRYRUN=1; shift ;;
+        -*)           echo "Unknown option: $1" >&2
+                      echo "Run 'bootstrap check help' for usage." >&2; exit 1 ;;
+        *)
+            if is_mode "$1"; then
+                MODE="$1"; shift
+            else
+                echo "Unknown command '$1'." >&2
+                echo "Run 'bootstrap check help' for usage." >&2
+                exit 1
+            fi ;;
+    esac
+done
+
+# no command given: bare 'check' is help, same as 'check help'
+[[ -z "$MODE" ]] && MODE=help
+
+if [[ -n "$ONLY_CAT" ]] && [[ ! " ${CATS[*]} " =~ " $ONLY_CAT " ]]; then
+    echo "Unknown category '$ONLY_CAT'. Valid: ${CATS[*]}" >&2
+    exit 1
+fi
+
+# ── Table helpers ─────────────────────────────────────────────────────────────
+# globals filled by parse_row / probe
+f_bins=(); f_apt=; f_nix=; f_cat=; f_why=; f_note=
+
+parse_row() {
+    IFS='|' read -r -a _f <<< "$1"
+    IFS=',' read -r -a f_bins <<< "${_f[0]}"
+    f_apt="${_f[1]}"; f_nix="${_f[2]}"; f_cat="${_f[3]}"
+    f_why="${_f[4]}"; f_note="${_f[5]}"
+}
+
+# sets: found_bin (empty if none), found_path
+probe() {
+    found_bin=; found_path=
+    local b
+    for b in "${f_bins[@]}"; do
+        if [[ -n "$b" ]] && command -v "$b" >/dev/null 2>&1; then
+            found_bin="$b"
+            found_path="$(command -v "$b")"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# short version string for an installed tool
+tool_version() {
+    local v
+    v="$("$1" --version 2>/dev/null | head -1)"
+    [[ -z "$v" ]] && v="$("$1" -V 2>&1 | head -1)"
+    [[ -z "$v" ]] && v="ok"
+    # keep the first version-looking token; the rest is copyright noise
+    local num
+    num="$(grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' <<< "$v" | head -1)"
+    [[ -n "$num" ]] && v="$num"
+    echo "${v:0:26}"
+}
+
+install_spec() {
+    local s=
+    [[ "$f_apt" != "-" ]] && s="apt:$f_apt"
+    [[ "$f_nix" != "-" ]] && s="${s:+$s | }nix:$f_nix"
+    [[ -z "$s" ]] && s="manual"
+    echo "$s"
+}
+
+# status for a row: ok | MISS | opt-miss | manual
+row_status() {
+    if probe; then echo ok; return; fi
+    if [[ "$f_cat" == "devtools" ]]; then echo opt-miss; return; fi
+    if [[ "$f_apt" == "-" && "$f_nix" == "-" ]]; then echo manual; return; fi
+    echo MISS
+}
+
+# ── Renderer ──────────────────────────────────────────────────────────────────
+TABLE_W=88
+
+# 'list': the raw table fields, grouped by category, no status probing
+render_list() {
+    local c row first=1
+    for c in "${CATS[@]}"; do
+        [[ -n "$ONLY_CAT" && "$c" != "$ONLY_CAT" ]] && continue
+        local any=
+        for row in "${TOOLS[@]}"; do
+            parse_row "$row"
+            [[ "$f_cat" == "$c" ]] && { any=1; break; }
+        done
+        [[ -z "$any" ]] && continue
+
+        [[ $first -eq 0 ]] && echo
+        first=0
+        echo "  ── $(cat_title "$c") ──"
+        printf '  %-12s %-18s %-18s %s\n' TOOL APT NIX WHY
+        for row in "${TOOLS[@]}"; do
+            parse_row "$row"
+            [[ "$f_cat" == "$c" ]] || continue
+            local spec_apt="$f_apt" spec_nix="$f_nix"
+            [[ "$spec_apt" == "-" ]] && spec_apt="-"
+            [[ "$spec_nix" == "-" ]] && spec_nix="-"
+            local why="$f_why"
+            [[ -n "$f_note" ]] && why="$why [$f_note]"
+            printf '  %-12s %-18s %-18s %s\n' \
+                "${f_bins[0]}" "$spec_apt" "$spec_nix" "$why"
+        done
+    done
+}
+
+render_table() {
+    local with_versions="${1:-}"
+    local total=0 miss=0 optmiss=0
+    local rows_missing=() rows_opt=()
+    local c
+
+    for c in "${CATS[@]}"; do
+        [[ -n "$ONLY_CAT" && "$c" != "$ONLY_CAT" ]] && continue
+        local cat_rows=() cat_ok=0 cat_n=0
+        local row status
+        for row in "${TOOLS[@]}"; do
+            parse_row "$row"
+            [[ "$f_cat" == "$c" ]] || continue
+            status="$(row_status)"
+            cat_rows+=("$row|$status")
+            cat_n=$((cat_n + 1))
+            [[ "$status" == "ok" ]] && cat_ok=$((cat_ok + 1))
+            total=$((total + 1))
+            case "$status" in
+                MISS)     miss=$((miss + 1)); rows_missing+=("${f_bins[0]}") ;;
+                opt-miss) optmiss=$((optmiss + 1)); rows_opt+=("${f_bins[0]}") ;;
+            esac
+        done
+        [[ $cat_n -eq 0 ]] && continue
+
+        echo
+        if [[ -z "$FLAT" ]]; then
+            local head="  ── $(cat_title "$c") ($cat_ok/$cat_n ok) "
+            local pad=$(( TABLE_W - ${#head} ))
+            (( pad < 4 )) && pad=4
+            printf '%s%s\n' "$head" "$(printf '─%.0s' $(seq 1 $pad))"
+        fi
+        # CATEGORY is redundant in sectioned output (it is the section header);
+        # --flat keeps it so each row stays self-describing
+        if [[ -n "$with_versions" && -n "$FLAT" ]]; then
+            printf '  %-12s %-8s %-9s %-9s %-34s %s\n' TOOL STATUS CATEGORY VERSION WHY INSTALL
+        elif [[ -n "$with_versions" ]]; then
+            printf '  %-12s %-8s %-9s %-34s %s\n' TOOL STATUS VERSION WHY INSTALL
+        elif [[ -n "$FLAT" ]]; then
+            printf '  %-12s %-8s %-9s %-38s %s\n' TOOL STATUS CATEGORY WHY INSTALL
+        else
+            printf '  %-12s %-8s %-38s %s\n' TOOL STATUS WHY INSTALL
+        fi
+        local r
+        for r in "${cat_rows[@]}"; do
+            local st="${r##*|}"
+            parse_row "${r%|*}"
+            local cell="$f_why"
+            [[ -n "$f_note" ]] && cell="$cell [$f_note]"
+            # show the binary that actually resolved (bat->batcat, fd->fdfind)
+            local tname="${f_bins[0]}"
+            probe && tname="$found_bin"
+            local stcolor=
+            [[ "$st" == "ok" ]] && stcolor="$colorGreen"
+            [[ "$st" == "MISS" ]] && stcolor="$colorYellow"
+
+            local ver= cats="$f_cat"
+            probe && [[ -n "$with_versions" ]] && ver="$(tool_version "$found_bin")"
+            [[ -z "$FLAT" ]] && cats=
+
+            if [[ -n "$with_versions" && -n "$FLAT" ]]; then
+                frow=(TOOL "$tname" STATUS "$st" CATEGORY "$cats" VERSION "$ver" WHY "$cell" INSTALL "$(install_spec)")
+            elif [[ -n "$with_versions" ]]; then
+                frow=(TOOL "$tname" STATUS "$st" VERSION "$ver" WHY "$cell" INSTALL "$(install_spec)")
+            elif [[ -n "$FLAT" ]]; then
+                frow=(TOOL "$tname" STATUS "$st" CATEGORY "$cats" WHY "$cell" INSTALL "$(install_spec)")
+            else
+                frow=(TOOL "$tname" STATUS "$st" WHY "$cell" INSTALL "$(install_spec)")
+            fi
+            # emit; status column carries the colour
+            local out="" i
+            for (( i=0; i<${#frow[@]}; i+=2 )); do
+                local lbl="${frow[i]}" val="${frow[i+1]}"
+                case "$lbl" in
+                    TOOL)     out+="$(printf '  %-12s' "$val")" ;;
+                    STATUS)   out+="$(printf ' %b%-8s%b' "$stcolor" "$val" "$colorReset")" ;;
+                    CATEGORY) out+="$(printf ' %-9s' "$val")" ;;
+                    VERSION)  out+="$(printf ' %-9s' "$val")" ;;
+                    WHY)      out+="$(printf ' %-34s' "$val")" ;;
+                    INSTALL)  out+="$(printf ' %s' "$val")" ;;
+                esac
+            done
+            printf '%s\n' "$out"
+        done
+    done
+
+    STATUS_RC=0
+    [[ $miss -gt 0 ]] && STATUS_RC=1
+
+    echo
+    printf '  %s\n' "$(printf '─%.0s' $(seq 1 $((TABLE_W - 2))))"
+    if [[ -n "$ONLY_CAT" ]]; then
+        echo "  $ONLY_CAT: $total checked, $miss missing, $optmiss optional not installed"
+    else
+        echo "  $total checked, $miss missing, $optmiss optional not installed"
+    fi
+    if [[ $miss -gt 0 ]]; then
+        echo "  $miss missing: ${rows_missing[*]}   →   run: bootstrap check install"
+    fi
+    if [[ $optmiss -gt 0 && -z "$WITH_DEV" ]]; then
+        echo "  $optmiss optional DevTools not installed (${rows_opt[*]}) — use --dev to offer them"
+    fi
+}
+
+# 'help' — usage only, no tool listing (that is 'list')
+if [[ "$MODE" == "help" ]]; then
+    awk '
+        /^#!/ { next }                     # shebang
+        /^# Note:/ || /^# would abort/ { exit }
+        /^#/ {
+            line = $0
+            sub(/^# ?/, "", line)
+            if (line ~ /^Summary:/) next   # already shown by "bootstrap check"
+            if (line == "" && !seen) next  # drop blank line right after the header
+            seen = 1
+            print line
+            next
+        }
+        { exit }                           # stop at the first non-comment line
+    ' "$0" | sed '${/^$/d;}'
+    exit 0
+fi
+
+# 'list' — every tool and its packages/purpose, no status
+if [[ "$MODE" == "list" ]]; then
+    FLAT=1
+    render_list
+    exit 0
+fi
+
+# 'status' — table only unless --dryrun, which continues into the prompt.
+# Exit non-zero when required tools are missing, so it is usable in scripts.
+if [[ "$MODE" == "status" && -z "$DRYRUN" ]]; then
+    render_table ${WITH_VERSIONS:+1}
+    exit $STATUS_RC
+fi
+
+# ── Prompt / install loop ('status', 'install') ───────────────────────────────
+[[ "$MODE" == "status" ]] && render_table ${WITH_VERSIONS:+1}
+
+# build the queue: missing, non-manual rows in category order, devtools gated
+QUEUE=()
+have_dev_skip=0
+for c in "${CATS[@]}"; do
+    [[ -n "$ONLY_CAT" && "$c" != "$ONLY_CAT" ]] && continue
+    if [[ "$c" == "devtools" && -z "$WITH_DEV" ]]; then
+        have_dev_skip=1
+        continue
+    fi
+    for row in "${TOOLS[@]}"; do
+        parse_row "$row"
+        [[ "$f_cat" == "$c" ]] || continue
+        probe && continue
+        [[ "$f_apt" == "-" && "$f_nix" == "-" ]] && continue
+        [[ "$f_nix" == "-" && -z "$ALLOW_APT" ]] && continue
+        [[ "$f_apt" == "-" && -z "$ALLOW_NIX" ]] && continue
+        QUEUE+=("$row")
+    done
+done
+
+if [[ ${#QUEUE[@]} -eq 0 ]]; then
+    echo
+    echo "  All required tools are installed."
+    exit 0
+fi
+
+# interactive availability
+interactive=0
+if [[ -n "$ASSUME_YES" ]]; then
+    interactive=1
+else
+    { : </dev/tty; } 2>/dev/null && interactive=1
+fi
+
+if [[ $interactive -eq 0 ]]; then
+    echo
+    echo "Non-interactive session; skipping installation."
+    exit 1
+fi
+
+apt_updated=0
+install_apt() {
+    local pkg="$1"
+    local do_update=0
+    if [[ $apt_updated -eq 0 ]]; then
+        do_update=1
+        apt_updated=1
+    fi
+    if [[ -n "$DRYRUN" ]]; then
+        [[ $do_update -eq 1 ]] && echo "        [dryrun] sudo apt-get update"
+        echo "        [dryrun] sudo apt-get install -qq -y $pkg"
+        return 0
+    fi
+    if [[ $do_update -eq 1 ]]; then
+        sudo apt-get update -qq || return 1
+    fi
+    sudo apt-get install -qq -y "$pkg"
+}
+
+install_nix() {
+    local attr="$1"
+    if [[ -n "$DRYRUN" ]]; then
+        echo "        [dryrun] nix-env -iA nixpkgs.$attr"
+        return 0
+    fi
+    nix-env -iA "nixpkgs.$attr"
+}
+
+idx=0
+for row in "${QUEUE[@]}"; do
+    idx=$((idx + 1))
+    parse_row "$row"
+
+    if [[ "$last_cat" != "$f_cat" ]]; then
+        echo
+        echo "  ── $(cat_title "$f_cat") ──"
+        last_cat="$f_cat"
+    fi
+
+    local_bins="${f_bins[0]}"
+    echo "  [$idx/${#QUEUE[@]}] $local_bins is missing.   ($f_why)"
+
+    # build the menu from what is actually available
+    prompt="       "
+    if [[ "$f_apt" != "-" && -n "$ALLOW_APT" ]]; then
+        prompt+="[a]pt ($f_apt)   "
+    fi
+    if [[ "$f_nix" != "-" && -n "$ALLOW_NIX" ]]; then
+        prompt+="[n]ix ($f_nix)   "
+    fi
+    prompt+="[s]kip   [e]xit"
+
+    if [[ -n "$ASSUME_YES" ]]; then
+        if [[ "$f_apt" != "-" && -n "$ALLOW_APT" ]]; then
+            ans=a
+        else
+            ans=n
+        fi
+        echo "$prompt   → auto: $ans"
+    else
+        while :; do
+            echo "$prompt"
+            echo -n "       > "
+            read -r ans </dev/tty || { echo; exit 1; }
+            [[ -z "$ans" ]] && ans=s
+            ans="${ans:0:1}"
+            case "$ans" in
+                s|S) ans=s; break ;;
+                e|E) ans=e; break ;;
+                a|A) [[ "$f_apt" != "-" && -n "$ALLOW_APT" ]] && break
+                     [[ "$f_nix" != "-" && -n "$ALLOW_NIX" ]] && { ans=n; break; }
+                     echo "       not available; choose another." ;;
+                n|N) [[ "$f_nix" != "-" && -n "$ALLOW_NIX" ]] && break
+                     echo "       not available; choose another." ;;
+                *)   echo "       invalid choice." ;;
+            esac
+        done
+    fi
+
+    case "$ans" in
+        e|E)
+            echo
+            echo "  Aborted by user; nothing further will be installed."
+            exit 1 ;;
+        s|S|"")
+            echo "        skipped" ;;
+        a|A)
+            if [[ -n "$DRYRUN" ]]; then
+                install_apt "$f_apt"; echo "        [dryrun] would verify $local_bins"
+            elif install_apt "$f_apt"; then
+                if probe; then echo "        ok   $local_bins ($found_path)"
+                else     echo "        FAIL $local_bins not on PATH after install"; fi
+            else
+                echo "        FAIL apt-get install $f_apt"
+            fi ;;
+        n|N)
+            if [[ -n "$DRYRUN" ]]; then
+                install_nix "$f_nix"; echo "        [dryrun] would verify $local_bins"
+            elif install_nix "$f_nix"; then
+                if probe; then echo "        ok   $local_bins ($found_path)"
+                else     echo "        FAIL $local_bins not on PATH after install"; fi
+            else
+                echo "        FAIL nix-env -iA nixpkgs.$f_nix"
+            fi ;;
+    esac
+done
+
+# final re-scan
+echo
+if [[ -n "$DRYRUN" ]]; then
+    echo "  [dryrun] no changes were made."
+    exit 0
+fi
+
+remaining=()
+for row in "${QUEUE[@]}"; do
+    parse_row "$row"
+    probe || remaining+=("${f_bins[0]}")
+done
+
+if [[ ${#remaining[@]} -eq 0 ]]; then
+    echo "  Done — all required tools are installed."
+    [[ $have_dev_skip -eq 1 ]] && echo "  (DevTools were not offered; use --dev to include them.)"
+    exit 0
+fi
+
+echo "  Still missing: ${remaining[*]}"
+exit 1
