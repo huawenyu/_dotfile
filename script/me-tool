@@ -31,30 +31,36 @@ find_tool_subcmd() {
 
 list_tool_subcmds() {
     local tool_dir="/home/hyu/dotwiki/tool"
-    [[ ! -d "$tool_dir" ]] && return
 
-    # Subcommands already available via other me subcommands - skip these
-    local skip_cmds="ai-log config-dut fgt-addr2line fgt-craddr fgt-eco fgt-pcap sshfs sync trace update-2fa update-repo update-wiki"
+    # Subcommands already available via another parent - skip these.
+    local skip_cmds="ai-log ai-update fgt-addr2line fgt-craddr fgt-eco fgt-pcap update-2fa update-repo update-share update-wiki"
 
     {
-        # Scan tool/ for me-<name> files (Flat layout: me-sync, me-sshfs)
-        for f in "$tool_dir/me-"*; do
+        # 1. <tool dir>/me-<name>       file, or dir with _main_ (Flat)
+        if [[ -d "$tool_dir" ]]; then
+            for f in "$tool_dir/me-"*; do
+                if [[ -x "$f" && ! -d "$f" ]]; then
+                    basename "$f" | sed 's/^me-//'
+                elif [[ -d "$f" && -x "$f/_main_" ]]; then
+                    basename "$f" | sed 's/^me-//'
+                fi
+            done 2>/dev/null
+        fi
+
+        # 2. Beside the dispatcher: <this dir>/me-tool-<name> and
+        #    me-tool-<name>/_main_. find_tool_subcmd already looks here, so
+        #    the listing must too, or a leaf resolves but never shows up.
+        for f in "$DIR/${SELF}-"*; do
             if [[ -x "$f" && ! -d "$f" ]]; then
-                local name="$(basename "$f" | sed 's/^me-//')"
-                # Skip if already a me subcommand or has a parent me subcommand
-                if [[ " $skip_cmds " == *" $name "* ]]; then
-                    continue
-                fi
-                echo "$name"
+                basename "$f" | sed "s/^${SELF}-//"
             elif [[ -d "$f" && -x "$f/_main_" ]]; then
-                local name="$(basename "$f" | sed 's/^me-//')"
-                if [[ " $skip_cmds " == *" $name "* ]]; then
-                    continue
-                fi
-                echo "$name"
+                basename "$f" | sed "s/^${SELF}-//"
             fi
         done 2>/dev/null
-    } | sort -u
+    } | sort -u | while IFS= read -r name; do
+        [[ " $skip_cmds " == *" $name "* ]] && continue
+        echo "$name"
+    done
 }
 
 cmd="${1:-help}"

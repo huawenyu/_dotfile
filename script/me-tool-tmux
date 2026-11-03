@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Usage: me tool tmux [options]
+# Summary: Tmux helper: mode, share, window/pane control
+#
 # merged from txctl + tx-share
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/me-lib.sh"

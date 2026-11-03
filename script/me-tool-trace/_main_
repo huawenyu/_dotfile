@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Usage: me tool trace [add|clean] [target] [options]
+# Summary: Insert or remove __TRACEME__ trace statements in C source
+
+# me API
+case "${1:-}" in
+    --summary) echo "Insert or remove __TRACEME__ trace statements in C source"; exit 0 ;;
+    --complete|__complete)
+        printf '%s\n' --help -h add clean
+        printf '%s\n' $(ls "${ME_TRACE_CONFIG_DIR:-$HOME/dotwiki/config}/trace.d" 2>/dev/null)
+        exit 0 ;;
+    -h|--help)
+        echo "Usage: me tool trace [add|clean] [target] [options]"
+        echo ""
+        echo "  Wraps trace.py. 'add' inserts the __TRACEME__ tag after each"
+        echo "  selected function's opening brace; 'clean' removes it again and"
+        echo "  reverses the config's patch.diff. Both work through a running Neovim."
+        echo ""
+        echo "  add      Insert traces (the default)"
+        echo "  clean    Remove traces, reverse the config's patch.diff"
+        echo "  target   Config dir under config/trace.d/ (default: wad)"
+        echo ""
+        echo "  -n, --dryrun     Print the resolved config, change nothing"
+        echo "  -m, --module     Module: wad|proxy"
+        echo "  -f, --file       File name match regex"
+        echo "  -s, --symbol     Symbol function name match regex"
+        echo "  -c, --client     Neovim listen address (default /tmp/nvim.trace)"
+        echo ""
+        echo "  Requires a Neovim listening on that address, e.g. in another pane:"
+        echo "    NVIM_LISTEN_ADDRESS=/tmp/nvim.trace nvim"
+        echo ""
+        echo "  Env: ME_TRACE_CONFIG_DIR (default ~/dotwiki/config)"
+        echo ""
+        echo "Script: ${BASH_SOURCE[0]}"
+        exit 0 ;;
+esac
+
+set -euo pipefail
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+IMPL="$DIR/trace.py"
+
+export ME_TRACE_CONFIG_DIR="${ME_TRACE_CONFIG_DIR:-$HOME/dotwiki/config}"
+if [[ ! -d "$ME_TRACE_CONFIG_DIR/trace.d" ]]; then
+    echo "me tool trace: config dir not found: $ME_TRACE_CONFIG_DIR/trace.d" >&2
+    echo "  Set ME_TRACE_CONFIG_DIR to the tree holding trace.d/." >&2
+    exit 1
+fi
+
+# The default action is 'add'. Accept it as a leading bare word or as
+# -a/--action, and hand trace.py the positional form its argparse declares:
+# ACTION [TARGET] [options].
+args=()
+have_action=0
+while (( $# > 0 )); do
+    case "$1" in
+        add|clean)
+            args+=("$1"); have_action=1; shift ;;
+        -a|--action)
+            if [[ $# -lt 2 ]]; then
+                echo "me tool trace: $1 needs a value (add|clean)." >&2
+                exit 1
+            fi
+            args+=("$2"); have_action=1; shift 2 ;;
+        *)
+            args+=("$1"); shift ;;
+    esac
+done
+
+if (( have_action == 0 )); then
+    # Put 'add' after any leading options and before the first positional
+    # (the target), which is where argparse expects the action.
+    first_pos=${#args[@]}
+    for i in "${!args[@]}"; do
+        case "${args[$i]}" in
+            -*) ;;
+            *) first_pos=$i; break ;;
+        esac
+    done
+    args=("${args[@]:0:first_pos}" add "${args[@]:first_pos}")
+fi
+
+exec python3 "$IMPL" "${args[@]}"

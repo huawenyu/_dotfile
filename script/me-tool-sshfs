@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# me API
+case "${1:-}" in
+    --summary) echo "Mount remote directory via SSHFS"; exit 0 ;;
+    --complete|__complete)
+        printf '%s\n' --help -h
+        exit 0 ;;
+    -h|--help)
+        echo "Usage: me tool sshfs <host:/path> <local_mount>"
+        echo "  <host:/path>     Remote host and path (e.g., work:/home/user)"
+        echo "  <local_mount>   Local mount point"
+        echo "  -h, --help     Show this help"
+        echo ""
+        echo "Script: ${BASH_SOURCE[0]}"
+        exit 0 ;;
+esac
+
+INPUT="$1"
+LOCAL_MNT="${2:-}"
+
+# ---- parse host:/path ----
+HOST="${INPUT%%:*}"
+REMOTE_PATH="${INPUT#*:}"
+
+# normalize path
+REMOTE_PATH="${REMOTE_PATH%/}"
+
+# safe mount name
+SAFE_NAME="$(echo "$REMOTE_PATH" | sed 's#/#_#g')"
+
+# default mount location
+if [[ -z "$LOCAL_MNT" ]]; then
+  #LOCAL_MNT="$HOME/mnt/$HOST/$SAFE_NAME"
+  echo "Please specify the local mount dir!"
+  exit 1
+fi
+
+mkdir -p "$LOCAL_MNT"
+
+sshfs "${HOST}:${REMOTE_PATH}" "$LOCAL_MNT" \
+  -o reconnect \
+  -o ServerAliveInterval=15 \
+  -o ServerAliveCountMax=3 \
+  -o Ciphers=chacha20-poly1305@openssh.com \
+  -o Compression=no \
+  -o cache=yes \
+  -o kernel_cache \
+  -o auto_cache \
+  -o ac_attr_timeout=60 \
+  -o entry_timeout=60 \
+  -o attr_timeout=60 \
+  -o negative_timeout=5 \
+  -o max_read=1048576 \
+  -o sshfs_sync \
+  -o follow_symlinks \
+  -o workaround=rename \
+  -o idmap=user \
+  -o transform_symlinks \
+  -o no_readahead \
+  -o ssh_command="ssh -o ControlMaster=auto -o ControlPersist=1h"

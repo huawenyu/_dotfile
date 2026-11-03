@@ -27,7 +27,7 @@ esac
 cat <<'EOF'
 # The `me` command family — this machine's layout
 
-`me` is a 157-line dispatcher in `~/script`. `me <cmd>` looks for an
+`me` is a 151-line dispatcher in `~/script`. `me <cmd>` looks for an
 executable named `me-<cmd>` on `PATH`, then in the dispatcher's own
 directory (`$DIR`). No arguments means `help`.
 
@@ -48,20 +48,66 @@ Real examples on this machine:
   `~/dotwiki/tool`. Both directories are on `PATH`, so the pair is Flat
   even though the files sit apart. `me-ai-update` is in the same tool
   directory.
-- `me-trace/` in `~/dotwiki/tool` is Flat+Dir: `_main_` is a bash wrapper
-  carrying the me API, and `trace.py` is the implementation.
-- `me-tool` is a dispatcher over `~/dotwiki/tool` only. It scans
-  `me-*` files there and subtracts a hardcoded `skip_cmds` list so that
-  commands already reachable through another parent (`ai-log`,
-  `fgt-*`, `sync`, `update-*`, …) do not appear twice.
+- `me-tool-trace/` in `~/script` is Flat+Dir: `_main_` is a bash wrapper
+  carrying the me API, and `trace.py` is the implementation. It sits beside
+  `me-tool` so `me tool trace` has exactly one spelling.
+- `me-tool` is a dispatcher over two places: `~/dotwiki/tool/me-<name>` and
+  `$DIR/me-tool-<name>` beside itself. It subtracts a hardcoded `skip_cmds`
+  list so commands reachable through another parent (`ai-log`, `fgt-*`,
+  `update-*`, …) do not appear twice. **Lookup and listing must agree** —
+  when only the lookup knew about `$DIR`, a leaf resolved but never appeared
+  in `me tool -h`. `me-tool-tag`, `me-tool-sshfs` and `me-tool-tmux` are
+  plain leaves there; they used to be `me tag`, `me sshfs` and `me tmux`,
+  which is why they sit beside their dispatcher.
 - `me-update-2fa` is reached both as `me update 2fa` and, from inside
   `me update repo`, as a helper: the parent asks it whether a 2FA code is
   needed before the first pull. A leaf does not have to be a leaf only.
+- **Leaf placement decides who can reach it.** `me-tool` scans
+  `~/dotwiki/tool` for `me-<name>`, so any leaf left there is also
+  reachable as `me tool <name>` whatever parent it was written for. Putting
+  `me-fgt-conf` next to `me-fgt` in `~/script` keeps it reachable only as
+  `me fgt conf`. Move the file, not the code, when you want one spelling.
 - `me-git` + `me-git-add` and `me-doc` are Flat: one executable each,
   both in `~/script`.
 
 Prefer Flat. Reach for Flat+Dir only when a subcommand needs more than
 one file (a Python module, several scripts); never add new Dir layouts.
+
+## The tree as it stands
+
+```
+me
+├── doc         me-family reference (this document)
+├── ai          (log, update)
+├── clang       clang/lint helpers
+├── fgt         (addr2line, build, conf, craddr, eco, pcap)
+├── git         (add)
+├── tool        (conf-putty, sshfs, tag, tmux, trace)
+└── update      (2fa, dot, nvim, repo, share, wiki)
+```
+
+Files: `~/script/me-*` for most leaves and parents, `~/dotwiki/tool/me-*`
+for the leaves that were always tool-directory resident. `me`'s list above
+is hardcoded and must be updated by hand; `me <parent> -h` for any parent
+derives its own table from the files on disk.
+
+## Two dispatchers that behave differently
+
+`me` (top level) and `me-tool` are the two that do not simply scan one
+directory, and both have tripped us:
+
+| | `me` | `me-tool` |
+| --- | --- | --- |
+| Lists by | hardcoded table | scanning |
+| Avoids child shadowing by | `grep -v '-'` in `__commands` | `skip_cmds` |
+| Extra detail | — | scans **two** dirs (see below) |
+
+`me-tool` resolves `me tool <name>` in `~/dotwiki/tool/me-<name>` **and**
+in `$DIR/me-tool-<name>` beside itself. Because `~/dotwiki/tool` is the
+same directory most leaves live in, any leaf there is reachable as
+`me tool <name>` no matter which parent it was written for — that is why
+`ai-log` and friends are in `skip_cmds`. A leaf meant to be reachable only
+through its real parent must live in `~/script`.
 
 ## The hidden API
 
@@ -163,7 +209,7 @@ chmod 755 ~/script/me-git
 
 Two differences from `me` itself, which is older:
 
-- `me`'s own help output is a hardcoded list (lines 130-147 of
+- `me`'s own help output is a hardcoded list (lines 131-141 of
   `~/script/me`). It does **not** auto-discover; a new top-level command
   stays invisible and incomplete until you add a line there.
 - `me` filters hyphenated names out of `__commands`
@@ -223,12 +269,51 @@ Two gotchas recorded from real failures:
 | Path | What it is |
 | --- | --- |
 | `~/script/me` | the dispatcher; hardcoded help list at the bottom |
-| `~/script/me-lib.sh` | `me_init` / `die` / `cleanup`; used by `me-tag`, `me-tmux`, `me-update-*` |
+| `~/script/me-lib.sh` | `me_init` / `die` / `cleanup`; used by `me-tool-tag`, `me-tool-tmux`, `me-update-*` |
 | `~/script/me-<name>` | leaf or parent subcommands |
-| `~/dotwiki/tool/` | second `PATH` directory: `me-ai-log`, `me-update-2fa`, `me-trace/`, `me-fgt-*` |
+| `~/script/me-tool-<name>` | `me tool` leaves beside the dispatcher: `tag`, `sshfs`, `tmux` (plain leaves) |
+| `~/dotwiki/tool/` | second `PATH` directory: `me-ai-log`, `me-update-2fa`, `me-update-share`, `me-conf-putty`, `me-fgt-*` |
+| `~/script/me-fgt-*` | `me fgt` leaves beside their dispatcher: `conf`, `build` |
+| `~/script/me-tool-trace/` | `me tool trace`, Flat+Dir; `trace.py` reads `ME_TRACE_CONFIG_DIR` (default `~/dotwiki/config`) |
+| `~/dotwiki/config/trace.d/` | trace targets (`wad`, `wad-64`, `dns`, …), one dir each with `conf.ini` |
 | `~/dotwiki/_removed/` | retired leaves, kept out of `PATH` so no dispatcher lists them |
 | `~/script/me_readme.md` | deploy notes: PATH, completions, the decision table |
 | `~/.claude-share/skills/me-subcmd/` | the generic scaffolding guide and templates |
+
+### Every file, by dispatcher
+
+`~/script` is on `PATH`; `~/dotwiki/tool` is on `PATH` too. A leaf listed
+under a parent is reachable as `me <parent> <leaf>` from its own directory,
+and additionally as `me tool <leaf>` if it sits in `~/dotwiki/tool`.
+
+| Command | File |
+| --- | --- |
+| `me doc` | `~/script/me-doc` |
+| `me ai log` | `~/dotwiki/tool/me-ai-log` |
+| `me ai update` | `~/dotwiki/tool/me-ai-update` |
+| `me clang` | `~/script/me-clang` |
+| `me fgt addr2line` | `~/dotwiki/tool/me-fgt-addr2line` |
+| `me fgt build` | `~/script/me-fgt-build` |
+| `me fgt conf` | `~/script/me-fgt-conf` |
+| `me fgt craddr` | `~/dotwiki/tool/me-fgt-craddr` |
+| `me fgt eco` | `~/dotwiki/tool/me-fgt-eco` |
+| `me fgt pcap` | `~/dotwiki/tool/me-fgt-pcap` |
+| `me git add` | `~/script/me-git-add` |
+| `me tool conf-putty` | `~/dotwiki/tool/me-conf-putty` |
+| `me tool sshfs` | `~/script/me-tool-sshfs` |
+| `me tool tag` | `~/script/me-tool-tag` |
+| `me tool tmux` | `~/script/me-tool-tmux` |
+| `me tool trace` | `~/script/me-tool-trace/_main_` (+ `trace.py`) |
+| `me update 2fa` | `~/dotwiki/tool/me-update-2fa` |
+| `me update dot` | `~/script/me-update-dot` |
+| `me update nvim` | `~/script/me-update-nvim` |
+| `me update repo` | `~/dotwiki/tool/me-update-repo` |
+| `me update share` | `~/dotwiki/tool/me-update-share` |
+| `me update wiki` | `~/dotwiki/tool/me-update-wiki` |
+
+Retired, kept in `~/dotwiki/_removed/` (not on `PATH`): `me-config`,
+`me-config-gitvan`, `me-sync`. Their replacements are `me tool …`,
+`me update 2fa tunnel`, and `me update share`.
 
 Which answers what:
 

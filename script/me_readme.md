@@ -38,9 +38,8 @@ autoload -Uz compinit && compinit
 
 #### Fish
 
-```bash
-me completion fish > ~/.config/fish/completions/me.fish
-```
+Not supported. The `completion` handler implements bash and zsh only;
+`me completion fish` exits 1 with `unknown shell 'fish'`.
 
 ## Usage
 
@@ -49,7 +48,6 @@ me help              # List all subcommands
 me help <subcmd>     # Help for specific subcommand
 me completion bash   # Print bash completion script
 me completion zsh    # Print zsh completion script
-me completion fish   # Print fish completion script
 ```
 
 ### Subcommand Hierarchy
@@ -59,16 +57,10 @@ me              # Top-level commands
 ├── doc         # The me-family reference: layout, API, how to add one
 ├── ai          # AI helpers (log)
 ├── clang       # Clang-related helpers
-├── config      # Configuration (dut, putty)
-├── fgt         # FortiGate tools (addr2line, craddr, eco, pcap)
+├── fgt         # FortiGate tools (addr2line, build, conf, craddr, eco, pcap)
 ├── git         # Git helpers (add)
-├── ssh         # Mount remote directory via SSHFS
-├── sync        # Sync files
-├── tag         # Tag management
-├── tmux        # Tmux helpers
-├── tool        # Miscellaneous tools (addr2line, craddr)
-├── trace       # Trace utilities
-└── update      # Update utilities (2fa, dot, nvim, repo, wiki)
+├── tool        # Miscellaneous tools (config-putty, sshfs, tag, tmux, trace)
+└── update      # Update utilities (2fa, dot, nvim, repo, share, wiki)
 ```
 
 ## Adding New Subcommands

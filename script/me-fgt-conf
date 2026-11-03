@@ -1,0 +1,140 @@
+#!/bin/bash
+# Usage: me fgt conf [all|route|socks]
+# Summary: Setup work VPN routing and socks proxy
+#
+# Ref:
+#	https://wiki.archlinux.org/index.php/Systemd-resolved
+#	https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/configuring_and_managing_networking/using-different-dns-servers-for-different-domains_configuring-and-managing-networking
+#    	https://d-heinrich.medium.com/solved-dns-issues-with-systemd-resolved-service-b6cbbea16a03
+#	https://askubuntu.com/questions/973017/wrong-nameserver-set-by-resolvconf-and-networkmanager
+#
+# 0. Let NetworkManager using Inner DNS {{{1
+# File: /etc/NetworkManager/NetworkManager.conf
+#		[main]
+#		plugins=ifupdown,keyfile
+#	+	dns=systemd-resolved
+#		 
+#		[ifupdown]
+#		managed=false
+#		 
+#		[device]
+#		wifi.scan-rand-mac-address=no
+# 1. Add DNS server
+# File: /etc/systemd/resolved.conf
+# We can insert our inner DNS-server 1.1.1.1 like:
+# 	[Resolve]
+# 	DNS=1.1.1.1 8.8.8.8
+# 	FallbackDNS=8.8.4.4
+# A whole sample like:
+# 	[Resolve]
+# 	DNS=172.16.100.100
+# 	FallbackDNS=8.8.8.8
+# 	Domains=~.corp.fortinet.com
+# 	#LLMNR=no
+# 	#MulticastDNS=no
+# 	DNSSEC=no
+# 	#DNSOverTLS=no
+# 	Cache=yes
+# 	DNSStubListener=yes
+# 	#ReadEtcHosts=yes
+# 2. Restart
+#   sudo systemctl reload NetworkManager
+#   sudo systemctl restart systemd-resolved
+# 3. Check status
+#   systemd-resolve --status
+#   cat /etc/resolv.conf
+# 4. patch a fix: https://bugs.launchpad.net/ubuntu/+source/systemd/+bug/1774632
+#   sudo rm -f /etc/resolv.conf
+#   sudo ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf
+# 5. Verify
+#   host web1 [dns-server]
+#   nslookup web1
+#
+
+# Handle me API
+case "${1:-}" in
+    --summary) echo "Setup work VPN routing and socks proxy"; exit 0 ;;
+    --complete|__complete)
+        printf '%s\n' --help -h all route socks
+        exit 0 ;;
+    -h|--help)
+        echo "Usage: me fgt conf [all|route|socks]"
+        echo "  all    Setup routes and socks (default)"
+        echo "  route  Setup routing only"
+        echo "  socks  Setup socks proxy only"
+        echo ""
+        echo "Script: ${BASH_SOURCE[0]}"
+        exit 0 ;;
+esac
+
+USAGE=$(cat <<-END
+	  $0  help    Show the help again.
+	  $0  all|route|socks
+END
+)
+
+# @args:action
+if [ -z ${1} ]; then
+	echo "${USAGE}"
+	exit 1
+else
+	action=$1
+	shift
+fi
+
+
+# Forward host traffic to guest-os, let it help us continue forward to dst {{{1
+# # Forward all work-related traffic from local pc to the forward-server,
+if false; then
+   sudo usermod -aG wheel hyu
+   sudo apt install firewalld
+   sudo firewall-cmd --list-all
+   sudo systemctl enable firewalld
+   sudo systemctl start firewalld
+   sudo firewall-cmd --state
+   sudo firewall-cmd --add-masquerade
+   sudo firewall-cmd --runtime-to-permanent
+   # Double check
+   cat /proc/sys/net/ipv4/ip_forward
+   sudo ufw disable
+   sudo firewall-cmd --state
+fi
+
+
+if [ ${action} == "all" ] || [ ${action} == "route" ]; then
+	# Vancouver office
+	sudo ip route add 172.16.0.0/16 via ${MY_GUEST}
+	sudo ip route add 172.17.0.0/16 via ${MY_GUEST}
+	sudo ip route add 172.18.0.0/16 via ${MY_GUEST}
+	# Sunnyvale QA
+	sudo ip route add 10.160.0.0/16 via ${MY_GUEST}
+	sudo ip route add 10.65.0.0/16 via ${MY_GUEST}
+	# Vancouver servers
+	sudo ip route add 192.168.100.0/24 via ${MY_GUEST}
+	# czech republic
+	sudo ip route add 10.109.0.0/16 via ${MY_GUEST}
+fi
+
+
+# setup socks-server as proxy of host's  to remote {{{1
+# # Start socks-server at local pc, please enale our local pc browser's explicit-proxy.
+# # - so we can use local pc to test as remote-client-pc's transparent-http
+# $ cat ~/.ssh/config
+# Host work
+#         Hostname work
+#         User hyu
+# Host kvm
+#         Hostname kvm
+#         User hyu
+# Host client
+#         Hostname 10.1.1.122
+#         User hyu
+#         ProxyJump work
+
+if [ ${action} == "all" ] || [ ${action} == "socks" ]; then
+	killall ssh
+	ssh -D 9080 -q -N -C -f hyu@work
+	ssh -D 9090 -q -N -C -f user@client
+	netstat -lntp | grep "/ssh"
+fi
+

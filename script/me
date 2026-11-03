@@ -132,16 +132,10 @@ COMPEOF
         echo "  doc             The me-family reference: layout, API, how to add one"
         echo "  ai              AI helpers (log)"
         echo "  clang           Clang-related helpers"
-        echo "  config          Configuration (dut, putty)"
-        echo "  fgt             FortiGate tools (addr2line, craddr, eco, pcap)"
+        echo "  fgt             FortiGate tools (addr2line, build, conf, craddr, eco, pcap)"
         echo "  git             Git helpers (add)"
-        echo "  ssh             Mount remote directory via SSHFS"
-    echo "  sync            Sync files"
-        echo "  tag             Tag management"
-        echo "  tmux            Tmux helpers"
-        echo "  tool            Miscellaneous tools (addr2line, craddr)"
-        echo "  trace           Trace utilities"
-        echo "  update          Update utilities (2fa, dot, nvim, repo, wiki)"
+        echo "  tool            Miscellaneous tools (config-putty, sshfs, tag, tmux, trace)"
+        echo "  update          Update utilities (2fa, dot, nvim, repo, share, wiki)"
         echo
         echo "Run '$SELF help <command>' for details."; echo
         echo "Script: ${BASH_SOURCE[0]}"; exit 0 ;;
