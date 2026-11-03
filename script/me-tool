@@ -34,7 +34,7 @@ list_tool_subcmds() {
     [[ ! -d "$tool_dir" ]] && return
 
     # Subcommands already available via other me subcommands - skip these
-    local skip_cmds="ai-log config-dut config-gitvan fgt-addr2line fgt-craddr fgt-eco fgt-pcap sshfs sync trace update-repo update-wiki"
+    local skip_cmds="ai-log config-dut fgt-addr2line fgt-craddr fgt-eco fgt-pcap sshfs sync trace update-2fa update-repo update-wiki"
 
     {
         # Scan tool/ for me-<name> files (Flat layout: me-sync, me-sshfs)

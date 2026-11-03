@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+# Usage: me doc
+# Summary: Me-family reference: layout, hidden API, how to add one
+
+# me API
+case "${1:-}" in
+    --summary) echo "Me-family reference: layout, hidden API, how to add one"; exit 0 ;;
+    --complete|__complete)
+        printf '%s\n' --help -h
+        exit 0 ;;
+    -h|--help)
+        echo "Usage: me doc"
+        echo ""
+        echo "  Prints the layout, the hidden API, both templates, the checklist for"
+        echo "  adding a subcommand, and where each piece lives on this machine."
+        echo "  Takes no arguments."
+        echo ""
+        echo "Script: ${BASH_SOURCE[0]}"
+        exit 0 ;;
+    "") ;;
+    *)
+        echo "me doc: takes no arguments (got '$1')." >&2
+        echo "Usage: me doc" >&2
+        exit 2 ;;
+esac
+
+cat <<'EOF'
+# The `me` command family — this machine's layout
+
+`me` is a 157-line dispatcher in `~/script`. `me <cmd>` looks for an
+executable named `me-<cmd>` on `PATH`, then in the dispatcher's own
+directory (`$DIR`). No arguments means `help`.
+
+Everything below describes the tree as it is on this machine, not a
+generic scaffold. For the generic guide, see the `me-subcmd` skill.
+
+## Layouts
+
+| Layout | Structure | How it is found |
+| --- | --- | --- |
+| **Flat** (preferred) | `me`, `me-<cmd>` as separate executables | `command -v me-<cmd>`, anywhere on `PATH` |
+| **Flat+Dir** | `me-<cmd>/_main_` plus other files | `me-<cmd>/_main_` on `PATH` or beside the dispatcher |
+| **Dir** (legacy) | `me`, `cmd/<subcmd>` | scan of `cmd/` next to the dispatcher |
+
+Real examples on this machine:
+
+- `me-ai` lives in `~/script`; its leaf `me-ai-log` lives in
+  `~/dotwiki/tool`. Both directories are on `PATH`, so the pair is Flat
+  even though the files sit apart. `me-ai-update` is in the same tool
+  directory.
+- `me-trace/` in `~/dotwiki/tool` is Flat+Dir: `_main_` is a bash wrapper
+  carrying the me API, and `trace.py` is the implementation.
+- `me-tool` is a dispatcher over `~/dotwiki/tool` only. It scans
+  `me-*` files there and subtracts a hardcoded `skip_cmds` list so that
+  commands already reachable through another parent (`ai-log`,
+  `fgt-*`, `sync`, `update-*`, …) do not appear twice.
+- `me-update-2fa` is reached both as `me update 2fa` and, from inside
+  `me update repo`, as a helper: the parent asks it whether a 2FA code is
+  needed before the first pull. A leaf does not have to be a leaf only.
+- `me-git` + `me-git-add` and `me-doc` are Flat: one executable each,
+  both in `~/script`.
+
+Prefer Flat. Reach for Flat+Dir only when a subcommand needs more than
+one file (a Python module, several scripts); never add new Dir layouts.
+
+## The hidden API
+
+The dispatcher answers these tokens; they exist for the shell, not for
+people:
+
+| Token | Meaning |
+| --- | --- |
+| `__commands` | subcommand names, one per line, sorted |
+| `__complete <subcmd>` | option list for `<subcmd>` (newline-separated) |
+| `__help <subcmd>` | the subcommand's one-line `--summary` |
+| `completion bash\|zsh` | print the completion adapter |
+
+Every leaf answers:
+
+| Token | Meaning |
+| --- | --- |
+| `--summary` | one-line description, exit 0 |
+| `--complete` / `__complete` | newline-separated options, exit 0 |
+| `-h` / `--help` | full usage, exit 0 |
+
+`--complete` and `__complete` are aliases on the leaf; the dispatcher
+always calls `__complete`. Output must be newline-separated — zsh's
+`${(@f)...}` splits on newlines and would treat a space-separated list
+as one candidate.
+
+A dispatcher's `help` loops its leaves, runs `--summary` on each, and
+pads the name to 15 columns:
+
+```bash
+for sub in $(list_subcmds); do
+    p="$(find_subcmd "$sub")"
+    s="$("$p" --summary 2>/dev/null || true)"
+    printf "  %-15s %s\n" "$sub" "$s"
+done
+```
+
+## A leaf, end to end
+
+This is the whole wrapper from `me-ai-update`: a usage comment pair, the
+me-API `case`, then the real body. Twenty lines, no framework.
+
+```bash
+#!/usr/bin/env bash
+# Usage: me ai update [all|install|clean|login] [-n]
+# Summary: Update the fos-ai Claude Code install and re-login
+
+# me API
+case "${1:-}" in
+    --summary) echo "Update the fos-ai Claude Code install and re-login"; exit 0 ;;
+    --complete|__complete)
+        printf '%s\n' --help -h -n --dryrun
+        printf '%s\n' all install clean login
+        exit 0 ;;
+    -h|--help)
+        echo "Usage: me ai update [all|install|clean|login] [-n]"
+        echo "  -n, --dryrun  Print the commands without executing them"
+        echo ""
+        echo "Script: ${BASH_SOURCE[0]}"
+        exit 0 ;;
+esac
+
+# implementation starts here...
+```
+
+Rules that matter:
+
+- `printf '%s\n'`, never `echo`, for the option list — `echo -n`
+  prints nothing.
+- `-h` ends with `Script: ${BASH_SOURCE[0]}`.
+- The `# Usage:` and `# Summary:` pair at the top and the `--summary`
+  string must agree.
+
+## A dispatcher, end to end
+
+`me-ai` (94 lines) is the reference shape. It defines two functions and
+a `case`:
+
+1. `find_ai_subcmd <cmd>` — try `$DIR/<SELF>-<cmd>` as a directory with
+   `_main_`, then as an executable, then the same two forms in each
+   `PATH` entry.
+2. `list_ai_subcmds` — scan every `PATH` entry once (`seen_dirs`),
+   print `me-ai-*` executables and `_main_` directories, dedupe with
+   `sort -u`.
+3. `case "$cmd"` handling `--summary`, `__commands`, `__complete`,
+   `__help`, `help|-h|--help`, then a trailing `shift` + `exec "$p" "$@"`.
+
+To make a new dispatcher, copy `~/script/me-ai` and rename three things:
+`find_ai_subcmd`, `list_ai_subcmds`, and the `--summary` text. Nothing
+else changes.
+
+```bash
+sed -e 's/find_ai_subcmd/find_git_subcmd/g' \
+    -e 's/list_ai_subcmds/list_git_subcmds/g' \
+    -e 's/"AI subcommands"/"Git helpers"/' \
+    ~/script/me-ai > ~/script/me-git
+chmod 755 ~/script/me-git
+```
+
+Two differences from `me` itself, which is older:
+
+- `me`'s own help output is a hardcoded list (lines 130-147 of
+  `~/script/me`). It does **not** auto-discover; a new top-level command
+  stays invisible and incomplete until you add a line there.
+- `me` filters hyphenated names out of `__commands`
+  (`grep -v '-'`) so `me-ai-log` does not show as a top-level command.
+  `me-ai`/`me-git`/`me-tool` do not filter — they are parents already.
+
+## Adding one
+
+1. Pick the layout — Flat unless the command needs several files.
+2. Create `~/script/me-<name>`, mode 755.
+3. Implement the API tokens: `--summary`, `--complete`/`__complete`
+   (`printf '%s\n' --help -h ...`), `-h`/`--help`.
+4. Test the leaf directly:
+   `me-<name> --summary`, `me-<name> -h`, `me-<name> __complete ""`.
+5. Add a line to `me`'s hardcoded help list in `~/script/me` — otherwise
+   `me -h` and `me __commands` never mention it.
+6. Add a row to `~/script/me_readme.md` (the deploy notes).
+7. Check the dispatcher view: `me -h`, `me __complete ""`,
+   `me help <name>`, and completion.
+
+For a family under a new parent (like `me git`), also add the parent's
+line to `me`'s list, and give the parent a `--summary` of its own so
+`me __help <parent>` is not blank.
+
+## Completion and debugging
+
+Bash:
+
+```bash
+source <(me completion bash)
+```
+
+Zsh:
+
+```bash
+me completion zsh > ~/.zsh/completions/_me
+autoload -Uz compinit && compinit
+```
+
+When completion misbehaves:
+
+```bash
+me __complete ""            # top-level candidates
+me __complete git           # options for one subcommand
+command -v me-git-add       # is the leaf actually on PATH?
+```
+
+Two gotchas recorded from real failures:
+
+- `echo -n` in a `--complete` handler prints nothing. Use `printf`.
+- A child subcommand must not shadow its parent. `me-ai-log` must not
+  be listed as top-level `ai-log`, which is why `me` filters hyphens
+  and `me-tool` keeps a `skip_cmds` list.
+
+## Where things live
+
+| Path | What it is |
+| --- | --- |
+| `~/script/me` | the dispatcher; hardcoded help list at the bottom |
+| `~/script/me-lib.sh` | `me_init` / `die` / `cleanup`; used by `me-tag`, `me-tmux`, `me-update-*` |
+| `~/script/me-<name>` | leaf or parent subcommands |
+| `~/dotwiki/tool/` | second `PATH` directory: `me-ai-log`, `me-update-2fa`, `me-trace/`, `me-fgt-*` |
+| `~/dotwiki/_removed/` | retired leaves, kept out of `PATH` so no dispatcher lists them |
+| `~/script/me_readme.md` | deploy notes: PATH, completions, the decision table |
+| `~/.claude-share/skills/me-subcmd/` | the generic scaffolding guide and templates |
+
+Which answers what:
+
+- **`me doc`** — this machine's actual tree. Read it first.
+- **the `me-subcmd` skill** — the generic guide: layouts, templates,
+  refactoring from `cmd/` to flat.
+- **`me_readme.md`** — install and deploy steps.
+EOF

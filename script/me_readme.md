@@ -56,17 +56,19 @@ me completion fish   # Print fish completion script
 
 ```
 me              # Top-level commands
+├── doc         # The me-family reference: layout, API, how to add one
 ├── ai          # AI helpers (log)
 ├── clang       # Clang-related helpers
-├── config      # Configuration (dut, gitvan)
+├── config      # Configuration (dut, putty)
 ├── fgt         # FortiGate tools (addr2line, craddr, eco, pcap)
+├── git         # Git helpers (add)
 ├── ssh         # Mount remote directory via SSHFS
 ├── sync        # Sync files
 ├── tag         # Tag management
 ├── tmux        # Tmux helpers
 ├── tool        # Miscellaneous tools (addr2line, craddr)
 ├── trace       # Trace utilities
-└── update      # Update utilities (dot, nvim, repo, wiki)
+└── update      # Update utilities (2fa, dot, nvim, repo, wiki)
 ```
 
 ## Adding New Subcommands

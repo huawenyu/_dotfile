@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# Usage: me git add [-n] [-C <dir>] [-- <pathspec>...]
+# Summary: Stage every non-ignored change in the repo; never commits
+
+# me API
+case "${1:-}" in
+    --summary) echo "Stage every non-ignored change in the repo; never commits"; exit 0 ;;
+    --complete|__complete)
+        printf '%s\n' --help -h -n --dryrun -C --
+        exit 0 ;;
+    -h|--help)
+        echo "Usage: me git add [-n] [-C <dir>] [-- <pathspec>...]"
+        echo "  Stages every non-ignored change (new, modified, deleted) with"
+        echo "  'git add -A', then prints git status --short. Never commits, never"
+        echo "  resets, never touches the working tree, never uses 'git add -f'."
+        echo ""
+        echo "  -n, --dryrun   Show what would be staged; stage nothing"
+        echo "  -C <dir>       Run as if started in <dir>. A relative <dir> is taken"
+        echo "                 from the previous -C target (the cwd for the first),"
+        echo "                 exactly like repeated git -C"
+        echo "  --             Everything after this is a pathspec, relative to the"
+        echo "                 working directory git finally sees (after -C)"
+        echo ""
+        echo "  Exit: 0 ok, 1 no git / not a work tree / bad -C,"
+        echo "        2 ignored path or pathspec matched nothing"
+        echo ""
+        echo "Script: ${BASH_SOURCE[0]}"
+        exit 0 ;;
+esac
+
+set -euo pipefail
+
+var_WorkDir="$(pwd -P)"
+trap 'cd "$var_WorkDir" 2>/dev/null || true' EXIT
+
+die() { local code="${1:-1}"; shift; echo "me git add: $*" >&2; exit "$code"; }
+
+command -v git >/dev/null 2>&1 || die 1 "git not found."
+
+dryrun=0
+target="$var_WorkDir"
+specs=()
+
+# Parse options; everything after "--" is a pathspec.
+while (( $# > 0 )); do
+    case "$1" in
+        -n|--dryrun) dryrun=1; shift ;;
+        -C)
+            # Each -C is relative to the previous one, as git's own -C is.
+            [[ $# -ge 2 ]] || die 1 "-C requires a directory."
+            target="$(cd "$target" && cd "$2" 2>/dev/null && pwd -P)" \
+                || die 1 "cannot change to '$2'."
+            shift 2 ;;
+        --) shift; specs+=("$@"); break ;;
+        -*) die 1 "unknown option '$1'. Run 'me git add -h'." ;;
+        *)  specs+=("$1"); shift ;;
+    esac
+done
+(( ${#specs[@]} > 0 )) || specs=(".")
+
+# The top level of the work tree containing the target directory. Every later
+# git call runs with -C "$top", never -C "$target", so the index is the same
+# one git would use from any depth.
+top="$(git -C "$target" rev-parse --show-toplevel 2>/dev/null)" \
+    || die 1 "'$var_WorkDir' is not inside a git working tree."
+
+# A pathspec is relative to the directory the user is in, but git resolves it
+# against the top level once it runs with -C "$top". Re-base each spec by the
+# target's prefix inside the work tree; ":" magic is already top-relative.
+prefix="$(git -C "$target" rev-parse --show-prefix 2>/dev/null || true)"
+translated=()
+for s in "${specs[@]}"; do
+    case "$s" in
+        :*) translated+=("$s") ;;
+        .)  translated+=("${prefix:-.}") ;;
+        *)  translated+=("${prefix}${s}") ;;
+    esac
+done
+
+rc=0
+out="$(git -C "$top" add -A --dry-run -- "${translated[@]}" 2>&1)" || rc=$?
+if (( rc != 0 )); then
+    printf '%s\n' "$out" >&2
+    case "$out" in
+        *"ignored by one of your .gitignore files"*)
+            die 2 "nothing to stage -- that path is ignored." ;;
+        *"did not match any files"*)
+            die 2 "no such path: ${specs[*]}" ;;
+    esac
+    echo "me git add: git add --dry-run failed (exit $rc)." >&2
+    exit "$rc"
+fi
+
+if (( dryrun )); then
+    [[ -n "$out" ]] && printf '%s\n' "$out"
+    echo "me git add: nothing was staged (-n)."
+    exit 0
+fi
+
+if [[ -z "$out" ]]; then
+    echo "me git add: nothing to stage; the index already matches the working tree."
+    exit 0
+fi
+
+n="$(printf '%s\n' "$out" | wc -l | tr -d ' ')"
+git -C "$top" add -A -- "${translated[@]}" || exit 1
+echo "me git add: staged $n path(s). Review with: git diff --cached --stat"
+echo "me git add: nothing was committed."
+echo
+echo "--- git status --short ---"
+git -C "$top" status --short
