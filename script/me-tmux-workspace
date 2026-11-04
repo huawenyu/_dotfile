@@ -1,0 +1,709 @@
+#!/usr/bin/env bash
+# Usage: me tmux workspace [list|save|load|apply|show|delete] [name] [options]
+# Summary: Save and replay tmux window/pane layouts as named workspaces
+#
+# A workspace captures a session's window/pane topology plus each pane's
+# current working directory, so the arrangement can be recreated later.
+# Files are plain tab-separated data and are never sourced.
+
+set -uo pipefail
+
+# me API
+case "${1:-}" in
+    --summary) echo "Save and replay tmux window/pane layouts as named workspaces"; exit 0 ;;
+    --complete|__complete)
+        printf '%s\n' --help -h -n --dryrun -s --session -f --force -y --yes --replace
+        printf '%s\n' list save load apply show delete
+        exit 0 ;;
+    -h|--help)
+        cat <<EOF
+Usage: me tmux workspace [list]                  # default action is list
+       me tmux workspace save   [name] [-s SESSION] [-f] [-n]
+       me tmux workspace load   [name] [-n]
+       me tmux workspace apply  [name] [-s SESSION] [--replace] [-y] [-n]
+       me tmux workspace show   [name]
+       me tmux workspace delete [name] [-y] [-n]
+
+  <name> defaults to 'default'. Names may not contain '.' or ':'.
+
+  save    Capture SESSION's windows, panes and pane cwds.
+  load    Create a NEW session named <name> from a workspace.
+          Refuses if that session already exists (use apply).
+  apply   Merge a workspace into an existing session (default: the
+          current one). Windows are matched by name; anything not in
+          the workspace is preserved. --replace kills extra windows
+          and panes and forces the saved layout and cwd.
+  show    Print a workspace's recorded topology.
+  delete  Remove a workspace file.
+  list    List workspaces (the default when no action is given).
+
+Options:
+  -s, --session SESSION  Target session (default: the current one;
+                         required for save/apply when outside tmux)
+  -f, --force            Overwrite an existing workspace on save
+  -y, --yes              Skip confirmation prompts
+      --replace          apply: restore exactly, killing extras
+  -n, --dryrun           Print the commands instead of running them
+  -h, --help             Show this help
+
+Storage: \${ME_TMUX_WS_DIR:-$HOME/.config/tmux/workspaces}/<name>.conf
+
+Script: ${BASH_SOURCE[0]}
+EOF
+        exit 0 ;;
+esac
+
+die()  { echo "me tmux workspace: $*" >&2; exit 1; }
+warn() { echo "me tmux workspace: $*" >&2; }
+
+action="list"
+dryrun=0
+force=0
+assume_yes=0
+replace=0
+session=""
+name_arg=""
+positional=()
+
+while (($#)); do
+    case "$1" in
+        -h|--help)   exec "$0" --help ;;
+        -n|--dryrun) dryrun=1 ;;
+        -f|--force)  force=1 ;;
+        -y|--yes)    assume_yes=1 ;;
+        --replace)   replace=1 ;;
+        -s|--session) (($# >= 2)) || die "$1 needs an argument"; session="$2"; shift ;;
+        -s?*)        session="${1#-s}" ;;
+        --session=*) session="${1#*=}" ;;
+        --)          shift; positional+=("$@"); break ;;
+        -*)          die "unknown option '$1' (try -h)" ;;
+        *)           positional+=("$1") ;;
+    esac
+    shift
+done
+
+if ((${#positional[@]})); then
+    action="${positional[0]}"
+    ((${#positional[@]} > 1)) && name_arg="${positional[1]}"
+    ((${#positional[@]} > 2)) && die "too many arguments"
+fi
+
+case "$action" in
+    list|save|load|apply|show|delete) ;;
+    *) die "unknown action '$action' (try -h)" ;;
+esac
+
+ws_name="${name_arg:-default}"
+case "$ws_name" in
+    ""|*.*|*:*) die "invalid workspace name '$ws_name' (must be non-empty, with no '.' or ':')" ;;
+esac
+
+ws_dir="${ME_TMUX_WS_DIR:-$HOME/.config/tmux/workspaces}"
+ws_file="$ws_dir/$ws_name.conf"
+
+# ---------------------------------------------------------------------------
+# helpers
+# ---------------------------------------------------------------------------
+require_tmux() {
+    command -v tmux >/dev/null 2>&1 || die "tmux is not installed"
+    tmux list-sessions >/dev/null 2>&1 || die "no tmux server running"
+}
+
+# Ask before a destructive step; non-interactive without -y refuses.
+confirm() {
+    ((assume_yes)) && return 0
+    if [[ ! -t 0 ]]; then
+        die "$1 (re-run with -y to confirm non-interactively)"
+    fi
+    local answer
+    read -r -p "$1 [y/N]: " answer
+    case "$answer" in
+        y|Y|yes|YES) return 0 ;;
+        *) echo "Cancelled." >&2; exit 1 ;;
+    esac
+}
+
+require_workspace() {
+    [[ -f "$ws_file" ]] || die "no workspace '$ws_name' (see 'me tmux workspace list')"
+}
+
+# Resolve -s, defaulting to the current session inside tmux.
+resolve_session() {
+    if [[ -z "$session" && -n "${TMUX:-}" ]]; then
+        session="$(tmux display-message -p '#{session_name}' 2>/dev/null)" || session=""
+    fi
+    [[ -n "$session" ]] || die "no session given: use -s SESSION outside tmux"
+}
+
+# Strip characters that would break the record format.
+sanitize() { local s="$1"; s="${s//$'\t'/ }"; s="${s//$'\n'/ }"; s="${s//$'\r'/ }"; printf '%s' "$s"; }
+
+# Quote for -n output.
+show_cmd() {
+    local a out=""
+    for a in "$@"; do printf -v a '%q' "$a"; out+="$a "; done
+    printf '%s\n' "${out% }"
+}
+
+# Run a command, or print it under -n.
+run() {
+    if ((dryrun)); then show_cmd "$@"; else "$@"; fi
+}
+
+# ---------------------------------------------------------------------------
+# workspace file model
+#
+#   session<TAB>name
+#   window <TAB>ord<TAB>name<TAB>active<TAB>layout
+#   pane   <TAB>win-ord<TAB>pane-ord<TAB>cwd<TAB>active
+# ---------------------------------------------------------------------------
+ws_session=""
+win_name=(); win_active=(); win_layout=()
+pane_win=(); pane_path=(); pane_active=()
+
+# Split $1 on tabs into ${fields[@]}, keeping empty fields. `read -a` with
+# IFS=$'\t' collapses runs of tabs, which would silently shift the fields.
+declare -a fields=()
+split_tabs() {
+    fields=()
+    local rest="$1"
+    while :; do
+        fields+=("${rest%%$'\t'*}")
+        [[ "$rest" == *$'\t'* ]] || break
+        rest="${rest#*$'\t'}"
+    done
+}
+
+parse_workspace() {
+    ws_session=""
+    win_name=(); win_active=(); win_layout=()
+    pane_win=(); pane_path=(); pane_active=()
+    local -a f
+    local line n=0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        n=$((n + 1))
+        [[ -z "$line" || "$line" == '#'* ]] && continue
+        split_tabs "$line"
+        f=("${fields[@]}")
+        case "${f[0]}" in
+            session)
+                ((${#f[@]} == 2)) || { warn "$ws_file:$n: bad session record"; continue; }
+                ws_session="${f[1]}" ;;
+            window)
+                ((${#f[@]} == 5)) || { warn "$ws_file:$n: bad window record"; continue; }
+                win_name+=("${f[2]}"); win_active+=("${f[3]}"); win_layout+=("${f[4]}") ;;
+            pane)
+                ((${#f[@]} == 5)) || { warn "$ws_file:$n: bad pane record"; continue; }
+                pane_win+=("${f[1]}"); pane_path+=("${f[3]}"); pane_active+=("${f[4]}") ;;
+            *) warn "$ws_file:$n: ignoring unknown record '${f[0]}'" ;;
+        esac
+    done < "$ws_file"
+    ((${#win_name[@]})) || die "workspace '$ws_name' has no windows"
+
+    # Panes are grouped under a window ordinal. A pane pointing at an
+    # ordinal that has no window record would silently vanish, so reject.
+    local p maxw=${#win_name[@]}
+    for p in "${pane_win[@]}"; do
+        if [[ "$p" =~ ^[0-9]+$ ]] && ((10#$p >= 1 && 10#$p <= maxw)); then
+            continue
+        fi
+        die "workspace '$ws_name' has a pane record for window '$p' (only 1..$maxw exist)"
+    done
+}
+
+# Emit the panes of window ordinal $1, in saved order:
+#   pane-ordinal<TAB>cwd<TAB>active
+saved_panes() {
+    local want="$1" i n=0
+    for i in "${!pane_win[@]}"; do
+        [[ "${pane_win[$i]}" == "$want" ]] || continue
+        n=$((n + 1))
+        printf '%d\t%s\t%s\n' "$n" "${pane_path[$i]}" "${pane_active[$i]}"
+    done
+}
+
+count_saved_panes() {
+    local want="$1" i n=0
+    for i in "${!pane_win[@]}"; do
+        [[ "${pane_win[$i]}" == "$want" ]] && n=$((n + 1))
+    done
+    printf '%d\n' "$n"
+}
+
+# Ordinal of the pane marked active in window ordinal $1 (empty if none).
+saved_active_ord() {
+    local want="$1" i n=0
+    for i in "${!pane_win[@]}"; do
+        [[ "${pane_win[$i]}" == "$want" ]] || continue
+        n=$((n + 1))
+        if [[ "${pane_active[$i]}" == "1" ]]; then printf '%d\n' "$n"; return 0; fi
+    done
+    return 0
+}
+
+# "d680,200x50,0,0,21" -> "200 50". Empty when the layout has no size.
+layout_size() {
+    local layout="$1"
+    if [[ "$layout" =~ ,([0-9]+)x([0-9]+), ]]; then
+        printf '%s %s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+    fi
+}
+
+# Saved cwd, falling back to $HOME when it no longer exists.
+pane_cwd() {
+    local dir="$1"
+    if [[ -z "$dir" || ! -d "$dir" ]]; then
+        warn "saved cwd '$dir' is gone; using $HOME"
+        printf '%s' "$HOME"
+    else
+        printf '%s' "$dir"
+    fi
+}
+
+# Attach a saved layout to window id $1 (ordinal $2) if pane counts match.
+apply_layout() {
+    local wid="$1" ord="$2" layout="${win_layout[$(( $2 - 1 ))]}"
+    local live
+    live="$(tmux list-panes -t "$wid" -F '#{pane_id}' 2>/dev/null | wc -l)"
+    if [[ "$live" != "$(count_saved_panes "$ord")" ]]; then
+        warn "layout not applied to $wid: saved $(count_saved_panes "$ord") panes, live $live"
+        return 0
+    fi
+    [[ -n "$layout" ]] || return 0
+    run tmux select-layout -t "$wid" "$layout" || warn "select-layout failed for $wid"
+}
+
+# ---------------------------------------------------------------------------
+# save
+# ---------------------------------------------------------------------------
+do_save() {
+    require_tmux
+    resolve_session
+    tmux has-session -t "=$session" 2>/dev/null || die "no such session '$session'"
+
+    if [[ -f "$ws_file" ]] && ((!force)); then
+        if ((dryrun)); then
+            echo "would overwrite $ws_file"
+        else
+            confirm "Workspace '$ws_name' exists; overwrite?"
+        fi
+    fi
+
+    if ((dryrun)); then
+        show_cmd tmux list-windows -t "=$session" -F '<window_index,window_name,window_active,window_layout>'
+        show_cmd tmux list-panes -s -t "=$session" -F '<window_index,pane_index,pane_active,pane_current_path>'
+        echo "would write $ws_file"
+        return 0
+    fi
+
+    mkdir -p "$ws_dir" || die "cannot create $ws_dir"
+    local tmp
+    tmp="$(mktemp "$ws_dir/.$ws_name.tmp.XXXXXX")" || die "cannot create a temp file in $ws_dir"
+
+    local win_idx win_id win_name_s win_active_s win_layout_s
+    local pane_idx pane_active_s pane_path_s
+    local win_ord=0 pane_ord
+    {
+        printf '# me tmux workspace v1\n'
+        printf 'session\t%s\n' "$(sanitize "$session")"
+        # Reorder at capture time so the free-text field (name, path) is
+        # last: bash's last `read` variable keeps any embedded separators.
+        while IFS=$'\t' read -r win_idx win_id win_active_s win_layout_s win_name_s; do
+            [[ -z "$win_id" ]] && continue
+            win_ord=$((win_ord + 1))
+            printf 'window\t%d\t%s\t%s\t%s\n' \
+                "$win_ord" "$(sanitize "$win_name_s")" "$win_active_s" "$win_layout_s"
+            pane_ord=0
+            while IFS=$'\t' read -r pane_idx pane_active_s pane_path_s; do
+                # pane_current_path is the last (free-text) field.
+                [[ -z "$pane_idx" ]] && continue
+                pane_ord=$((pane_ord + 1))
+                printf 'pane\t%d\t%d\t%s\t%s\n' \
+                    "$win_ord" "$pane_ord" "$(sanitize "$pane_path_s")" "$pane_active_s"
+            done < <(sort -n < <(tmux list-panes -t "$win_id" -F \
+                $'#{pane_index}\t#{pane_active}\t#{pane_current_path}'))
+        done < <(sort -n < <(tmux list-windows -t "=$session" -F \
+            $'#{window_index}\t#{window_id}\t#{window_active}\t#{window_layout}\t#{window_name}'))
+    } > "$tmp"
+
+    if [[ "$(grep -c '^window' "$tmp")" -eq 0 ]]; then
+        rm -f "$tmp"; die "failed to capture session '$session'"
+    fi
+    chmod 600 "$tmp" 2>/dev/null
+    mv -f "$tmp" "$ws_file" || { rm -f "$tmp"; die "cannot write $ws_file"; }
+    echo "Saved '$ws_name' from session '$session' -> $ws_file"
+}
+
+# ---------------------------------------------------------------------------
+# load — always a new session
+# ---------------------------------------------------------------------------
+do_load() {
+    require_workspace
+    parse_workspace
+    require_tmux
+
+    if tmux has-session -t "=$ws_name" 2>/dev/null; then
+        die "session '$ws_name' already exists; use 'me tmux workspace apply $ws_name -s $ws_name'"
+    fi
+
+    local w ord wname act layout n i dir p_act
+    local first_wid="" active_wid="" wid size_w size_h created=0
+    local -a pane_ids=()
+
+    for w in "${!win_name[@]}"; do
+        ord=$((w + 1))
+        wname="${win_name[$w]}"
+        act="${win_active[$w]}"
+        layout="${win_layout[$w]}"
+        # Reset both: read leaves them untouched when a layout has no size.
+        size_w=""; size_h=""
+        read -r size_w size_h <<<"$(layout_size "$layout")"
+        pane_ids=()
+        n=0
+
+        while IFS=$'\t' read -r i dir p_act; do
+            [[ -z "$i" ]] && continue
+            dir="$(pane_cwd "$dir")"
+            n=$((n + 1))
+            # The first record for the window creates it; later ones split.
+            # Keyed on the pane list rather than ordinal 1 so a truncated
+            # file cannot leave a window with no panes.
+            if ((${#pane_ids[@]} == 0)); then
+                if ((created == 0)); then
+                    if ((dryrun)); then
+                        show_cmd tmux new-session -d -s "$ws_name" -n "$wname" -c "$dir" \
+                            ${size_w:+-x "$size_w"} ${size_h:+-y "$size_h"}
+                        pane_ids+=("%new")
+                        created=1
+                    else
+                        first_wid="$(tmux new-session -d -s "$ws_name" -n "$wname" -c "$dir" \
+                            ${size_w:+-x "$size_w"} ${size_h:+-y "$size_h"} \
+                            -P -F '#{window_id}')" || die "cannot create session '$ws_name'"
+                        pane_ids+=("$(tmux list-panes -t "$first_wid" -F '#{pane_id}' | head -1)")
+                        created=1
+                    fi
+                else
+                    if ((dryrun)); then
+                        show_cmd tmux new-window -d -t "=$ws_name" -n "$wname" -c "$dir" \
+                            ${size_w:+-x "$size_w"} ${size_h:+-y "$size_h"}
+                        pane_ids+=("%new")
+                    else
+                        local new_wid
+                        new_wid="$(tmux new-window -d -t "=$ws_name" -n "$wname" -c "$dir" \
+                            -P -F '#{window_id}')" || die "cannot create window '$wname'"
+                        pane_ids+=("$(tmux list-panes -t "$new_wid" -F '#{pane_id}' | head -1)")
+                    fi
+                fi
+            else
+                # Split the pane just created, not the window: splitting by
+                # window id targets the active pane and reorders the indices.
+                # The -U resize keeps room for the next split in small windows.
+                local target="${pane_ids[${#pane_ids[@]} - 1]}"
+                if ((dryrun)); then
+                    show_cmd tmux resize-pane -t "$target" -U 999
+                    show_cmd tmux split-window -d -t "$target" -c "$dir"
+                    pane_ids+=("%new")
+                else
+                    tmux resize-pane -t "$target" -U 999 2>/dev/null
+                    local new_pid
+                    new_pid="$(tmux split-window -d -t "$target" -c "$dir" \
+                        -P -F '#{pane_id}')" || die "split failed in window '$wname'"
+                    pane_ids+=("$new_pid")
+                fi
+            fi
+        done < <(saved_panes "$ord")
+
+        # Layout after every pane of the window exists. The window may have
+        # been widened by the splits, so size it back to the saved geometry
+        # first; tmux scales proportionally when the terminal is smaller.
+        if ((n > 1)); then
+            wid="${pane_ids[0]}"
+            if ((dryrun)); then
+                echo "layout window '$wname' <- saved"
+            else
+                [[ -n "$size_w" ]] && tmux resize-window -t "$wid" -x "$size_w" -y "$size_h" 2>/dev/null
+                tmux select-layout -t "$wid" "$layout" \
+                    || warn "select-layout failed for window '$wname'"
+            fi
+        fi
+
+        local want_act
+        want_act="$(saved_active_ord "$ord")"
+        if [[ -n "$want_act" && -n "${pane_ids[$((want_act - 1))]:-}" ]]; then
+            run tmux select-pane -t "${pane_ids[$((want_act - 1))]}"
+        fi
+        [[ "$act" == "1" ]] && active_wid="${pane_ids[0]:-}"
+    done
+
+    if [[ -n "$active_wid" ]]; then
+        run tmux select-window -t "$active_wid"
+    fi
+
+    if ((dryrun)); then
+        echo "# session '$ws_name' would be created"
+        return 0
+    fi
+
+    if [[ -n "${TMUX:-}" ]]; then
+        tmux switch-client -t "=$ws_name" || warn "switch-client failed"
+    elif [[ -t 0 ]]; then
+        exec tmux attach -t "=$ws_name"
+    else
+        echo "tmux attach -t $ws_name"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# apply — merge into an existing session
+# ---------------------------------------------------------------------------
+declare -A live_win_id=()      # name -> window ids, space separated, in index order
+declare -A live_pane_count=()  # window id -> pane count
+
+gather_live() {
+    live_win_id=(); live_pane_count=()
+    local wid name pid
+    while IFS=$'\t' read -r wid name; do
+        [[ -z "$wid" ]] && continue
+        live_win_id[$name]="${live_win_id[$name]:-} $wid"
+    done < <(tmux list-windows -t "=$session" -F $'#{window_id}\t#{window_name}')
+    while IFS=$'\t' read -r wid pid; do
+        [[ -z "$wid" ]] && continue
+        live_pane_count[$wid]=$(( ${live_pane_count[$wid]:-0} + 1 ))
+    done < <(tmux list-panes -s -t "=$session" -F $'#{window_id}\t#{pane_id}')
+}
+
+# Live panes of window $1 in pane_index order: "<index>\t<id>\t<command>\t<cwd>"
+# The cwd comes last so `read` keeps any tab it contains.
+live_panes() {
+    tmux list-panes -t "$1" -F \
+        $'#{pane_index}\t#{pane_id}\t#{pane_current_command}\t#{pane_current_path}' \
+        | sort -n
+}
+
+# Print "<pane-id>\t<live-command>\t<saved-cwd>" pairing live panes of
+# window id $1 with the saved cwds of window ordinal $2, in order.
+# The cwd is last so `read` keeps it whole if it contains a tab.
+pair_cwds() {
+    local wid="$1" ord="$2" n=0 idx pid cmd cwd
+    local -a paths=()
+    local i
+    for i in "${!pane_win[@]}"; do
+        [[ "${pane_win[$i]}" == "$ord" ]] && paths+=("${pane_path[$i]}")
+    done
+    while IFS=$'\t' read -r idx pid cmd cwd; do
+        [[ -z "$pid" ]] && continue
+        printf '%s\t%s\t%s\n' "$pid" "$cmd" "${paths[$n]:-}"
+        n=$((n + 1))
+    done < <(live_panes "$wid")
+}
+
+do_apply() {
+    require_workspace
+    parse_workspace
+    require_tmux
+    resolve_session
+    tmux has-session -t "=$session" 2>/dev/null || die "no such session '$session'"
+
+    if ((replace && !dryrun)); then
+        confirm "Restore '$ws_name' exactly into '$session' (kills extra windows and panes)?"
+    fi
+
+    gather_live
+
+    local -A ws_names=() used_wid=()
+    local w ord wname layout n i dir p_act wid live_n cmd new_wid split_from added
+    local -a candidates=()
+
+    for w in "${!win_name[@]}"; do
+        ord=$((w + 1))
+        wname="${win_name[$w]}"
+        layout="${win_layout[$w]}"
+        n="$(count_saved_panes "$ord")"
+        ws_names[$wname]=1
+
+        # Names need not be unique: take the first unused live window with
+        # this name, so N saved records map onto at most N live windows.
+        read -r -a candidates <<<"${live_win_id[$wname]:-}"
+        wid=""
+        for i in "${candidates[@]}"; do
+            [[ -n "${used_wid[$i]:-}" ]] && continue
+            wid="$i"; used_wid[$i]=1; break
+        done
+
+        if [[ -n "$wid" ]]; then
+            live_n="${live_pane_count[$wid]:-0}"
+
+            # Split only the missing panes, in saved order. Each split hangs
+            # off the pane created before it: splitting by window id targets
+            # the active pane and would produce the panes in reverse order.
+            if ((n > live_n)); then
+                added=0
+                split_from="$wid"
+                while IFS=$'\t' read -r i dir p_act; do
+                    ((i <= live_n)) && continue
+                    dir="$(pane_cwd "$dir")"
+                    if ((dryrun)); then
+                        echo "split $split_from -> $dir"
+                    else
+                        tmux resize-pane -t "$split_from" -U 999 2>/dev/null
+                        split_from="$(tmux split-window -d -t "$split_from" -c "$dir" \
+                            -P -F '#{pane_id}')" || { warn "split failed in window '$wname'"; break; }
+                    fi
+                    added=$((added + 1))
+                done < <(saved_panes "$ord")
+            else
+                added=0
+            fi
+
+            # Keep extra live panes (and the live layout) unless --replace.
+            if ((!replace)); then
+                if ((added > 0)); then
+                    if ((dryrun)); then
+                        echo "layout $wid <- saved"
+                    else
+                        tmux resize-pane -t "$wid" -U 999 2>/dev/null
+                        apply_layout "$wid" "$ord"
+                    fi
+                fi
+            else
+                # Drop extra panes, then force the saved layout and cwd.
+                p_act=0
+                while IFS=$'\t' read -r _idx i cmd dir; do
+                    [[ -z "$i" ]] && continue
+                    p_act=$((p_act + 1))
+                    ((p_act <= n)) && continue
+                    if ((dryrun)); then
+                        echo "kill pane $i"
+                    else
+                        tmux kill-pane -t "$i" 2>/dev/null || warn "cannot kill pane $i"
+                    fi
+                done < <(live_panes "$wid")
+
+                if ((dryrun)); then
+                    echo "layout $wid <- saved"
+                else
+                    apply_layout "$wid" "$ord"
+                fi
+
+                while IFS=$'\t' read -r i cmd dir; do
+                    [[ -z "$i" || -z "$dir" ]] && continue
+                    case "$cmd" in
+                        zsh|bash|sh|fish|dash|ksh)
+                            if ((dryrun)); then
+                                echo "cd $dir  (pane $i)"
+                            else
+                                tmux send-keys -t "$i" -- "cd -- $(printf '%q' "$dir")" Enter
+                            fi ;;
+                        *) warn "pane $i runs '$cmd'; cwd left unchanged" ;;
+                    esac
+                done < <(pair_cwds "$wid" "$ord")
+            fi
+        else
+            # Window absent: create it with all its panes, then its layout.
+            local new_wid="" split_from=""
+            while IFS=$'\t' read -r i dir p_act; do
+                [[ -z "$i" ]] && continue
+                dir="$(pane_cwd "$dir")"
+                if ((i == 1)); then
+                    if ((dryrun)); then
+                        echo "add window $wname"
+                    else
+                        new_wid="$(tmux new-window -d -t "=$session" -n "$wname" -c "$dir" \
+                            -P -F '#{window_id}')" || { warn "cannot create window '$wname'"; break; }
+                        split_from="$(tmux list-panes -t "$new_wid" -F '#{pane_id}' | head -1)"
+                    fi
+                else
+                    if ((dryrun)); then
+                        echo "split $wname -> $dir"
+                    else
+                        tmux resize-pane -t "$split_from" -U 999 2>/dev/null
+                        split_from="$(tmux split-window -d -t "$split_from" -c "$dir" \
+                            -P -F '#{pane_id}')" || { warn "split failed in window '$wname'"; break; }
+                    fi
+                fi
+            done < <(saved_panes "$ord")
+
+            if ((n > 1)); then
+                if ((dryrun)); then
+                    echo "layout $wname <- saved"
+                else
+                    tmux select-layout -t "$new_wid" "$layout" \
+                        || warn "select-layout failed for window '$wname'"
+                fi
+            fi
+        fi
+    done
+
+    if ((replace)); then
+        local name
+        while IFS=$'\t' read -r wid name; do
+            [[ -z "$wid" ]] && continue
+            [[ -n "${ws_names[$name]:-}" ]] && continue
+            if ((dryrun)); then
+                echo "kill window $name"
+            else
+                tmux kill-window -t "$wid" 2>/dev/null || warn "cannot kill window '$name'"
+            fi
+        done < <(tmux list-windows -t "=$session" -F $'#{window_id}\t#{window_name}')
+    fi
+
+    ((dryrun)) || echo "Applied '$ws_name' to session '$session'"
+}
+
+# ---------------------------------------------------------------------------
+# list / show / delete
+# ---------------------------------------------------------------------------
+do_list() {
+    if [[ ! -d "$ws_dir" ]]; then
+        echo "(none)"; return 0
+    fi
+    local found=0 f nm wins panes stamp
+    for f in "$ws_dir"/*.conf; do
+        [[ -e "$f" ]] || continue
+        found=1
+        nm="$(basename "$f" .conf)"
+        wins="$(grep -c '^window' "$f" 2>/dev/null)"
+        panes="$(grep -c '^pane' "$f" 2>/dev/null)"
+        stamp="$(date -r "$f" '+%Y-%m-%d %H:%M' 2>/dev/null)"
+        printf '%-20s W:%-2d P:%-2d %s\n' "$nm" "${wins:-0}" "${panes:-0}" "$stamp"
+    done
+    ((found)) || echo "(none)"
+}
+
+do_show() {
+    require_workspace
+    parse_workspace
+    local w ord i cwd act
+    printf '%s%s\n' "$ws_name" "${ws_session:+  (saved from session: $ws_session)}"
+    for w in "${!win_name[@]}"; do
+        ord=$((w + 1))
+        printf '  window %d  %-20s %s panes=%s\n' "$ord" "${win_name[$w]}" \
+            "$([[ "${win_active[$w]:-}" == 1 ]] && printf '[active]' || printf '        ')" \
+            "$(count_saved_panes "$ord")"
+        while IFS=$'\t' read -r i cwd act; do
+            [[ -z "$i" ]] && continue
+            printf '    %d %s %s\n' "$i" "$cwd" \
+                "$([[ "$act" == 1 ]] && printf '*' || printf ' ')"
+        done < <(saved_panes "$ord")
+    done
+}
+
+do_delete() {
+    require_workspace
+    if ((dryrun)); then
+        echo "$ws_file"
+        return 0
+    fi
+    confirm "Delete workspace '$ws_name' ($ws_file)?"
+    rm -f "$ws_file" || die "cannot remove $ws_file"
+    echo "Deleted '$ws_name'"
+}
+
+case "$action" in
+    list)   do_list ;;
+    save)   do_save ;;
+    load)   do_load ;;
+    apply)  do_apply ;;
+    show)   do_show ;;
+    delete) do_delete ;;
+esac

@@ -56,9 +56,18 @@ Real examples on this machine:
   list so commands reachable through another parent (`ai-log`, `fgt-*`,
   `update-*`, …) do not appear twice. **Lookup and listing must agree** —
   when only the lookup knew about `$DIR`, a leaf resolved but never appeared
-  in `me tool -h`. `me-tool-tag`, `me-tool-sshfs` and `me-tool-tmux` are
-  plain leaves there; they used to be `me tag`, `me sshfs` and `me tmux`,
-  which is why they sit beside their dispatcher.
+  in `me tool -h`. `me-tool-tag` and `me-tool-sshfs` are plain leaves
+  there; they used to be `me tag` and `me sshfs`, which is why they sit
+  beside their dispatcher.
+- `me-tmux` is a dispatcher over `me-tmux-*` beside it in `~/script`. The
+  live-session actions (`ctl`, `mode`, `share`, `unshare`, `update`,
+  `kill`, `select`, `zoom`, `cmd`) all execute `me-tmux-ctl`: the seven
+  action names are **symlinks** to it and the action defaults from
+  `basename "$0"`. Symlinks rather than an alias table in the dispatcher
+  because nested completion never goes through the parent — the shell
+  adapter calls `me __complete "tmux-mode"`, `me` resolves that with
+  `command -v me-tmux-mode`, and only a real `PATH` entry completes.
+  `me-tmux-workspace` is a separate leaf.
 - `me-update-2fa` is reached both as `me update 2fa` and, from inside
   `me update repo`, as a helper: the parent asks it whether a 2FA code is
   needed before the first pull. A leaf does not have to be a leaf only.
@@ -82,7 +91,8 @@ me
 ├── clang       clang/lint helpers
 ├── fgt         (addr2line, build, conf, craddr, eco, pcap)
 ├── git         (add)
-├── tool        (conf-putty, sshfs, tag, tmux, trace)
+├── tmux        (ctl, mode, share, unshare, update, kill, select, zoom, cmd, workspace)
+├── tool        (conf-putty, sshfs, tag, trace)
 └── update      (2fa, dot, nvim, repo, share, wiki)
 ```
 
@@ -269,9 +279,10 @@ Two gotchas recorded from real failures:
 | Path | What it is |
 | --- | --- |
 | `~/script/me` | the dispatcher; hardcoded help list at the bottom |
-| `~/script/me-lib.sh` | `me_init` / `die` / `cleanup`; used by `me-tool-tag`, `me-tool-tmux`, `me-update-*` |
+| `~/script/me-lib.sh` | `me_init` / `die` / `cleanup`; used by `me-tool-tag`, `me-tmux-ctl`, `me-update-*` |
 | `~/script/me-<name>` | leaf or parent subcommands |
-| `~/script/me-tool-<name>` | `me tool` leaves beside the dispatcher: `tag`, `sshfs`, `tmux` (plain leaves) |
+| `~/script/me-tool-<name>` | `me tool` leaves beside the dispatcher: `tag`, `sshfs` (plain leaves) |
+| `~/script/me-tmux-<name>` | `me tmux` leaves beside the dispatcher: `ctl`, `workspace`; the action names are symlinks to `me-tmux-ctl` |
 | `~/dotwiki/tool/` | second `PATH` directory: `me-ai-log`, `me-update-2fa`, `me-update-share`, `me-conf-putty`, `me-fgt-*` |
 | `~/script/me-fgt-*` | `me fgt` leaves beside their dispatcher: `conf`, `build` |
 | `~/script/me-tool-trace/` | `me tool trace`, Flat+Dir; `trace.py` reads `ME_TRACE_CONFIG_DIR` (default `~/dotwiki/config`) |
@@ -302,8 +313,9 @@ and additionally as `me tool <leaf>` if it sits in `~/dotwiki/tool`.
 | `me tool conf-putty` | `~/dotwiki/tool/me-conf-putty` |
 | `me tool sshfs` | `~/script/me-tool-sshfs` |
 | `me tool tag` | `~/script/me-tool-tag` |
-| `me tool tmux` | `~/script/me-tool-tmux` |
 | `me tool trace` | `~/script/me-tool-trace/_main_` (+ `trace.py`) |
+| `me tmux ctl` | `~/script/me-tmux-ctl` (also `mode`, `share`, `unshare`, `update`, `kill`, `select`, `zoom`, `cmd` via symlinks) |
+| `me tmux workspace` | `~/script/me-tmux-workspace` |
 | `me update 2fa` | `~/dotwiki/tool/me-update-2fa` |
 | `me update dot` | `~/script/me-update-dot` |
 | `me update nvim` | `~/script/me-update-nvim` |

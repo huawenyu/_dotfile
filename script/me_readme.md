@@ -59,7 +59,8 @@ me              # Top-level commands
 ├── clang       # Clang-related helpers
 ├── fgt         # FortiGate tools (addr2line, build, conf, craddr, eco, pcap)
 ├── git         # Git helpers (add)
-├── tool        # Miscellaneous tools (config-putty, sshfs, tag, tmux, trace)
+├── tmux        # Tmux helpers (ctl, mode, share, workspace)
+├── tool        # Miscellaneous tools (config-putty, sshfs, tag, trace)
 └── update      # Update utilities (2fa, dot, nvim, repo, share, wiki)
 ```
 

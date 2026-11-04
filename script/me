@@ -134,7 +134,8 @@ COMPEOF
         echo "  clang           Clang-related helpers"
         echo "  fgt             FortiGate tools (addr2line, build, conf, craddr, eco, pcap)"
         echo "  git             Git helpers (add)"
-        echo "  tool            Miscellaneous tools (config-putty, sshfs, tag, tmux, trace)"
+        echo "  tmux            Tmux helpers (ctl, mode, share, workspace)"
+        echo "  tool            Miscellaneous tools (config-putty, sshfs, tag, trace)"
         echo "  update          Update utilities (2fa, dot, nvim, repo, share, wiki)"
         echo
         echo "Run '$SELF help <command>' for details."; echo
