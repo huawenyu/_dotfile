@@ -131,3 +131,10 @@ export NVM_DIR="$HOME/.nvm"
 
 # FOS AI
 source "$HOME/.fos-exp-ai/bin/env.sh"
+
+# bun completions
+[ -s "/home/hyu/.bun/_bun" ] && source "/home/hyu/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"

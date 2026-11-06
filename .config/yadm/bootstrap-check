@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Usage: bootstrap check <command> [options]
+#        bootstrap check install [--nix|--apt] <tool>[,<tool>...]
 # Summary: Check/install required tools
 #
 # Commands:
 #   help      Show this help (same as running 'check' with no command)
-#   list      List every tool and its category, apt/nix package and purpose
+#   list      List tools, install status, apt/nix packages and purpose
 #   status    Check the tools and print the table; exits 1 if any required tool is missing
-#   install   Skip the table and prompt for each missing tool (y=install / s=skip / e=exit)
+#   install   Install missing tools, optionally only a comma-separated selection
 #
 # Options:
 #   --dev         Include the optional 'devtools' category (default: excluded)
@@ -17,6 +18,9 @@
 #   --nix         Only offer nix
 #   --yes         Non-interactive: install every missing tool with the preferred manager
 #   --dryrun, -n  Print the commands that would run; make no changes
+#
+# Example:
+#   bootstrap check install --nix eza,broot,tig
 
 # Note: deliberately no 'set -e' — 'read' returns non-zero on EOF/non-tty and
 # would abort the install loop (same reason as bootstrap-init).
@@ -28,6 +32,15 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/bootstraplib"
+
+# Color only for terminals; NO_COLOR and redirected output stay machine-friendly.
+colorCyan='\e[36m'
+colorBold='\e[1m'
+colorDim='\e[2m'
+if [[ ! -t 1 || -n "${NO_COLOR:-}" ]]; then
+    colorRed=; colorGreen=; colorYellow=; colorCyan=
+    colorBold=; colorDim=; colorReset=
+fi
 
 # ── Tool table ────────────────────────────────────────────────────────────────
 # fields: bins | apt pkg | nix attr | category | why | notes
@@ -45,6 +58,8 @@ TOOLS=(
     'fd,fdfind|fd-find|fd|search|file finder|'
     'bat,batcat|bat|bat|search|viewer; ftIDE|'
     'jq|jq|jq|search|JSON; script/me-clang|'
+    'eza|eza|eza|search|modern ls replacement|nix preferred'
+    'broot|broot|broot|search|interactive directory tree|nix preferred'
     # editor & tooling
     'nvim|neovim|neovim|editor|editor; bootstrap-init/update, ftIDE|'
     'cscope|cscope|cscope|editor|C symbol DB; script/me-tag|'
@@ -58,6 +73,7 @@ TOOLS=(
     # version control
     'yadm|yadm|yadm|vcs|dotfiles; bin/yadm|apt 3.2.2, nix 3.5.0'
     'difft|-|difftastic|vcs|structural diff|nix only'
+    'tig|tig|tig|vcs|interactive Git TUI; .tigrc|nix preferred'
     # network & remote
     'autossh|autossh|autossh|net|ftCommon|'
     'sshpass|sshpass|sshpass|net|ftCommon, script/lib/connect.exp|'
@@ -107,6 +123,7 @@ ALLOW_APT=1
 ALLOW_NIX=1
 ASSUME_YES=
 DRYRUN=
+TOOL_SELECT=()
 
 is_mode() {
     case "$1" in
@@ -134,6 +151,14 @@ while [[ $# -gt 0 ]]; do
         *)
             if is_mode "$1"; then
                 MODE="$1"; shift
+            elif [[ "$MODE" == "install" ]]; then
+                if [[ -z "$1" || "$1" == ,* || "$1" == *, || "$1" == *,,* ]]; then
+                    echo "Invalid tool list '$1'; use comma-separated names." >&2
+                    exit 1
+                fi
+                IFS=',' read -r -a _requested <<< "$1"
+                TOOL_SELECT+=("${_requested[@]}")
+                shift
             else
                 echo "Unknown command '$1'." >&2
                 echo "Run 'bootstrap check help' for usage." >&2
@@ -175,6 +200,40 @@ probe() {
     return 1
 }
 
+tool_selected() {
+    local wanted bin
+    [[ ${#TOOL_SELECT[@]} -eq 0 ]] && return 0
+    for wanted in "${TOOL_SELECT[@]}"; do
+        for bin in "${f_bins[@]}"; do
+            [[ "$wanted" == "$bin" ]] && return 0
+        done
+    done
+    return 1
+}
+
+validate_tool_select() {
+    local wanted row bin found
+    local valid=()
+    for row in "${TOOLS[@]}"; do
+        parse_row "$row"
+        valid+=("${f_bins[0]}")
+    done
+    for wanted in "${TOOL_SELECT[@]}"; do
+        found=
+        for row in "${TOOLS[@]}"; do
+            parse_row "$row"
+            for bin in "${f_bins[@]}"; do
+                [[ "$wanted" == "$bin" ]] && { found=1; break 2; }
+            done
+        done
+        if [[ -z "$found" ]]; then
+            echo "Unknown tool '$wanted'." >&2
+            echo "Valid tools: ${valid[*]}" >&2
+            exit 1
+        fi
+    done
+}
+
 # short version string for an installed tool
 tool_version() {
     local v
@@ -207,34 +266,77 @@ row_status() {
 # ── Renderer ──────────────────────────────────────────────────────────────────
 TABLE_W=88
 
-# 'list': the raw table fields, grouped by category, no status probing
+# 'list': package choices, grouped by category unless --flat is requested.
+render_list_header() {
+    if [[ -n "$FLAT" ]]; then
+        printf '    %b%-12s %-7s %-9s %-18s %-18s %s%b\n' \
+            "$colorBold" TOOL STATUS CATEGORY APT NIX WHY "$colorReset"
+    else
+        printf '    %b%-12s %-7s %-18s %-18s %s%b\n' \
+            "$colorBold" TOOL STATUS APT NIX WHY "$colorReset"
+    fi
+}
+
+render_list_row() {
+    local row_missing="${1:-}"
+    local tool_color="$colorBold" status="ok" status_color="$colorGreen"
+    if [[ -n "$row_missing" ]]; then
+        tool_color="$colorYellow$colorBold"
+        status="MISS"
+        status_color="$colorYellow"
+    fi
+    local apt_color="$colorYellow" nix_color="$colorGreen"
+    [[ "$f_apt" == "-" ]] && apt_color="$colorDim"
+    [[ "$f_nix" == "-" ]] && nix_color="$colorDim"
+
+    printf '    %b%-12s%b %b%-7s%b ' \
+        "$tool_color" "${f_bins[0]}" "$colorReset" \
+        "$status_color" "$status" "$colorReset"
+    [[ -n "$FLAT" ]] && printf '%-9s ' "$f_cat"
+    printf '%b%-18s%b %b%-18s%b %s' \
+        "$apt_color" "$f_apt" "$colorReset" \
+        "$nix_color" "$f_nix" "$colorReset" "$f_why"
+    [[ -n "$f_note" ]] && printf ' %b[%s]%b' "$colorDim" "$f_note" "$colorReset"
+    printf '\n'
+}
+
 render_list() {
-    local c row first=1
+    local c row first=1 count=0 uninstalled=0 any row_missing
+    [[ -n "$FLAT" ]] && render_list_header
+
     for c in "${CATS[@]}"; do
         [[ -n "$ONLY_CAT" && "$c" != "$ONLY_CAT" ]] && continue
-        local any=
+        any=
         for row in "${TOOLS[@]}"; do
             parse_row "$row"
             [[ "$f_cat" == "$c" ]] && { any=1; break; }
         done
         [[ -z "$any" ]] && continue
 
-        [[ $first -eq 0 ]] && echo
-        first=0
-        echo "  ── $(cat_title "$c") ──"
-        printf '  %-12s %-18s %-18s %s\n' TOOL APT NIX WHY
+        if [[ -z "$FLAT" ]]; then
+            [[ $first -eq 0 ]] && echo
+            printf '  %b── %s ──%b\n' "$colorCyan$colorBold" "$(cat_title "$c")" "$colorReset"
+            [[ $first -eq 1 ]] && render_list_header
+            first=0
+        fi
         for row in "${TOOLS[@]}"; do
             parse_row "$row"
             [[ "$f_cat" == "$c" ]] || continue
-            local spec_apt="$f_apt" spec_nix="$f_nix"
-            [[ "$spec_apt" == "-" ]] && spec_apt="-"
-            [[ "$spec_nix" == "-" ]] && spec_nix="-"
-            local why="$f_why"
-            [[ -n "$f_note" ]] && why="$why [$f_note]"
-            printf '  %-12s %-18s %-18s %s\n' \
-                "${f_bins[0]}" "$spec_apt" "$spec_nix" "$why"
+            row_missing=
+            probe || row_missing=1
+            [[ -n "$row_missing" ]] && uninstalled=$((uninstalled + 1))
+            render_list_row "$row_missing"
+            count=$((count + 1))
         done
     done
+
+    local uninstalled_color="$colorGreen"
+    (( uninstalled > 0 )) && uninstalled_color="$colorYellow"
+    printf '\n  %b%d tools listed%b · %d installed · %b%d uninstalled%b\n' \
+        "$colorBold" "$count" "$colorReset" "$((count - uninstalled))" \
+        "$uninstalled_color" "$uninstalled" "$colorReset"
+    printf '  Install: %byadm bootstrap check install --nix%b  %b(n = nix, s = skip, e = exit)%b\n' \
+        "$colorGreen" "$colorReset" "$colorDim" "$colorReset"
 }
 
 render_table() {
@@ -360,9 +462,8 @@ if [[ "$MODE" == "help" ]]; then
     exit 0
 fi
 
-# 'list' — every tool and its packages/purpose, no status
+# 'list' — every tool, its install status and packages/purpose; --flat keeps one table.
 if [[ "$MODE" == "list" ]]; then
-    FLAT=1
     render_list
     exit 0
 fi
@@ -378,17 +479,19 @@ fi
 [[ "$MODE" == "status" ]] && render_table ${WITH_VERSIONS:+1}
 
 # build the queue: missing, non-manual rows in category order, devtools gated
+validate_tool_select
 QUEUE=()
 have_dev_skip=0
 for c in "${CATS[@]}"; do
     [[ -n "$ONLY_CAT" && "$c" != "$ONLY_CAT" ]] && continue
-    if [[ "$c" == "devtools" && -z "$WITH_DEV" ]]; then
+    if [[ "$c" == "devtools" && -z "$WITH_DEV" && ${#TOOL_SELECT[@]} -eq 0 ]]; then
         have_dev_skip=1
         continue
     fi
     for row in "${TOOLS[@]}"; do
         parse_row "$row"
         [[ "$f_cat" == "$c" ]] || continue
+        tool_selected || continue
         probe && continue
         [[ "$f_apt" == "-" && "$f_nix" == "-" ]] && continue
         [[ "$f_nix" == "-" && -z "$ALLOW_APT" ]] && continue
@@ -399,7 +502,11 @@ done
 
 if [[ ${#QUEUE[@]} -eq 0 ]]; then
     echo
-    echo "  All required tools are installed."
+    if [[ ${#TOOL_SELECT[@]} -gt 0 ]]; then
+        echo "  No selected tools to install with the current options."
+    else
+        echo "  All required tools are installed."
+    fi
     exit 0
 fi
 
@@ -538,7 +645,11 @@ for row in "${QUEUE[@]}"; do
 done
 
 if [[ ${#remaining[@]} -eq 0 ]]; then
-    echo "  Done — all required tools are installed."
+    if [[ ${#TOOL_SELECT[@]} -gt 0 ]]; then
+        echo "  Done — all selected tools are installed."
+    else
+        echo "  Done — all required tools are installed."
+    fi
     [[ $have_dev_skip -eq 1 ]] && echo "  (DevTools were not offered; use --dev to include them.)"
     exit 0
 fi
