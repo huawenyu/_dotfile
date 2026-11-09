@@ -1,23 +1,26 @@
 #!/usr/bin/env bash
-# Usage: me git add [-n] [-C <dir>] [-- <pathspec>...]
-# Summary: Stage every non-ignored change in the repo; never commits
+# Usage: me git add [-n] [-C <dir>] [--tool <name>] [-- <pathspec>...]
+# Summary: Stage non-ignored changes; optionally list related new files
 
 # me API
 case "${1:-}" in
-    --summary) echo "Stage every non-ignored change in the repo; never commits"; exit 0 ;;
+    --summary) echo "Stage non-ignored changes; optionally list related new files"; exit 0 ;;
     --complete|__complete)
-        printf '%s\n' --help -h -n --dryrun -C --
+        printf '%s\n' --help -h -n --dryrun -C --tool --
         exit 0 ;;
     -h|--help)
-        echo "Usage: me git add [-n] [-C <dir>] [-- <pathspec>...]"
+        echo "Usage: me git add [-n] [-C <dir>] [--tool <name>] [-- <pathspec>...]"
         echo "  Stages every non-ignored change (new, modified, deleted) with"
         echo "  'git add -A', then prints git status --short. Never commits, never"
         echo "  resets, never touches the working tree, never uses 'git add -f'."
         echo ""
-        echo "  -n, --dryrun   Show what would be staged; stage nothing"
+        echo "  -n, --dryrun   Show M/A/D flags for changes; stage nothing"
         echo "  -C <dir>       Run as if started in <dir>. A relative <dir> is taken"
         echo "                 from the previous -C target (the cwd for the first),"
         echo "                 exactly like repeated git -C"
+        echo "  --tool <name>  Use a git-compatible tool (e.g. yadme); list related new files"
+        echo "                 At \$HOME or /, an implicit '.' uses only changed paths;"
+        echo "                 other related-directory scans have a 6s timeout"
         echo "  --             Everything after this is a pathspec, relative to the"
         echo "                 working directory git finally sees (after -C)"
         echo ""
@@ -35,10 +38,10 @@ trap 'cd "$var_WorkDir" 2>/dev/null || true' EXIT
 
 die() { local code="${1:-1}"; shift; echo "me git add: $*" >&2; exit "$code"; }
 
-command -v git >/dev/null 2>&1 || die 1 "git not found."
-
 dryrun=0
 target="$var_WorkDir"
+tool=""
+git_cmd=(git)
 specs=()
 
 # Parse options; everything after "--" is a pathspec.
@@ -51,23 +54,41 @@ while (( $# > 0 )); do
             target="$(cd "$target" && cd "$2" 2>/dev/null && pwd -P)" \
                 || die 1 "cannot change to '$2'."
             shift 2 ;;
+        --tool|--tool=*)
+            if [[ "$1" == "--tool" ]]; then
+                [[ $# -ge 2 ]] || die 1 "--tool requires an executable name."
+                tool="$2"
+                shift 2
+            else
+                tool="${1#--tool=}"
+                [[ -n "$tool" ]] || die 1 "--tool requires an executable name."
+                shift
+            fi
+            tool_path="$(command -v "$tool" 2>/dev/null)" \
+                || die 1 "tool not found: $tool"
+            git_cmd=("$tool_path") ;;
         --) shift; specs+=("$@"); break ;;
         -*) die 1 "unknown option '$1'. Run 'me git add -h'." ;;
         *)  specs+=("$1"); shift ;;
     esac
 done
-(( ${#specs[@]} > 0 )) || specs=(".")
+command -v "${git_cmd[0]}" >/dev/null 2>&1 || die 1 "${tool:-git} not found."
+default_specs=0
+if (( ${#specs[@]} == 0 )); then
+    specs=(".")
+    default_specs=1
+fi
 
 # The top level of the work tree containing the target directory. Every later
 # git call runs with -C "$top", never -C "$target", so the index is the same
 # one git would use from any depth.
-top="$(git -C "$target" rev-parse --show-toplevel 2>/dev/null)" \
+top="$("${git_cmd[@]}" -C "$target" rev-parse --show-toplevel 2>/dev/null)" \
     || die 1 "'$var_WorkDir' is not inside a git working tree."
 
 # A pathspec is relative to the directory the user is in, but git resolves it
 # against the top level once it runs with -C "$top". Re-base each spec by the
 # target's prefix inside the work tree; ":" magic is already top-relative.
-prefix="$(git -C "$target" rev-parse --show-prefix 2>/dev/null || true)"
+prefix="$("${git_cmd[@]}" -C "$target" rev-parse --show-prefix 2>/dev/null || true)"
 translated=()
 for s in "${specs[@]}"; do
     case "$s" in
@@ -77,8 +98,77 @@ for s in "${specs[@]}"; do
     esac
 done
 
+# Collect changed paths before staging so a broad alternate-tool work tree
+# (notably yadm's $HOME) never needs an implicit whole-tree 'add -- .'.
+changed_paths=()
+related_dirs=()
+limited_to_diff=0
+if [[ -n "$tool" ]]; then
+    command -v lsdiff >/dev/null 2>&1 \
+        || die 1 "lsdiff not found; install patchutils or omit --tool."
+
+    diff_out="$("${git_cmd[@]}" -C "$top" -c color.ui=false \
+        diff --no-ext-diff --default-prefix --)" \
+        || die 1 "$tool diff failed."
+    changed_out="$(printf '%s\n' "$diff_out" | lsdiff --strip=1)" \
+        || die 1 "could not parse $tool diff with lsdiff."
+
+    declare -A seen_dirs=()
+    while IFS= read -r path; do
+        [[ -n "$path" && "$path" != "/dev/null" ]] || continue
+        changed_paths+=("$path")
+        dir="${path%/*}"
+        [[ "$dir" == "$path" ]] && dir="."
+        [[ -z "$dir" ]] && dir="/"
+        # A top-level change must not trigger a recursive scan of / or $HOME.
+        if [[ "$dir" == "." || "$dir" == "/" || "$dir" == "$HOME" \
+            || "$dir" == "~" || "$dir" == "~/" ]]; then
+            continue
+        fi
+        [[ -n "${seen_dirs[$dir]:-}" ]] && continue
+        seen_dirs[$dir]=1
+        related_dirs+=("$dir")
+    done <<< "$changed_out"
+
+    if (( default_specs )) && [[ "$top" == "/" || "$top" == "$HOME" ]]; then
+        translated=("${changed_paths[@]}")
+        limited_to_diff=1
+        echo "me git add: broad root $top; using changed paths from $tool diff instead of '.'."
+    fi
+
+    if (( ${#related_dirs[@]} > 0 )); then
+        command -v timeout >/dev/null 2>&1 \
+            || die 1 "timeout not found; install GNU coreutils or omit --tool."
+        related_chunks=()
+        for dir in "${related_dirs[@]}"; do
+            rc=0
+            dir_out="$(timeout 6s "${git_cmd[@]}" -C "$top" ls-files \
+                --others --exclude-standard -- "$dir")" || rc=$?
+            if (( rc == 124 )); then
+                printf "me git add: timeout after 6s; exempting related directory '%s'.\n" \
+                    "$dir" >&2
+                continue
+            elif (( rc != 0 )); then
+                die "$rc" "$tool ls-files failed for related directory '$dir'."
+            fi
+            [[ -n "$dir_out" ]] && related_chunks+=("$dir_out")
+        done
+
+        if (( ${#related_chunks[@]} > 0 )); then
+            related_out="$(printf '%s\n' "${related_chunks[@]}" | sort -u)"
+            echo "me git add: potential new files in changed directories ($tool; informational):"
+            while IFS= read -r path; do
+                printf '  %s\n' "$path"
+            done <<< "$related_out"
+        fi
+    fi
+fi
+
 rc=0
-out="$(git -C "$top" add -A --dry-run -- "${translated[@]}" 2>&1)" || rc=$?
+out=""
+if (( ${#translated[@]} > 0 )); then
+    out="$("${git_cmd[@]}" -C "$top" add -A --dry-run -- "${translated[@]}" 2>&1)" || rc=$?
+fi
 if (( rc != 0 )); then
     printf '%s\n' "$out" >&2
     case "$out" in
@@ -92,20 +182,46 @@ if (( rc != 0 )); then
 fi
 
 if (( dryrun )); then
-    [[ -n "$out" ]] && printf '%s\n' "$out"
+    if [[ -n "$out" ]]; then
+        # The add dry-run says only "add" for both new and modified files.
+        # Porcelain status distinguishes those actions; X-only entries are
+        # already staged and therefore absent from the add dry-run.
+        status_out="$("${git_cmd[@]}" -C "$top" -c color.ui=false status \
+            --short --untracked-files=all -- "${translated[@]}")" \
+            || die 1 "${tool:-git} status failed during dry-run."
+        echo "me git add: dry-run changes (M=modify, A=add, D=delete):"
+        while IFS= read -r line; do
+            (( ${#line} >= 3 )) || continue
+            xy="${line:0:2}"
+            path="${line:3}"
+            worktree_flag="${xy:1:1}"
+            if [[ "$xy" == "??" ]]; then
+                flag="A"
+            elif [[ "$worktree_flag" != " " ]]; then
+                flag="$worktree_flag"
+            else
+                continue
+            fi
+            printf '%s  %s\n' "$flag" "$path"
+        done <<< "$status_out"
+    fi
     echo "me git add: nothing was staged (-n)."
     exit 0
 fi
 
 if [[ -z "$out" ]]; then
-    echo "me git add: nothing to stage; the index already matches the working tree."
+    if (( limited_to_diff )); then
+        echo "me git add: no changed paths in $tool diff; broad root was not scanned."
+    else
+        echo "me git add: nothing to stage; the index already matches the working tree."
+    fi
     exit 0
 fi
 
 n="$(printf '%s\n' "$out" | wc -l | tr -d ' ')"
-git -C "$top" add -A -- "${translated[@]}" || exit 1
+"${git_cmd[@]}" -C "$top" add -A -- "${translated[@]}" || exit 1
 echo "me git add: staged $n path(s). Review with: git diff --cached --stat"
 echo "me git add: nothing was committed."
 echo
 echo "--- git status --short ---"
-git -C "$top" status --short
+"${git_cmd[@]}" -C "$top" status --short

@@ -139,6 +139,11 @@ COMPEOF
         echo "  update          Update utilities (2fa, dot, nvim, repo, share, wiki)"
         echo
         echo "Run '$SELF help <command>' for details."; echo
+        echo "Command family tree:"
+        if p="$(find_subcmd doc)"; then
+            "$p" --tree
+        fi
+        echo
         echo "Script: ${BASH_SOURCE[0]}"; exit 0 ;;
 esac
 

@@ -1,19 +1,74 @@
 #!/usr/bin/env bash
-# Usage: me doc
+# Usage: me doc [--tree]
 # Summary: Me-family reference: layout, hidden API, how to add one
+
+# Print the live dispatcher tree; leaf summaries become human-readable comments.
+me_doc_is_dispatcher() {
+    local slug="${1// /-}"
+    local script
+    script="$(command -v "$slug" 2>/dev/null)" || return 1
+    [[ -f "$script" ]] || return 1
+    # Do not probe leaves with __commands: older leaves treat unknown tokens
+    # as normal input and may execute their real operation.
+    grep -qE '^[[:space:]]*__commands\)' "$script"
+}
+
+me_doc_tree_level() {
+    local prefix="$1"
+    local indent="$2"
+    local depth="${3:-0}"
+    (( depth < 8 )) || return 0
+    me_doc_is_dispatcher "$prefix" || return 0
+
+    local -a invocation=()
+    local -a children=()
+    read -r -a invocation <<< "$prefix"
+    local output
+    output="$("${invocation[@]}" __commands 2>/dev/null || true)"
+    [[ -n "$output" ]] || return 0
+    mapfile -t children <<< "$output"
+
+    local i child summary branch next_indent
+    for i in "${!children[@]}"; do
+        child="${children[$i]}"
+        [[ -n "$child" ]] || continue
+        summary="$("${invocation[@]}" __help "$child" 2>/dev/null || true)"
+        if (( i + 1 == ${#children[@]} )); then
+            branch='└── '
+            next_indent="${indent}    "
+        else
+            branch='├── '
+            next_indent="${indent}│   "
+        fi
+        printf '%s%s%s' "$indent" "$branch" "$child"
+        printf ' — %s\n' "${summary:-no summary}"
+        me_doc_tree_level "$prefix $child" "$next_indent" "$((depth + 1))"
+    done
+}
+
+me_doc_print_tree() {
+    printf '%s\n' me
+    me_doc_tree_level me "" 0
+}
 
 # me API
 case "${1:-}" in
     --summary) echo "Me-family reference: layout, hidden API, how to add one"; exit 0 ;;
     --complete|__complete)
-        printf '%s\n' --help -h
+        printf '%s\n' --help -h --tree
+        exit 0 ;;
+    --tree)
+        me_doc_print_tree
         exit 0 ;;
     -h|--help)
-        echo "Usage: me doc"
+        echo "Usage: me doc [--tree]"
         echo ""
-        echo "  Prints the layout, the hidden API, both templates, the checklist for"
-        echo "  adding a subcommand, and where each piece lives on this machine."
-        echo "  Takes no arguments."
+        echo "  Without arguments, prints the full me-family reference for AI agents."
+        echo "  -h, --help  Show this help and the command family tree"
+        echo "  --tree      Print only the command family tree"
+        echo ""
+        echo "Command family tree:"
+        me_doc_print_tree
         echo ""
         echo "Script: ${BASH_SOURCE[0]}"
         exit 0 ;;
